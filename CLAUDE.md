@@ -52,6 +52,17 @@ resume o que importa para o código. Na dúvida sobre uma regra, pergunte antes 
 
 Pronto, com dados de exemplo fixos: Minhas turmas, Turma › Grafo e Nova atividade (lado do professor).
 
+Nova atividade integrada à função (item 3 da entrega), testada no emulador (celular e tablet):
+- "Gerar atividade" envia o PDF de `files/materiais/` via `data/GeracaoRepositorio` (supabase-kt
+  3.1.4 functions + Ktor OkHttp; timeout 160 s). Com origem "Conceitos do grafo" fica desabilitado
+  com o motivo. Quantidade padrão 5, máximo 10.
+- `ui/NovaAtividadeViewModel`: Ocioso → Gerando(segundos) → Concluido | Erro (cota, IA sobrecarregada,
+  tempo esgotado, sem conexão, outro). Etapa 3 em `ui/GerandoAtividade.kt`, etapa 4 (Revisão, só
+  leitura) em `ui/RevisaoAtividade.kt`; LaTeX vira texto legível em `ui/TextoLatex.kt` (com testes).
+- O estado do formulário vive em `remember` no topo da `NovaAtividadeScreen` (sobrevive a
+  Gerando/Erro/Revisão, mas não à recriação da Activity, assim como a navegação do `EdutecApp`).
+- supabase-kt ≥ 3.2 exige Kotlin ≥ 2.2: não atualizar sem subir o Kotlin.
+
 Back-end (Supabase, projeto `vuxnyjkykftecqgznswg`, em `supabase/`):
 - Edge Function `gerar-atividade` (deploy feito): recebe PDF multipart (até 20 MB) + `quantidade`,
   `formato`, `dificuldade`; salva no bucket privado `materiais`; pede conceitos e questões ao Gemini
@@ -66,7 +77,7 @@ Back-end (Supabase, projeto `vuxnyjkykftecqgznswg`, em `supabase/`):
   raciocínio `low` (~85 s com o padrão do modelo, `medium`, sem ganho visível de qualidade).
   Perto do limite de 150 s; com mais questões, dividir as chamadas (ver TODO).
 
-Ainda não existe: integração do app com a função, login, RLS, lado do aluno, etapas Gerando/Revisão/Publicar.
+Ainda não existe: login, RLS, lado do aluno, edição na Revisão, etapa Publicar, gerar a partir do grafo.
 
 ## Próxima entrega (21/10/2026) — atividade da 1ª VA
 
