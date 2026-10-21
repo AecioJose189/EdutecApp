@@ -61,7 +61,7 @@ Back-end (Supabase, projeto `vuxnyjkykftecqgznswg`, em `supabase/`):
 - Autenticação: `verify_jwt = false`; a função aceita só a chave pública do projeto no cabeçalho
   `apikey` (publishable ou legacy anon). Qualquer um com o APK pode gastar a cota do Gemini.
 - Teste: `scripts/testar-geracao.sh [pdf]` (URL e chave pública em `local.properties`:
-  `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`) → `amostras/resultado.json` (pasta fora do git).
+  `SUPABASE_URL`, `SUPABASE_CHAVE_PUBLICA`) → `amostras/resultado.json` (pasta fora do git).
 - Testado de ponta a ponta com PDF real (2,5 MB, 5 questões mistas): ~67 s dentro da função com
   raciocínio `low` (~85 s com o padrão do modelo, `medium`, sem ganho visível de qualidade).
   Perto do limite de 150 s; com mais questões, dividir as chamadas (ver TODO).

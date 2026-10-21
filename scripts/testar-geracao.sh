@@ -7,8 +7,9 @@
 #   formato      multipla_escolha | aberta | mista (padrão mista)
 #   dificuldade  facil | media | dificil (padrão media)
 #
-# URL e chave pública (publishable ou anon) vêm das variáveis SUPABASE_URL e
-# SUPABASE_PUBLISHABLE_KEY (ou SUPABASE_ANON_KEY), ou das mesmas chaves em local.properties.
+# URL e chave pública (publishable ou anon) vêm das variáveis SUPABASE_URL e SUPABASE_CHAVE_PUBLICA
+# (ou SUPABASE_PUBLISHABLE_KEY / SUPABASE_ANON_KEY), ou de SUPABASE_URL e SUPABASE_CHAVE_PUBLICA
+# em local.properties (as mesmas que o app lê).
 set -euo pipefail
 export LC_NUMERIC=C  # ponto decimal no printf, mesmo com locale pt_BR
 
@@ -20,12 +21,11 @@ ler_propriedade() {
 }
 
 url="${SUPABASE_URL:-$(ler_propriedade SUPABASE_URL)}"
-chave="${SUPABASE_PUBLISHABLE_KEY:-${SUPABASE_ANON_KEY:-}}"
-chave="${chave:-$(ler_propriedade SUPABASE_PUBLISHABLE_KEY)}"
-chave="${chave:-$(ler_propriedade SUPABASE_ANON_KEY)}"
+chave="${SUPABASE_CHAVE_PUBLICA:-${SUPABASE_PUBLISHABLE_KEY:-${SUPABASE_ANON_KEY:-}}}"
+chave="${chave:-$(ler_propriedade SUPABASE_CHAVE_PUBLICA)}"
 
 if [ -z "$url" ] || [ -z "$chave" ]; then
-  echo "Defina SUPABASE_URL e SUPABASE_PUBLISHABLE_KEY (no ambiente ou em local.properties)." >&2
+  echo "Defina SUPABASE_URL e SUPABASE_CHAVE_PUBLICA (no ambiente ou em local.properties)." >&2
   exit 1
 fi
 
