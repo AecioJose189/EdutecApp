@@ -2,17 +2,19 @@ package com.edutec.app.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.edutec.app.data.DadosExemplo
 import com.edutec.app.data.Turma
 
 /**
- * Navegação simples por estado: Minhas turmas → Turma → Nova atividade.
- * O botão "voltar" do Android volta uma tela.
+ * Navegação simples por estado: Minhas turmas → Turma → Nova atividade (Origem/Formato → Gerando → Revisão).
+ * O botão "voltar" do Android volta uma tela ou uma etapa.
  */
 @Composable
 fun EdutecApp() {
@@ -37,11 +39,21 @@ fun EdutecApp() {
         }
 
         else -> {
-            BackHandler { novaAtividade = null }
+            val geracao: NovaAtividadeViewModel = viewModel()
+            val estado by geracao.estado.collectAsState()
+            val fechar = {
+                geracao.voltar() // cancela uma geração em andamento
+                novaAtividade = null
+            }
+            BackHandler { if (estado == EstadoGeracao.Ocioso) fechar() else geracao.voltar() }
             NovaAtividadeScreen(
                 turma = turma,
                 conceitosIniciais = conceitosIniciais,
-                onFechar = { novaAtividade = null },
+                onFechar = fechar,
+                estado = estado,
+                onGerar = geracao::gerar,
+                onTentarDeNovo = geracao::tentarDeNovo,
+                onVoltar = geracao::voltar,
             )
         }
     }
