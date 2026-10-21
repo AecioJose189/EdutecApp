@@ -5,14 +5,20 @@
 //   quantidade   1–10 (padrão 5)
 //   formato      multipla_escolha | aberta | mista (padrão mista)
 //   dificuldade  facil | media | dificil (padrão media)
+//   forcar_nova  "true" para gerar de novo mesmo havendo resultado salvo (padrão false)
 //
-// Saída 200: { conceitos, questoes, arquivo, modelo, nivel_raciocinio, tokens, duracao_ms }
+// Saída 200: { conceitos, questoes, arquivo, modelo, nivel_raciocinio, tokens, duracao_ms,
+//              reaproveitado, gerado_em }
+//
+// RN12 (cada PDF é processado uma vez): o PDF é identificado pelo SHA-256 e salvo como
+// pdfs/<hash>.pdf. Se já houver na tabela `geracoes` um resultado para o mesmo hash e os mesmos
+// parâmetros, ele volta na hora, sem chamar o Gemini, com reaproveitado = true.
 // Erro:      { erro: "..." } com status 4xx/5xx.
 //
 // Autenticação: verify_jwt = false (config.toml), porque a chave publishable (sb_publishable_...)
 // não é JWT. A função confere aqui mesmo se o cabeçalho `apikey` é uma chave pública do projeto.
 
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { ErroGemini, gerarJsonComPdf } from "../_shared/gemini.ts";
 
 const TAMANHO_MAXIMO = 20 * 1024 * 1024;
@@ -49,6 +55,11 @@ interface Atividade {
   conceitos: Conceito[];
   questoes: Questao[];
 }
+/** O que fica salvo em geracoes.resultado. */
+interface ResultadoSalvo extends Atividade {
+  nivel_raciocinio: string;
+  tokens: unknown;
+}
 
 class ErroPedido extends Error {
   constructor(message: string, readonly status: number) {
@@ -66,15 +77,35 @@ Deno.serve(async (req) => {
       return erro("Chave de API ausente ou inválida (envie a chave pública do Supabase em `apikey`).", 401);
     }
 
-    const { pdf, quantidade, formato, dificuldade } = await lerFormulario(req);
+    const { pdf, quantidade, formato, dificuldade, forcarNova } = await lerFormulario(req);
+    const hash = await sha256(pdf);
+    const caminho = `pdfs/${hash}.pdf`;
+    const supabase = clienteServico();
+    const parametros = { hash_pdf: hash, quantidade, formato, dificuldade };
 
-    const caminho = `pdfs/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.pdf`;
+    if (!forcarNova) {
+      const salvo = await buscarGeracao(supabase, parametros);
+      if (salvo) {
+        return json({
+          conceitos: salvo.resultado.conceitos,
+          questoes: salvo.resultado.questoes,
+          arquivo: `${BUCKET}/${caminho}`,
+          modelo: salvo.modelo,
+          nivel_raciocinio: salvo.resultado.nivel_raciocinio,
+          tokens: salvo.resultado.tokens,
+          duracao_ms: Date.now() - inicio,
+          reaproveitado: true,
+          gerado_em: new Date(salvo.criado_em).toISOString(),
+        });
+      }
+    }
+
     // TODO: a especificação prevê uma questão por chamada ao Gemini (limites do plano gratuito:
     // ~10 pedidos/min e 150 s por Edge Function). Para a demo da 1ª VA, conceitos e todas as
     // questões saem numa única chamada. Depois: 1 chamada para os conceitos e 1 por questão,
     // orquestradas pelo app ou por uma fila.
     const [, resposta] = await Promise.all([
-      salvarPdf(caminho, pdf),
+      salvarPdf(supabase, caminho, pdf),
       gerarJsonComPdf<Atividade>({
         pdf,
         instrucaoSistema: INSTRUCAO_SISTEMA,
@@ -89,14 +120,24 @@ Deno.serve(async (req) => {
       return erro(`A IA devolveu uma atividade inválida: ${problemas.join("; ")}`, 502);
     }
 
-    return json({
+    const resultado: ResultadoSalvo = {
       conceitos: resposta.dados.conceitos,
       questoes: resposta.dados.questoes.map(normalizarQuestao),
-      arquivo: `${BUCKET}/${caminho}`,
-      modelo: resposta.modelo,
       nivel_raciocinio: resposta.nivelRaciocinio,
       tokens: resposta.tokens,
+    };
+    const geradoEm = await registrarGeracao(supabase, { ...parametros, resultado, modelo: resposta.modelo });
+
+    return json({
+      conceitos: resultado.conceitos,
+      questoes: resultado.questoes,
+      arquivo: `${BUCKET}/${caminho}`,
+      modelo: resposta.modelo,
+      nivel_raciocinio: resultado.nivel_raciocinio,
+      tokens: resultado.tokens,
       duracao_ms: Date.now() - inicio,
+      reaproveitado: false,
+      gerado_em: geradoEm,
     });
   } catch (e) {
     if (e instanceof ErroPedido || e instanceof ErroGemini) {
@@ -168,23 +209,77 @@ async function lerFormulario(req: Request) {
     throw new ErroPedido(`"dificuldade" deve ser uma de: ${DIFICULDADES.join(", ")}.`, 400);
   }
 
-  return { pdf, quantidade, formato, dificuldade };
+  const forcarNova = (form.get("forcar_nova") ?? "").toString().trim().toLowerCase() === "true";
+
+  return { pdf, quantidade, formato, dificuldade, forcarNova };
 }
 
-// ---------- storage ----------
+async function sha256(dados: Uint8Array): Promise<string> {
+  const resumo = new Uint8Array(await crypto.subtle.digest("SHA-256", dados as Uint8Array<ArrayBuffer>));
+  return Array.from(resumo, (b) => b.toString(16).padStart(2, "0")).join("");
+}
 
-async function salvarPdf(caminho: string, pdf: Uint8Array) {
-  const supabase = createClient(
+// ---------- storage e banco (service_role: ignora RLS) ----------
+
+type Cliente = SupabaseClient;
+
+interface Parametros {
+  hash_pdf: string;
+  quantidade: number;
+  formato: Formato;
+  dificuldade: Dificuldade;
+}
+
+function clienteServico(): Cliente {
+  return createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
+}
+
+/** Salva o PDF uma vez só: se pdfs/<hash>.pdf já existe, não envia de novo. */
+async function salvarPdf(supabase: Cliente, caminho: string, pdf: Uint8Array) {
   const { error } = await supabase.storage.from(BUCKET).upload(caminho, pdf, {
     contentType: "application/pdf",
+    upsert: false,
   });
+  if (!error) return;
+  const status = String((error as { statusCode?: string | number }).statusCode ?? "");
+  if (status === "409" || /already exists|duplicate/i.test(error.message)) return;
+  throw new ErroPedido(`Não foi possível salvar o PDF no Storage: ${error.message}`, 500);
+}
+
+async function buscarGeracao(supabase: Cliente, p: Parametros) {
+  const { data, error } = await supabase
+    .from("geracoes")
+    .select("resultado, modelo, criado_em")
+    .eq("hash_pdf", p.hash_pdf)
+    .eq("quantidade", p.quantidade)
+    .eq("formato", p.formato)
+    .eq("dificuldade", p.dificuldade)
+    .order("criado_em", { ascending: false })
+    .limit(1)
+    .maybeSingle();
   if (error) {
-    throw new ErroPedido(`Não foi possível salvar o PDF no Storage: ${error.message}`, 500);
+    // Sem o reaproveitamento a função ainda funciona: segue para uma geração nova.
+    console.error("Falha ao buscar geração salva:", error.message);
+    return null;
   }
+  return data as { resultado: ResultadoSalvo; modelo: string | null; criado_em: string } | null;
+}
+
+/** Grava a geração e devolve a data (ISO). Se falhar, a atividade ainda é devolvida ao app. */
+async function registrarGeracao(
+  supabase: Cliente,
+  linha: Parametros & { resultado: ResultadoSalvo; modelo: string },
+): Promise<string> {
+  const { data, error } = await supabase.from("geracoes").insert(linha).select("criado_em").single();
+  if (error) {
+    console.error("Falha ao salvar a geração:", error.message);
+    return new Date().toISOString();
+  }
+  return new Date((data as { criado_em: string }).criado_em).toISOString();
 }
 
 // ---------- prompt e schema ----------
