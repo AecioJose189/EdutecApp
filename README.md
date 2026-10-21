@@ -1,6 +1,6 @@
 # Edutec – Minhas turmas
 
-App Android em **Kotlin + Jetpack Compose** que reproduz a tela "Minhas turmas" de `../imagens_se_basear/image.png`.
+App Android em **Kotlin + Jetpack Compose** que reproduz a tela "Minhas turmas" de [`images/image.png`](images/image.png).
 
 ## Estrutura
 
@@ -46,9 +46,11 @@ Interações:
    Depois clique em **Run ▶** (Shift+F10).
 5. Celular físico: ative *Opções do desenvolvedor → Depuração USB*, conecte por cabo e escolha-o no seletor de dispositivos.
 
-Via linha de comando (com JDK 17 e Android SDK configurados):
+Via linha de comando (com JDK 17 ou mais recente e Android SDK configurados). Fora do Android Studio,
+indique o SDK em `local.properties` (não vai para o git), por exemplo `sdk.dir=/home/<usuario>/Android/Sdk`,
+ou defina a variável `ANDROID_HOME`.
 
-```
-gradlew.bat assembleDebug      # gera app/build/outputs/apk/debug/app-debug.apk
-gradlew.bat installDebug       # instala no emulador/celular conectado
-```
+| Ação | Windows | Linux / macOS |
+|------|---------|---------------|
+| Gerar o APK (`app/build/outputs/apk/debug/app-debug.apk`) | `gradlew.bat assembleDebug` | `./gradlew assembleDebug` |
+| Instalar no emulador/celular conectado | `gradlew.bat installDebug` | `./gradlew installDebug` |
