@@ -9,3 +9,6 @@
 .externalNativeBuild/
 .cxx/
 .kotlin/
+
+# PDFs de teste e resultados (não versionar)
+/amostras/
