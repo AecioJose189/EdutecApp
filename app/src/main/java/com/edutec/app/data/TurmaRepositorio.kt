@@ -46,6 +46,11 @@ object TurmaRepositorio {
     suspend fun grafo(turmaId: String): GrafoTurma =
         chamar<RespostaGrafo>("grafo", "turma_id" to turmaId).paraGrafo()
 
+    /** DEMONSTRAÇÃO: simula 25 alunos (pseudônimos) respondendo; substitui a simulação anterior da turma. */
+    suspend fun simular(turmaId: String) {
+        chamar<RespostaSimular>("simular", "turma_id" to turmaId)
+    }
+
     /** POST { acao, ...parametros } → corpo JSON decodificado como [T]. */
     private suspend inline fun <reified T> chamar(acao: String, vararg parametros: Pair<String, Any?>): T =
         withContext(Dispatchers.IO) {
@@ -95,6 +100,9 @@ private data class RespostaTurma(val turma: TurmaApi)
 
 @Serializable
 private data class RespostaPublicar(@SerialName("atividade_id") val atividadeId: String)
+
+@Serializable
+private data class RespostaSimular(@SerialName("n_respostas") val respostas: Int)
 
 @Serializable
 private data class RespostaGrafo(

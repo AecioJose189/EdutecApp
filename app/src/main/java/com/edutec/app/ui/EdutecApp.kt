@@ -48,6 +48,14 @@ fun EdutecApp() {
                 // Enquanto o ViewModel ainda guarda o grafo de outra turma, mostra "carregando".
                 grafo = if (dadosTurma.turmaId == turma.id) grafoAtual else EstadoGrafo.Carregando,
                 onTentarDeNovo = dadosTurma::recarregar,
+                onSimular = {
+                    dadosTurma.simular(turma.id) { erro ->
+                        Toast.makeText(context, erro ?: "Simulação concluída: 25 alunos responderam", Toast.LENGTH_SHORT).show()
+                        // Número de alunos e resumo do cartão em Minhas turmas.
+                        if (erro == null) navegacao.recarregarTurmas(silencioso = true)
+                    }
+                },
+                simulando = dadosTurma.simulando,
                 onVoltar = navegacao::fecharTurma,
                 onNovaAtividade = {
                     geracao.voltar() // não mostrar o resultado de uma sessão anterior

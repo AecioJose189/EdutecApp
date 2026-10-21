@@ -6,6 +6,8 @@
 //   publicar      { turma_id, geracao_id, permitir_refazer, tempo_minutos }
 //                                     → { atividade_id }   (409 se já publicada ou se formar ciclo)
 //   grafo         { turma_id }        → { conceitos: [ConceitoGrafo], alunos: [AlunoGrafo] }
+//   simular       { turma_id }        → { n_alunos, n_respostas }   DEMONSTRAÇÃO: 25 pseudônimos
+//                                       respondendo às questões publicadas (substitui a anterior)
 //
 // Turma: { id, nome, codigo, criado_em, n_atividades, n_alunos, pct_consolidado, pct_desenvolvimento,
 //          pct_revisar, conceitos_a_revisar }  (percentuais dos conceitos com dados, pelo estado da média)
@@ -40,6 +42,7 @@ const ACOES: Record<string, (supabase: Cliente, corpo: Corpo) => Promise<unknown
   criar_turma: criarTurma,
   publicar,
   grafo,
+  simular,
 };
 
 Deno.serve(async (req) => {
@@ -221,6 +224,28 @@ async function grafo(supabase: Cliente, corpo: Corpo) {
 /** Mesmos limiares (propostos) de public.estado_dominio: 0,5 e 0,8. */
 function estadoDominio(p: number): string {
   return p < 0.5 ? "revisar" : p < 0.8 ? "em_desenvolvimento" : "consolidado";
+}
+
+// ---------- demonstração ----------
+
+/**
+ * Simula 25 alunos (pseudônimos "sim-...", RN13) respondendo às questões publicadas na turma.
+ * Tudo roda em simular_respostas no Postgres (semente fixa, resultado reproduzível): uma chamada só,
+ * sem gastar a CPU da Edge Function com centenas de respostas.
+ */
+async function simular(supabase: Cliente, corpo: Corpo) {
+  const turma = uuid(corpo.turma_id, "turma_id");
+  const { count, error: erroContagem } = await supabase
+    .from("atividades").select("id", { count: "exact", head: true }).eq("turma_id", turma);
+  if (erroContagem) throw falhaBanco("simular as respostas", erroContagem);
+  if (!count) throw new ErroPedido("Publique uma atividade antes de simular as respostas.", 409);
+
+  const { data, error } = await supabase.rpc("simular_respostas", { turma });
+  if (error) {
+    if (error.code === "ED404") throw new ErroPedido(error.message, 404);
+    throw falhaBanco("simular as respostas", error);
+  }
+  return (data as unknown[])[0];
 }
 
 // ---------- utilitários ----------

@@ -712,6 +712,9 @@ private fun PainelConceito(
                     )
                 }
 
+                // Logo abaixo do estado: é a leitura principal do painel.
+                CausaRaiz(conceito, grafo)
+
                 if (estado == null) {
                     Text(
                         "O domínio estimado aparece quando os alunos responderem a questões deste conceito.",
@@ -731,8 +734,6 @@ private fun PainelConceito(
                         )
                     }
                 }
-
-                CausaRaiz(conceito, grafo)
             }
 
             Button(

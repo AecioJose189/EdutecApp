@@ -25,7 +25,12 @@ sealed interface EstadoGrafo {
 /** Dados da tela Turma (escopo da Activity: girar a tela não recarrega). */
 class TurmaViewModel(
     private val buscarGrafo: suspend (String) -> GrafoTurma = TurmaRepositorio::grafo,
+    private val simularRespostas: suspend (String) -> Unit = TurmaRepositorio::simular,
 ) : ViewModel() {
+    /** Simulação de demonstração em andamento. */
+    var simulando by mutableStateOf(false)
+        private set
+
     private val _grafo = MutableStateFlow<EstadoGrafo>(EstadoGrafo.Carregando)
     val grafo: StateFlow<EstadoGrafo> = _grafo.asStateFlow()
 
@@ -50,6 +55,30 @@ class TurmaViewModel(
                 throw e
             } catch (e: Exception) {
                 EstadoGrafo.Erro((e as? ErroTurmaApi)?.message ?: "Não foi possível carregar o grafo da turma.")
+            }
+        }
+    }
+
+    /**
+     * Demonstração: simula 25 alunos respondendo e recarrega o grafo. [aoTerminar] recebe null em caso
+     * de sucesso ou a mensagem de erro.
+     */
+    fun simular(turmaId: String, aoTerminar: (erro: String?) -> Unit) {
+        if (simulando) return
+        simulando = true
+        viewModelScope.launch {
+            try {
+                simularRespostas(turmaId)
+                if (this@TurmaViewModel.turmaId == turmaId) {
+                    _grafo.value = EstadoGrafo.Pronto(buscarGrafo(turmaId))
+                }
+                aoTerminar(null)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                aoTerminar((e as? ErroTurmaApi)?.message ?: "Não foi possível simular as respostas.")
+            } finally {
+                simulando = false
             }
         }
     }
