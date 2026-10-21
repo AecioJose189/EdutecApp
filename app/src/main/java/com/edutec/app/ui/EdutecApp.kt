@@ -1,7 +1,10 @@
 package com.edutec.app.ui
 
 import androidx.activity.compose.BackHandler
+import android.widget.Toast
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -13,6 +16,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
  */
 @Composable
 fun EdutecApp() {
+    val context = LocalContext.current
     val navegacao: NavegacaoViewModel = viewModel()
     val geracao: NovaAtividadeViewModel = viewModel()
 
@@ -61,7 +65,17 @@ fun EdutecApp() {
                 onGerar = geracao::gerar,
                 onTentarDeNovo = geracao::tentarDeNovo,
                 onVoltar = geracao::voltar,
+                onPublicar = { geracao.publicar(turma.id) },
             )
+            // Publicada: volta para a Turma com os dados atualizados.
+            LaunchedEffect(estado) {
+                if (estado is EstadoGeracao.Publicado) {
+                    Toast.makeText(context, "Atividade publicada para a turma", Toast.LENGTH_SHORT).show()
+                    geracao.voltar()
+                    navegacao.fecharNovaAtividade()
+                    navegacao.recarregarTurmas(silencioso = true)
+                }
+            }
         }
     }
 }

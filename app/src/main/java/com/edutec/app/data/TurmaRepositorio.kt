@@ -34,6 +34,14 @@ object TurmaRepositorio {
     suspend fun criarTurma(nome: String, codigo: String): Turma =
         chamar<RespostaTurma>("criar_turma", "nome" to nome, "codigo" to codigo).turma.paraTurma()
 
+    /** Publica a geração (já revisada pelo professor) na turma; devolve o id da atividade. */
+    suspend fun publicar(turmaId: String, geracaoId: Long, permitirRefazer: Boolean, tempoMinutos: Int?): String =
+        chamar<RespostaPublicar>(
+            "publicar",
+            "turma_id" to turmaId, "geracao_id" to geracaoId,
+            "permitir_refazer" to permitirRefazer, "tempo_minutos" to tempoMinutos,
+        ).atividadeId
+
     /** POST { acao, ...parametros } → corpo JSON decodificado como [T]. */
     private suspend inline fun <reified T> chamar(acao: String, vararg parametros: Pair<String, Any?>): T =
         withContext(Dispatchers.IO) {
@@ -80,6 +88,9 @@ private data class RespostaTurmas(val turmas: List<TurmaApi>)
 
 @Serializable
 private data class RespostaTurma(val turma: TurmaApi)
+
+@Serializable
+private data class RespostaPublicar(@SerialName("atividade_id") val atividadeId: String)
 
 @Serializable
 private data class TurmaApi(

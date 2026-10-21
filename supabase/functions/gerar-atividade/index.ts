@@ -8,7 +8,8 @@
 //   forcar_nova  "true" para gerar de novo mesmo havendo resultado salvo (padrão false)
 //
 // Saída 200: { conceitos, questoes, arquivo, modelo, nivel_raciocinio, tokens, duracao_ms,
-//              reaproveitado, gerado_em }
+//              reaproveitado, gerado_em, geracao_id }
+// geracao_id identifica a linha de `geracoes`; a turma-api usa para publicar (null se não foi salva).
 //
 // RN12 (cada PDF é processado uma vez): o PDF é identificado pelo SHA-256 e salvo como
 // pdfs/<hash>.pdf. Se já houver na tabela `geracoes` um resultado para o mesmo hash e os mesmos
@@ -19,6 +20,7 @@
 // não é JWT. A função confere aqui mesmo se o cabeçalho `apikey` é uma chave pública do projeto.
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { chavePublicaValida } from "../_shared/chave_publica.ts";
 import { ErroGemini, gerarJsonComPdf } from "../_shared/gemini.ts";
 
 const TAMANHO_MAXIMO = 20 * 1024 * 1024;
@@ -96,6 +98,7 @@ Deno.serve(async (req) => {
           duracao_ms: Date.now() - inicio,
           reaproveitado: true,
           gerado_em: new Date(salvo.criado_em).toISOString(),
+          geracao_id: salvo.id,
         });
       }
     }
@@ -126,7 +129,7 @@ Deno.serve(async (req) => {
       nivel_raciocinio: resposta.nivelRaciocinio,
       tokens: resposta.tokens,
     };
-    const geradoEm = await registrarGeracao(supabase, { ...parametros, resultado, modelo: resposta.modelo });
+    const { geradoEm, id } = await registrarGeracao(supabase, { ...parametros, resultado, modelo: resposta.modelo });
 
     return json({
       conceitos: resultado.conceitos,
@@ -138,6 +141,7 @@ Deno.serve(async (req) => {
       duracao_ms: Date.now() - inicio,
       reaproveitado: false,
       gerado_em: geradoEm,
+      geracao_id: id,
     });
   } catch (e) {
     if (e instanceof ErroPedido || e instanceof ErroGemini) {
@@ -148,24 +152,6 @@ Deno.serve(async (req) => {
     return erro("Erro interno ao gerar a atividade.", 500);
   }
 });
-
-// ---------- autenticação ----------
-
-function chavePublicaValida(req: Request): boolean {
-  const enviada = req.headers.get("apikey") ??
-    req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!enviada) return false;
-
-  const aceitas = new Set<string>();
-  const anon = Deno.env.get("SUPABASE_ANON_KEY");
-  if (anon) aceitas.add(anon);
-  try {
-    // JSON no formato { "default": "sb_publishable_..." }
-    const publicas = JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") ?? "{}");
-    for (const v of Object.values(publicas)) if (typeof v === "string") aceitas.add(v);
-  } catch { /* variável ausente ou malformada: fica só a anon */ }
-  return aceitas.has(enviada);
-}
 
 // ---------- entrada ----------
 
@@ -253,7 +239,7 @@ async function salvarPdf(supabase: Cliente, caminho: string, pdf: Uint8Array) {
 async function buscarGeracao(supabase: Cliente, p: Parametros) {
   const { data, error } = await supabase
     .from("geracoes")
-    .select("resultado, modelo, criado_em")
+    .select("id, resultado, modelo, criado_em")
     .eq("hash_pdf", p.hash_pdf)
     .eq("quantidade", p.quantidade)
     .eq("formato", p.formato)
@@ -266,20 +252,24 @@ async function buscarGeracao(supabase: Cliente, p: Parametros) {
     console.error("Falha ao buscar geração salva:", error.message);
     return null;
   }
-  return data as { resultado: ResultadoSalvo; modelo: string | null; criado_em: string } | null;
+  return data as { id: number; resultado: ResultadoSalvo; modelo: string | null; criado_em: string } | null;
 }
 
-/** Grava a geração e devolve a data (ISO). Se falhar, a atividade ainda é devolvida ao app. */
+/**
+ * Grava a geração e devolve o id e a data (ISO). Se falhar, a atividade ainda é devolvida ao app
+ * (com id null: dá para revisar, mas não para publicar).
+ */
 async function registrarGeracao(
   supabase: Cliente,
   linha: Parametros & { resultado: ResultadoSalvo; modelo: string },
-): Promise<string> {
-  const { data, error } = await supabase.from("geracoes").insert(linha).select("criado_em").single();
+): Promise<{ geradoEm: string; id: number | null }> {
+  const { data, error } = await supabase.from("geracoes").insert(linha).select("id, criado_em").single();
   if (error) {
     console.error("Falha ao salvar a geração:", error.message);
-    return new Date().toISOString();
+    return { geradoEm: new Date().toISOString(), id: null };
   }
-  return new Date((data as { criado_em: string }).criado_em).toISOString();
+  const salva = data as { id: number; criado_em: string };
+  return { geradoEm: new Date(salva.criado_em).toISOString(), id: salva.id };
 }
 
 // ---------- prompt e schema ----------

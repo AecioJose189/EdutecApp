@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.edutec.app.data.AtividadeGerada
 import com.edutec.app.data.ErroGeracao
+import com.edutec.app.data.ErroTurmaApi
+import com.edutec.app.data.TurmaRepositorio
 import com.edutec.app.data.GeracaoRepositorio
 import com.edutec.app.data.PedidoGeracao
 import kotlinx.coroutines.CancellationException
@@ -15,11 +17,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Etapas 3 (Gerando) e 4 (Revisão) da Nova atividade. */
+/** Etapas 3 (Gerando), 4 (Revisão) e 5 (Publicar) da Nova atividade. */
 sealed interface EstadoGeracao {
     data object Ocioso : EstadoGeracao
     data class Gerando(val pedido: PedidoGeracao, val segundos: Int = 0) : EstadoGeracao
-    data class Concluido(val pedido: PedidoGeracao, val resultado: AtividadeGerada) : EstadoGeracao
+    data class Concluido(
+        val pedido: PedidoGeracao,
+        val resultado: AtividadeGerada,
+        val publicando: Boolean = false,
+        /** Mensagem da última tentativa de publicar que falhou. */
+        val erroPublicacao: String? = null,
+    ) : EstadoGeracao
+
+    /** Publicada na turma: a tela volta para a Turma. */
+    data class Publicado(val turmaId: String) : EstadoGeracao
     data class Erro(val pedido: PedidoGeracao, val tipo: TipoErro, val detalhe: String? = null) : EstadoGeracao
 }
 
@@ -27,6 +38,7 @@ enum class TipoErro { Cota, Indisponivel, TempoEsgotado, SemConexao, Outro }
 
 class NovaAtividadeViewModel(
     private val gerarAtividade: suspend (PedidoGeracao) -> AtividadeGerada = GeracaoRepositorio::gerar,
+    private val publicarAtividade: suspend (String, Long, Boolean, Int?) -> String = TurmaRepositorio::publicar,
 ) : ViewModel() {
 
     private val _estado = MutableStateFlow<EstadoGeracao>(EstadoGeracao.Ocioso)
@@ -60,6 +72,28 @@ class NovaAtividadeViewModel(
                 EstadoGeracao.Erro(pedido, TipoErro.Outro)
             } finally {
                 cronometro.cancel()
+            }
+        }
+    }
+
+    /** Etapa 5: publica o resultado revisado na turma (RN04: só com a ação do professor). */
+    fun publicar(turmaId: String) {
+        val atual = _estado.value as? EstadoGeracao.Concluido ?: return
+        if (atual.publicando) return
+        val geracaoId = atual.resultado.geracaoId
+        if (geracaoId == null) {
+            _estado.value = atual.copy(erroPublicacao = "Esta geração não foi salva no servidor. Gere novas questões para publicar.")
+            return
+        }
+        _estado.value = atual.copy(publicando = true, erroPublicacao = null)
+        trabalho = viewModelScope.launch {
+            _estado.value = try {
+                publicarAtividade(turmaId, geracaoId, atual.pedido.permitirRefazer, atual.pedido.tempoMinutos)
+                EstadoGeracao.Publicado(turmaId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                atual.copy(erroPublicacao = (e as? ErroTurmaApi)?.message ?: "Não foi possível publicar a atividade.")
             }
         }
     }

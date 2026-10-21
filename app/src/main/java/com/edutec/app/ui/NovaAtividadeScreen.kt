@@ -172,6 +172,8 @@ fun NovaAtividadeScreen(
     onGerar: (PedidoGeracao) -> Unit = {},
     onTentarDeNovo: () -> Unit = {},
     onVoltar: () -> Unit = {},
+    /** Etapa 5: publica o resultado revisado na turma. */
+    onPublicar: () -> Unit = {},
 ) {
     val context = LocalContext.current
     fun avisar(mensagem: String) = Toast.makeText(context, mensagem, Toast.LENGTH_SHORT).show()
@@ -295,6 +297,8 @@ fun NovaAtividadeScreen(
                                 quantidade = quantidade,
                                 formato = formato.valor,
                                 dificuldade = ValorDificuldade.getValue(dificuldade),
+                                permitirRefazer = permitirRefazer,
+                                tempoMinutos = tempo.removeSuffix(" min").toIntOrNull(),
                             )
                         )
                     }
@@ -315,7 +319,8 @@ fun NovaAtividadeScreen(
             val etapa = when (estado) {
                 EstadoGeracao.Ocioso -> 2
                 is EstadoGeracao.Gerando, is EstadoGeracao.Erro -> 3
-                is EstadoGeracao.Concluido -> 4
+                is EstadoGeracao.Concluido -> if (estado.publicando) 5 else 4
+                is EstadoGeracao.Publicado -> 5
             }
             Cabecalho(turma = turma, expandido = expandido, etapa = etapa, onFechar = onFechar)
 
@@ -326,8 +331,11 @@ fun NovaAtividadeScreen(
                 is EstadoGeracao.Concluido -> RevisaoConteudo(
                     estado, expandido,
                     onGerarNovas = { onGerar(estado.pedido.copy(forcarNova = true)) },
+                    onPublicar = onPublicar,
                     modifier = Modifier.fillMaxWidth().weight(1f),
                 )
+                // Instante entre publicar e voltar para a Turma.
+                is EstadoGeracao.Publicado -> Box(Modifier.fillMaxWidth().weight(1f))
                 EstadoGeracao.Ocioso -> if (expandido) {
                     Row(
                         modifier = Modifier.fillMaxWidth().weight(1f),

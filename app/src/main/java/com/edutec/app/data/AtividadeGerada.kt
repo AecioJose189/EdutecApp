@@ -15,6 +15,10 @@ data class PedidoGeracao(
     val dificuldade: String,
     /** true: gera de novo mesmo que o servidor já tenha um resultado para este PDF e parâmetros. */
     val forcarNova: Boolean = false,
+    // Configurações de publicação escolhidas no formulário (usadas só ao publicar).
+    val permitirRefazer: Boolean = true,
+    /** null = sem limite de tempo. */
+    val tempoMinutos: Int? = null,
 )
 
 // Espelho do JSON devolvido por supabase/functions/gerar-atividade.
@@ -32,6 +36,8 @@ data class AtividadeGerada(
     val reaproveitado: Boolean = false,
     /** Data da geração original, em ISO 8601 UTC (ex.: 2026-10-21T02:28:23.983Z). */
     @SerialName("gerado_em") val geradoEm: String? = null,
+    /** Linha da tabela geracoes no servidor; é o que a turma-api publica. null se não foi salva. */
+    @SerialName("geracao_id") val geracaoId: Long? = null,
 )
 
 @Serializable

@@ -3,8 +3,10 @@
 // Entrada: POST com JSON { "acao": "...", ...parâmetros }. Ações:
 //   listar_turmas                     → { turmas: [Turma] }
 //   criar_turma   { nome, codigo }    → { turma: Turma }
+//   publicar      { turma_id, geracao_id, permitir_refazer, tempo_minutos }
+//                                     → { atividade_id }   (409 se já publicada ou se formar ciclo)
 //
-// Turma: { id, nome, codigo, criado_em }
+// Turma: { id, nome, codigo, criado_em, n_atividades }
 // Erro: { erro: "..." } com status 4xx/5xx.
 //
 // As tabelas têm RLS sem políticas: só a service_role (usada aqui) lê e escreve.
@@ -31,6 +33,7 @@ class ErroPedido extends Error {
 const ACOES: Record<string, (supabase: Cliente, corpo: Corpo) => Promise<unknown>> = {
   listar_turmas: listarTurmas,
   criar_turma: criarTurma,
+  publicar,
 };
 
 Deno.serve(async (req) => {
@@ -66,9 +69,14 @@ Deno.serve(async (req) => {
 const COLUNAS_TURMA = "id, nome, codigo, criado_em";
 
 async function listarTurmas(supabase: Cliente) {
-  const { data, error } = await supabase.from("turmas").select(COLUNAS_TURMA).order("criado_em");
+  const { data, error } = await supabase
+    .from("turmas")
+    .select(`${COLUNAS_TURMA}, atividades(count)`)
+    .order("criado_em");
   if (error) throw falhaBanco("listar as turmas", error);
-  return { turmas: data };
+  const turmas = (data as (Record<string, unknown> & { atividades: { count: number }[] })[])
+    .map(({ atividades, ...t }) => ({ ...t, n_atividades: atividades[0]?.count ?? 0 }));
+  return { turmas };
 }
 
 async function criarTurma(supabase: Cliente, corpo: Corpo) {
@@ -79,7 +87,45 @@ async function criarTurma(supabase: Cliente, corpo: Corpo) {
   return { turma: data };
 }
 
+// ---------- publicação ----------
+
+/**
+ * Publica na turma as questões de uma geração que o professor revisou (RN04) e junta os conceitos
+ * da geração ao grafo da turma. Tudo acontece na função publicar_atividade do Postgres, numa
+ * transação: se o grafo ficar com ciclo (RN03), nada é gravado.
+ */
+async function publicar(supabase: Cliente, corpo: Corpo) {
+  const turma = uuid(corpo.turma_id, "turma_id");
+  const geracao = Number(corpo.geracao_id);
+  if (!Number.isInteger(geracao)) throw new ErroPedido('"geracao_id" deve ser um número inteiro.', 400);
+  const tempo = corpo.tempo_minutos == null ? null : Number(corpo.tempo_minutos);
+  if (tempo !== null && (!Number.isInteger(tempo) || tempo <= 0)) {
+    throw new ErroPedido('"tempo_minutos" deve ser um inteiro positivo ou null (sem limite).', 400);
+  }
+
+  const { data, error } = await supabase.rpc("publicar_atividade", {
+    turma,
+    geracao,
+    permitir_refazer: corpo.permitir_refazer !== false,
+    tempo_minutos: tempo,
+  });
+  if (error) {
+    const status = { ED404: 404, ED409: 409, ED003: 409 }[error.code ?? ""];
+    if (status) throw new ErroPedido(error.message, status);
+    throw falhaBanco("publicar a atividade", error);
+  }
+  return { atividade_id: data };
+}
+
 // ---------- utilitários ----------
+
+function uuid(valor: unknown, campo: string): string {
+  const t = typeof valor === "string" ? valor.trim() : "";
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t)) {
+    throw new ErroPedido(`"${campo}" deve ser um uuid.`, 400);
+  }
+  return t;
+}
 
 function texto(valor: unknown, campo: string, maximo: number): string {
   const t = typeof valor === "string" ? valor.trim() : "";

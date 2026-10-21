@@ -27,6 +27,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -57,6 +60,7 @@ import com.edutec.app.ui.theme.Consolidado
 import com.edutec.app.ui.theme.EdutecTheme
 import com.edutec.app.ui.theme.EtiquetaAzulFundo
 import com.edutec.app.ui.theme.EtiquetaAzulTexto
+import com.edutec.app.ui.theme.EtiquetaVermelhaTexto
 import com.edutec.app.ui.theme.Fundo
 import com.edutec.app.ui.theme.Pilula
 import com.edutec.app.ui.theme.RoxoFundo
@@ -85,6 +89,8 @@ fun RevisaoConteudo(
     /** "Gerar novas questões" quando o resultado foi reaproveitado (envia forcar_nova = true). */
     onGerarNovas: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Etapa 5: "Publicar para a turma". */
+    onPublicar: () -> Unit = {},
 ) {
     val atividade = estado.resultado
     if (expandido) {
@@ -118,6 +124,7 @@ fun RevisaoConteudo(
                     }
                 }
             }
+            BarraPublicar(estado, onPublicar)
         }
     } else {
         LazyColumn(modifier, verticalArrangement = Arrangement.spacedBy(Espaco)) {
@@ -128,6 +135,7 @@ fun RevisaoConteudo(
                     Box(Modifier.padding(20.dp)) { DetalheQuestao(i, q) }
                 }
             }
+            item { BarraPublicar(estado, onPublicar) }
         }
     }
 }
@@ -195,6 +203,60 @@ private fun formatarData(iso: String?): String {
         val data = entrada.parse(iso.take(19))!!
         SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", Locale("pt", "BR")).format(data)
     }.getOrDefault("uma geração anterior")
+}
+
+// ---------------------------------------------------------------------------
+// Publicar (etapa 5)
+// ---------------------------------------------------------------------------
+
+/**
+ * Configurações mínimas de publicação, vindas do formulário (refazer e tempo).
+ * TODO: prazo de entrega e data de liberação para os alunos.
+ */
+@Composable
+private fun BarraPublicar(estado: EstadoGeracao.Concluido, onPublicar: () -> Unit) {
+    val pedido = estado.pedido
+    val configuracao = buildString {
+        append(if (pedido.permitirRefazer) "Permitir refazer" else "Tentativa única")
+        append(" · ")
+        append(pedido.tempoMinutos?.let { "$it min por tentativa" } ?: "sem limite de tempo")
+    }
+    Surface(shape = CantoCartao, color = Cartao, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    "Publicar ${estado.resultado.questoes.size} questões para a turma",
+                    color = TextoPrincipal, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "$configuracao · os conceitos entram no grafo da turma",
+                    color = TextoSecundario, fontSize = 13.sp,
+                )
+                estado.erroPublicacao?.let {
+                    Text(it, color = EtiquetaVermelhaTexto, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            Button(
+                onClick = onPublicar,
+                enabled = !estado.publicando,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Consolidado),
+                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 14.dp),
+            ) {
+                if (estado.publicando) {
+                    CircularProgressIndicator(Modifier.size(18.dp), color = Cartao, strokeWidth = 2.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Text("Publicando…", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                } else {
+                    Text("Publicar para a turma", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
