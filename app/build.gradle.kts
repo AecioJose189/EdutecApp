@@ -23,6 +23,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SUPABASE_URL", "\"${propriedadeLocal("SUPABASE_URL")}\"")
         buildConfigField("String", "SUPABASE_CHAVE_PUBLICA", "\"${propriedadeLocal("SUPABASE_CHAVE_PUBLICA")}\"")
@@ -73,4 +74,11 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("junit:junit:4.13.2")
+
+    // Testes de interface no emulador/aparelho (./gradlew connectedDebugAndroidTest).
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
