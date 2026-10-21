@@ -92,6 +92,8 @@ fun ErroGeracaoConteudo(
     val (titulo, explicacao) = when (estado.tipo) {
         TipoErro.Cota -> "A IA atingiu o limite de uso por agora" to
             "O plano gratuito do Gemini aceita poucos pedidos por minuto. Espere cerca de 1 minuto e tente de novo."
+        TipoErro.Indisponivel -> "A IA está sobrecarregada agora" to
+            "O serviço do Gemini está com muita demanda. Isso costuma passar em instantes: tente de novo."
         TipoErro.TempoEsgotado -> "A IA demorou demais para responder" to
             "Às vezes o serviço fica lento. Tente de novo; se continuar, peça menos questões ou use um PDF menor."
         TipoErro.SemConexao -> "Sem conexão com o servidor" to

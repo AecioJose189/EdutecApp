@@ -27,6 +27,9 @@ sealed class ErroGeracao(mensagem: String) : Exception(mensagem) {
     /** Cota do plano gratuito do Gemini esgotada (HTTP 429). */
     class Cota(detalhe: String) : ErroGeracao(detalhe)
 
+    /** O Gemini está sobrecarregado ou fora do ar (HTTP 503 da função); costuma passar em instantes. */
+    class Indisponivel : ErroGeracao("IA indisponível")
+
     /** A IA ou a rede passaram do tempo (timeout do app ou HTTP 504 da função). */
     class TempoEsgotado : ErroGeracao("Tempo esgotado")
 
@@ -85,6 +88,7 @@ object GeracaoRepositorio {
             val detalhe = mensagemDeErro(e.error)
             throw when (e.statusCode) {
                 429 -> ErroGeracao.Cota(detalhe)
+                503 -> ErroGeracao.Indisponivel()
                 504 -> ErroGeracao.TempoEsgotado()
                 else -> ErroGeracao.Servidor(detalhe)
             }

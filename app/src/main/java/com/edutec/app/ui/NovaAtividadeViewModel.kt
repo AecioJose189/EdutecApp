@@ -23,7 +23,7 @@ sealed interface EstadoGeracao {
     data class Erro(val pedido: PedidoGeracao, val tipo: TipoErro, val detalhe: String? = null) : EstadoGeracao
 }
 
-enum class TipoErro { Cota, TempoEsgotado, SemConexao, Outro }
+enum class TipoErro { Cota, Indisponivel, TempoEsgotado, SemConexao, Outro }
 
 class NovaAtividadeViewModel(
     private val gerarAtividade: suspend (PedidoGeracao) -> AtividadeGerada = GeracaoRepositorio::gerar,
@@ -51,6 +51,7 @@ class NovaAtividadeViewModel(
             } catch (e: ErroGeracao) {
                 when (e) {
                     is ErroGeracao.Cota -> EstadoGeracao.Erro(pedido, TipoErro.Cota)
+                    is ErroGeracao.Indisponivel -> EstadoGeracao.Erro(pedido, TipoErro.Indisponivel)
                     is ErroGeracao.TempoEsgotado -> EstadoGeracao.Erro(pedido, TipoErro.TempoEsgotado)
                     is ErroGeracao.SemConexao -> EstadoGeracao.Erro(pedido, TipoErro.SemConexao)
                     is ErroGeracao.Servidor -> EstadoGeracao.Erro(pedido, TipoErro.Outro, e.detalhe)
