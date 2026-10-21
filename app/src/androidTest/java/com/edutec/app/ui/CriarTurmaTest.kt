@@ -73,7 +73,9 @@ class CriarTurmaTest {
             nome = "Programação I", codigo = "Turma C", alunos = 0,
             consolidado = 0, desenvolvimento = 0, revisar = 0, rodape = "Nenhuma atividade ainda",
         )
-        regra.setContent { EdutecTheme { TurmaScreen(turma, onVoltar = {}, onNovaAtividade = {}) } }
+        regra.setContent {
+            EdutecTheme { TurmaScreen(turma, EstadoGrafo.Carregando, onVoltar = {}, onNovaAtividade = {}) }
+        }
 
         regra.onNodeWithText("Ainda não há dados de aprendizagem nesta turma").assertIsDisplayed()
         regra.onNodeWithText("Nenhum aluno ainda").assertIsDisplayed()

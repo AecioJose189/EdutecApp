@@ -68,7 +68,8 @@ from (
   select 2, 'turma', '(' || t.n_alunos || ' alunos)', 'média ' || t.media_dominio || ' · mediana ' || t.mediana_dominio,
          t.conceito, null, null, t.media_dominio, 'moda: ' || t.estado_moda
   from public.dominio_turma t
-  where t.conceito in (select conceito from demo_sequencias)
+  where t.turma_id is null  -- só a demo do BKT (turmas reais têm turma_id)
+    and t.conceito in (select conceito from demo_sequencias)
 ) resultado
 order by ordem, conceito, aluno;
 

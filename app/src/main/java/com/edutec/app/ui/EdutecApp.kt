@@ -19,6 +19,7 @@ fun EdutecApp() {
     val context = LocalContext.current
     val navegacao: NavegacaoViewModel = viewModel()
     val geracao: NovaAtividadeViewModel = viewModel()
+    val dadosTurma: TurmaViewModel = viewModel()
 
     val turma = navegacao.turmaAberta
     val conceitosIniciais = navegacao.novaAtividade
@@ -38,8 +39,15 @@ fun EdutecApp() {
 
         conceitosIniciais == null -> {
             BackHandler { navegacao.fecharTurma() }
+            LaunchedEffect(turma.id) { dadosTurma.abrir(turma.id) }
+            // Lê o estado sempre (fora do if), para a tela recompor quando o grafo chegar.
+            val grafo by dadosTurma.grafo.collectAsState()
+            val grafoAtual = grafo
             TurmaScreen(
                 turma = turma,
+                // Enquanto o ViewModel ainda guarda o grafo de outra turma, mostra "carregando".
+                grafo = if (dadosTurma.turmaId == turma.id) grafoAtual else EstadoGrafo.Carregando,
+                onTentarDeNovo = dadosTurma::recarregar,
                 onVoltar = navegacao::fecharTurma,
                 onNovaAtividade = {
                     geracao.voltar() // não mostrar o resultado de uma sessão anterior
@@ -69,11 +77,13 @@ fun EdutecApp() {
             )
             // Publicada: volta para a Turma com os dados atualizados.
             LaunchedEffect(estado) {
-                if (estado is EstadoGeracao.Publicado) {
+                val publicado = estado
+                if (publicado is EstadoGeracao.Publicado) {
                     Toast.makeText(context, "Atividade publicada para a turma", Toast.LENGTH_SHORT).show()
                     geracao.voltar()
                     navegacao.fecharNovaAtividade()
                     navegacao.recarregarTurmas(silencioso = true)
+                    dadosTurma.abrir(publicado.turmaId, forcar = true)
                 }
             }
         }

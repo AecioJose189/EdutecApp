@@ -42,6 +42,10 @@ object TurmaRepositorio {
             "permitir_refazer" to permitirRefazer, "tempo_minutos" to tempoMinutos,
         ).atividadeId
 
+    /** Conceitos da turma com o resumo do domínio estimado, e os alunos (pseudônimos). */
+    suspend fun grafo(turmaId: String): GrafoTurma =
+        chamar<RespostaGrafo>("grafo", "turma_id" to turmaId).paraGrafo()
+
     /** POST { acao, ...parametros } → corpo JSON decodificado como [T]. */
     private suspend inline fun <reified T> chamar(acao: String, vararg parametros: Pair<String, Any?>): T =
         withContext(Dispatchers.IO) {
@@ -91,6 +95,46 @@ private data class RespostaTurma(val turma: TurmaApi)
 
 @Serializable
 private data class RespostaPublicar(@SerialName("atividade_id") val atividadeId: String)
+
+@Serializable
+private data class RespostaGrafo(
+    val conceitos: List<ConceitoApi>,
+    val alunos: List<AlunoApi>,
+) {
+    fun paraGrafo() = GrafoTurma(
+        conceitos = conceitos.map {
+            ConceitoGrafo(
+                nome = it.nome,
+                prerequisitos = it.prerequisitos,
+                alunos = it.alunos,
+                respostas = it.respostas,
+                media = it.media,
+                mediana = it.mediana,
+                estado = estadoDoServidor(it.estado),
+                alunosRevisar = it.alunosRevisar,
+            )
+        },
+        alunos = alunos.mapNotNull { a -> estadoDoServidor(a.piorEstado)?.let { Aluno(a.rotulo, it) } },
+    )
+}
+
+@Serializable
+private data class ConceitoApi(
+    val nome: String,
+    val prerequisitos: List<String> = emptyList(),
+    @SerialName("n_alunos") val alunos: Int = 0,
+    @SerialName("n_respostas") val respostas: Int = 0,
+    @SerialName("media_dominio") val media: Double? = null,
+    @SerialName("mediana_dominio") val mediana: Double? = null,
+    @SerialName("estado_da_media") val estado: String? = null,
+    @SerialName("n_revisar") val alunosRevisar: Int = 0,
+)
+
+@Serializable
+private data class AlunoApi(
+    val rotulo: String,
+    @SerialName("pior_estado") val piorEstado: String,
+)
 
 @Serializable
 private data class TurmaApi(

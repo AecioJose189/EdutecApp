@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -34,18 +37,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,23 +62,29 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.roundToInt
 import com.edutec.app.data.Aluno
+import com.edutec.app.data.ConceitoGrafo
 import com.edutec.app.data.DadosExemplo
 import com.edutec.app.data.DadosTurmaExemplo
 import com.edutec.app.data.EstadoConceito
+import com.edutec.app.data.GrafoTurma
 import com.edutec.app.data.Turma
 import com.edutec.app.data.rotuloAlunos
-import com.edutec.app.data.semDados
+import com.edutec.app.data.semAtividade
+import com.edutec.app.ui.theme.AmareloFundo
 import com.edutec.app.ui.theme.AmareloTexto
 import com.edutec.app.ui.theme.AzulFundo
 import com.edutec.app.ui.theme.BordaTracejada
@@ -82,33 +92,38 @@ import com.edutec.app.ui.theme.Cartao
 import com.edutec.app.ui.theme.Consolidado
 import com.edutec.app.ui.theme.CremeFundo
 import com.edutec.app.ui.theme.EdutecTheme
+import com.edutec.app.ui.theme.EtiquetaAzulFundo
 import com.edutec.app.ui.theme.EtiquetaAzulTexto
 import com.edutec.app.ui.theme.EtiquetaVermelhaFundo
 import com.edutec.app.ui.theme.EtiquetaVermelhaTexto
 import com.edutec.app.ui.theme.Fundo
-import com.edutec.app.ui.theme.LaranjaFundo
-import com.edutec.app.ui.theme.LaranjaTexto
 import com.edutec.app.ui.theme.Pilula
-import com.edutec.app.ui.theme.Revisar
 import com.edutec.app.ui.theme.TextoCorpo
 import com.edutec.app.ui.theme.TextoPrincipal
 import com.edutec.app.ui.theme.TextoSecundario
-import com.edutec.app.ui.theme.Trilho
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 private val CantoCartao = RoundedCornerShape(24.dp)
 private val Espaco = 14.dp
 private val Abas = listOf("Grafo", "Atividades", "Materiais", "Estatísticas", "Turma")
 
 /**
- * Tela de uma turma. Por enquanto é só visual: o que funciona de verdade é o botão
- * "Nova atividade" (e "Gerar atividade de reforço", que abre a mesma tela já com o conceito).
+ * Tela de uma turma: grafo de conhecimento com o domínio estimado de cada conceito (dados reais da
+ * turma-api), painel do conceito selecionado e lista de alunos (pseudônimos).
+ * Turma sem atividade publicada mostra os primeiros passos em vez do grafo.
  */
 @Composable
 fun TurmaScreen(
     turma: Turma,
+    grafo: EstadoGrafo,
     onVoltar: () -> Unit,
     onNovaAtividade: (conceitosIniciais: Set<String>) -> Unit,
     modifier: Modifier = Modifier,
+    onTentarDeNovo: () -> Unit = {},
+    /** Botão de demonstração "Simular respostas da turma"; null esconde o botão. */
+    onSimular: (() -> Unit)? = null,
+    simulando: Boolean = false,
 ) {
     val context = LocalContext.current
     var aba by rememberSaveable { mutableStateOf(Abas.first()) }
@@ -133,93 +148,108 @@ fun TurmaScreen(
                 onNovaAtividade = { onNovaAtividade(emptySet()) },
             )
         }
-        val painel: @Composable (Modifier) -> Unit = { mod ->
+        val colunaTablet = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(horizontal = margem, vertical = 12.dp)
+        val colunaCelular = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(horizontal = margem, vertical = 12.dp)
+
+        val dados = (grafo as? EstadoGrafo.Pronto)?.grafo
+        if (turma.semAtividade || dados == null) {
+            // Sem atividade publicada (primeiros passos), ou o grafo ainda carregando / com erro.
+            val centro: @Composable (Modifier) -> Unit = { mod ->
+                when {
+                    turma.semAtividade -> EstadoVazio(
+                        onNovaAtividade = { onNovaAtividade(emptySet()) },
+                        // Só rola sozinho no tablet; no celular a coluna da tela já rola.
+                        rolavel = expandido,
+                        modifier = mod,
+                    )
+                    grafo is EstadoGrafo.Erro -> ErroGrafo(grafo.mensagem, onTentarDeNovo, mod)
+                    else -> CarregandoGrafo(mod)
+                }
+            }
+            if (expandido) {
+                Column(colunaTablet, verticalArrangement = Arrangement.spacedBy(Espaco)) {
+                    cabecalho()
+                    Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(Espaco)) {
+                        ListaAlunos(emptyList(), rolavel = true, modifier = Modifier.width(290.dp).fillMaxHeight())
+                        centro(Modifier.weight(1f).fillMaxHeight())
+                    }
+                }
+            } else {
+                Column(colunaCelular, verticalArrangement = Arrangement.spacedBy(Espaco)) {
+                    cabecalho()
+                    centro(Modifier.fillMaxWidth())
+                    ListaAlunos(emptyList(), rolavel = false, modifier = Modifier.fillMaxWidth())
+                }
+            }
+        } else {
+            ConteudoGrafo(turma, dados, expandido, colunaTablet, colunaCelular, cabecalho, onNovaAtividade, onSimular, simulando)
+        }
+    }
+}
+
+@Composable
+private fun ConteudoGrafo(
+    turma: Turma,
+    dados: GrafoTurma,
+    expandido: Boolean,
+    colunaTablet: Modifier,
+    colunaCelular: Modifier,
+    cabecalho: @Composable () -> Unit,
+    onNovaAtividade: (Set<String>) -> Unit,
+    onSimular: (() -> Unit)?,
+    simulando: Boolean,
+) {
+    val context = LocalContext.current
+    fun avisar(mensagem: String) = Toast.makeText(context, mensagem, Toast.LENGTH_SHORT).show()
+    // Conceito selecionado: o tocado no grafo, ou o mais fraco da turma.
+    var selecionado by rememberSaveable(turma.id) { mutableStateOf<String?>(null) }
+    val conceito = selecionado?.let(dados::conceito) ?: dados.conceitoInicial()
+
+    val cartaoGrafo: @Composable (Modifier) -> Unit = { mod ->
+        CartaoGrafo(dados, conceito?.nome, onSelecionar = { selecionado = it }, modifier = mod)
+    }
+    val demonstracao: @Composable () -> Unit = {
+        onSimular?.let { FaixaDemonstracao(it, simulando, Modifier.fillMaxWidth()) }
+    }
+    val painel: @Composable (Modifier) -> Unit = { mod ->
+        if (conceito != null) {
             PainelConceito(
-                alunos = turma.alunos,
-                onFechar = { avisar("Selecione um conceito no grafo") },
-                onReforco = { onNovaAtividade(setOf("Regra da cadeia")) },
-                onVerAlunos = { avisar("Lista de alunos com dificuldade") },
+                conceito = conceito,
+                grafo = dados,
+                onReforco = { onNovaAtividade(setOf(conceito.nome)) },
+                onVerAlunos = { avisar("Lista de alunos com dificuldade (próxima versão)") },
                 preencherAltura = expandido,
                 modifier = mod,
             )
         }
+    }
 
-        val vazio: @Composable (Modifier) -> Unit = { mod ->
-            // Só rola sozinho no tablet; no celular a coluna da tela já rola (rolagem dentro de rolagem quebra).
-            EstadoVazio(onNovaAtividade = { onNovaAtividade(emptySet()) }, rolavel = expandido, modifier = mod)
+    if (expandido) {
+        Column(colunaTablet, verticalArrangement = Arrangement.spacedBy(Espaco)) {
+            cabecalho()
+            Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(Espaco)) {
+                ListaAlunos(dados.alunos, rolavel = true, modifier = Modifier.width(290.dp).fillMaxHeight())
+                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(Espaco)) {
+                    cartaoGrafo(Modifier.fillMaxWidth().weight(1f))
+                    demonstracao()
+                }
+                painel(Modifier.width(320.dp).fillMaxHeight())
+            }
         }
-
-        if (turma.semDados) {
-            // Turma nova: nada de grafo nem alunos de exemplo, só os primeiros passos.
-            if (expandido) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .windowInsetsPadding(WindowInsets.safeDrawing)
-                        .padding(horizontal = margem, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(Espaco),
-                ) {
-                    cabecalho()
-                    Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(Espaco)) {
-                        ListaAlunos(emptyList(), Modifier.width(290.dp).fillMaxHeight())
-                        vazio(Modifier.weight(1f).fillMaxHeight())
-                    }
-                }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .windowInsetsPadding(WindowInsets.safeDrawing)
-                        .padding(horizontal = margem, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(Espaco),
-                ) {
-                    cabecalho()
-                    vazio(Modifier.fillMaxWidth())
-                    ListaAlunos(emptyList(), Modifier.fillMaxWidth())
-                }
-            }
-        } else if (expandido) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(horizontal = margem, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(Espaco),
-            ) {
-                cabecalho()
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(Espaco),
-                ) {
-                    ListaAlunos(DadosTurmaExemplo.alunos, Modifier.width(290.dp).fillMaxHeight())
-                    Column(
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                        verticalArrangement = Arrangement.spacedBy(Espaco),
-                    ) {
-                        CartaoGrafo(Modifier.fillMaxWidth().weight(1f))
-                        LinhaDoTempo(Modifier.fillMaxWidth())
-                    }
-                    painel(Modifier.width(320.dp).fillMaxHeight())
-                }
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(horizontal = margem, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(Espaco),
-            ) {
-                cabecalho()
-                CartaoGrafo(Modifier.fillMaxWidth().height(420.dp))
-                LinhaDoTempo(Modifier.fillMaxWidth())
-                painel(Modifier.fillMaxWidth())
-                ListaAlunos(DadosTurmaExemplo.alunos, Modifier.fillMaxWidth())
-            }
+    } else {
+        Column(colunaCelular, verticalArrangement = Arrangement.spacedBy(Espaco)) {
+            cabecalho()
+            cartaoGrafo(Modifier.fillMaxWidth().height(460.dp))
+            demonstracao()
+            painel(Modifier.fillMaxWidth())
+            ListaAlunos(dados.alunos, rolavel = false, modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -242,7 +272,7 @@ private fun Cabecalho(
             onClick = onNovaAtividade,
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Consolidado),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 22.dp, vertical = 14.dp),
+            contentPadding = PaddingValues(horizontal = 22.dp, vertical = 14.dp),
         ) {
             Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
@@ -297,11 +327,11 @@ private fun SeletorAbas(selecionada: String, onAba: (String) -> Unit) {
 }
 
 // ---------------------------------------------------------------------------
-// Lista de alunos
+// Lista de alunos (só pseudônimos, RN13)
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun ListaAlunos(alunos: List<Aluno>, modifier: Modifier = Modifier) {
+private fun ListaAlunos(alunos: List<Aluno>, rolavel: Boolean, modifier: Modifier = Modifier) {
     if (alunos.isEmpty()) {
         Surface(shape = CantoCartao, color = Cartao, modifier = modifier) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -316,20 +346,20 @@ private fun ListaAlunos(alunos: List<Aluno>, modifier: Modifier = Modifier) {
         return
     }
     Surface(shape = CantoCartao, color = Cartao, modifier = modifier) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Surface(shape = RoundedCornerShape(50), color = Pilula, modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Filled.Search, null, tint = TextoSecundario, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Text("Buscar aluno", color = TextoSecundario, fontSize = 15.sp)
-                }
+        Column(
+            (if (rolavel) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(Modifier.padding(start = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Alunos (${alunos.size})", color = TextoPrincipal, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
+            Text(
+                "Pseudônimos, com o pior estado de cada aluno.",
+                color = TextoSecundario, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp),
+            )
             Spacer(Modifier.height(4.dp))
 
-            // Linha "Turma toda" destacada
+            // Linha "Turma toda" destacada: o grafo mostra a turma inteira.
             Surface(shape = RoundedCornerShape(14.dp), color = AzulFundo, modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
@@ -346,13 +376,13 @@ private fun ListaAlunos(alunos: List<Aluno>, modifier: Modifier = Modifier) {
 
             alunos.forEach { aluno ->
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(
                         Modifier.size(32.dp).clip(CircleShape).background(Pilula),
                         contentAlignment = Alignment.Center,
-                    ) { Text(aluno.nome.last().toString(), color = TextoCorpo, fontSize = 14.sp) }
+                    ) { Text(aluno.nome.takeLast(2), color = TextoCorpo, fontSize = 12.sp) }
                     Spacer(Modifier.width(14.dp))
                     Text(aluno.nome, color = TextoPrincipal, fontSize = 15.sp, modifier = Modifier.weight(1f))
                     SeloEstado(aluno.estado)
@@ -363,39 +393,27 @@ private fun ListaAlunos(alunos: List<Aluno>, modifier: Modifier = Modifier) {
 }
 
 // ---------------------------------------------------------------------------
-// Grafo da turma
+// Grafo da turma (layout automático em camadas)
 // ---------------------------------------------------------------------------
 
-/** Posição (fração da largura/altura) e diâmetro de cada nó do grafo. */
-private data class No(val nome: String, val x: Float, val y: Float, val diametro: Dp, val estado: EstadoConceito?)
+private val DiametroMinimo = 36.dp
+private val DiametroMaximo = 72.dp
+private val LarguraRotulo = 128.dp
+/** Espaço abaixo do círculo reservado ao rótulo (até 3 linhas). */
+private val AlturaRotulo = 52.dp
 
-private val Nos = listOf(
-    No("Funções", 0.11f, 0.46f, 64.dp, EstadoConceito.Consolidado),
-    No("Limites", 0.30f, 0.27f, 58.dp, EstadoConceito.Consolidado),
-    No("Continuidade", 0.30f, 0.66f, 44.dp, EstadoConceito.Desenvolvimento),
-    No("Derivada", 0.51f, 0.42f, 62.dp, EstadoConceito.Desenvolvimento),
-    No("Regra da cadeia", 0.72f, 0.19f, 60.dp, EstadoConceito.Revisar),
-    No("Otimização", 0.88f, 0.40f, 38.dp, EstadoConceito.Desenvolvimento),
-    No("Derivada implícita", 0.72f, 0.57f, 42.dp, EstadoConceito.Revisar),
-    No("Integral", 0.51f, 0.81f, 32.dp, null), // ainda sem dados
-)
-
-private val Arestas = listOf(
-    "Funções" to "Limites",
-    "Funções" to "Continuidade",
-    "Limites" to "Continuidade",
-    "Limites" to "Derivada",
-    "Derivada" to "Regra da cadeia",
-    "Derivada" to "Otimização",
-    "Derivada" to "Derivada implícita",
-    "Regra da cadeia" to "Derivada implícita",
-    "Derivada" to "Integral",
-)
-
-private const val NoSelecionado = "Regra da cadeia"
+/** Tamanho = nº de respostas (raiz quadrada: a área cresce com as respostas), entre o mínimo e o máximo. */
+private fun diametro(conceito: ConceitoGrafo, maxRespostas: Int): Dp =
+    if (conceito.semDados || maxRespostas == 0) DiametroMinimo
+    else DiametroMinimo + (DiametroMaximo - DiametroMinimo) * sqrt(conceito.respostas.toFloat() / maxRespostas)
 
 @Composable
-private fun CartaoGrafo(modifier: Modifier = Modifier) {
+private fun CartaoGrafo(
+    grafo: GrafoTurma,
+    selecionado: String?,
+    onSelecionar: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Surface(shape = CantoCartao, color = Cartao, modifier = modifier) {
         Column(Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -417,62 +435,91 @@ private fun CartaoGrafo(modifier: Modifier = Modifier) {
                             )
                         }
                     }
+                    Row(Modifier.align(Alignment.CenterVertically), verticalAlignment = Alignment.CenterVertically) {
+                        SeloSemDados(16.dp)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Sem dados", color = TextoCorpo, fontSize = 13.sp)
+                    }
                     Text(
                         "Tamanho = nº de respostas", color = TextoSecundario, fontSize = 13.sp,
                         modifier = Modifier.align(Alignment.CenterVertically),
                     )
                 }
             }
-            DesenhoGrafo(Modifier.fillMaxWidth().weight(1f))
+            DesenhoGrafo(grafo, selecionado, onSelecionar, Modifier.fillMaxWidth().weight(1f))
         }
     }
 }
 
 @Composable
-private fun DesenhoGrafo(modifier: Modifier = Modifier) {
-    val porNome = Nos.associateBy { it.nome }
+private fun DesenhoGrafo(
+    grafo: GrafoTurma,
+    selecionado: String?,
+    onSelecionar: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val conceitos = grafo.conceitos
+    val layout = remember(conceitos) { layoutEmCamadas(conceitos.associate { it.nome to it.prerequisitos }) }
+    val maxRespostas = conceitos.maxOfOrNull { it.respostas } ?: 0
+    val diametros = conceitos.associate { it.nome to diametro(it, maxRespostas) }
 
-    Box(modifier) {
-        // Arestas com seta, cortadas na borda de cada nó.
+    BoxWithConstraints(modifier.padding(top = 12.dp)) {
+        val largura = maxWidth
+        val altura = maxHeight
+        // Centro do círculo de cada nó, em dp. Na vertical, desconta o espaço do rótulo embaixo.
+        fun centro(nome: String): Pair<Dp, Dp> {
+            val p = layout.getValue(nome)
+            val util = (altura - AlturaRotulo - 8.dp).coerceAtLeast(0.dp)
+            return largura * p.x to (8.dp + util * p.y)
+        }
+
+        // Arestas pré-requisito → conceito, com seta, cortadas na borda de cada nó.
         Canvas(Modifier.fillMaxSize()) {
             val cor = Color(0xFFBDB9B1)
             val traco = 1.5.dp.toPx()
             val tamanhoSeta = 8.dp.toPx()
-            Arestas.forEach { (de, para) ->
-                val a = porNome.getValue(de)
-                val b = porNome.getValue(para)
-                val pa = Offset(a.x * size.width, a.y * size.height)
-                val pb = Offset(b.x * size.width, b.y * size.height)
-                val dir = (pb - pa) / (pb - pa).getDistance()
-                val inicio = pa + dir * (a.diametro.toPx() / 2 + 4.dp.toPx())
-                val fim = pb - dir * (b.diametro.toPx() / 2 + 4.dp.toPx())
-                drawLine(cor, inicio, fim, strokeWidth = traco, cap = StrokeCap.Round)
+            conceitos.forEach { c ->
+                c.prerequisitos.filter { it in layout }.forEach { pre ->
+                    val (ax, ay) = centro(pre)
+                    val (bx, by) = centro(c.nome)
+                    val pa = Offset(ax.toPx(), ay.toPx())
+                    val pb = Offset(bx.toPx(), by.toPx())
+                    val distancia = (pb - pa).getDistance()
+                    if (distancia == 0f) return@forEach
+                    val dir = (pb - pa) / distancia
+                    val inicio = pa + dir * (diametros.getValue(pre).toPx() / 2 + 4.dp.toPx())
+                    val fim = pb - dir * (diametros.getValue(c.nome).toPx() / 2 + 4.dp.toPx())
+                    drawLine(cor, inicio, fim, strokeWidth = traco, cap = StrokeCap.Round)
 
-                val normal = Offset(-dir.y, dir.x)
-                val base = fim - dir * tamanhoSeta
-                val seta = Path().apply {
-                    moveTo(fim.x, fim.y)
-                    lineTo(base.x + normal.x * tamanhoSeta / 2, base.y + normal.y * tamanhoSeta / 2)
-                    moveTo(fim.x, fim.y)
-                    lineTo(base.x - normal.x * tamanhoSeta / 2, base.y - normal.y * tamanhoSeta / 2)
+                    val normal = Offset(-dir.y, dir.x)
+                    val base = fim - dir * tamanhoSeta
+                    val seta = Path().apply {
+                        moveTo(fim.x, fim.y)
+                        lineTo(base.x + normal.x * tamanhoSeta / 2, base.y + normal.y * tamanhoSeta / 2)
+                        moveTo(fim.x, fim.y)
+                        lineTo(base.x - normal.x * tamanhoSeta / 2, base.y - normal.y * tamanhoSeta / 2)
+                    }
+                    drawPath(seta, cor, style = Stroke(width = traco, cap = StrokeCap.Round))
                 }
-                drawPath(seta, cor, style = Stroke(width = traco, cap = StrokeCap.Round))
             }
         }
 
-        // Nós: cada filho é (círculo + rótulo) e é posicionado com o centro do círculo no ponto.
+        // Nós: cada filho é (círculo + rótulo), posicionado com o centro do círculo no ponto do layout.
         Layout(
             modifier = Modifier.fillMaxSize(),
-            content = { Nos.forEach { NoDoGrafo(it) } },
+            content = {
+                conceitos.forEach { c ->
+                    NoDoGrafo(c, diametros.getValue(c.nome), c.nome == selecionado, onClick = { onSelecionar(c.nome) })
+                }
+            },
         ) { medidas, restricoes ->
             val livres = restricoes.copy(minWidth = 0, minHeight = 0)
             val colocaveis = medidas.map { it.measure(livres) }
             layout(restricoes.maxWidth, restricoes.maxHeight) {
                 colocaveis.forEachIndexed { i, p ->
-                    val no = Nos[i]
-                    val cx = (no.x * restricoes.maxWidth).toInt()
-                    val cy = (no.y * restricoes.maxHeight).toInt()
-                    p.place(cx - p.width / 2, cy - no.diametro.roundToPx() / 2)
+                    val c = conceitos[i]
+                    val (cx, cy) = centro(c.nome)
+                    p.place(cx.roundToPx() - p.width / 2, cy.roundToPx() - diametros.getValue(c.nome).roundToPx() / 2)
                 }
             }
         }
@@ -480,98 +527,132 @@ private fun DesenhoGrafo(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun NoDoGrafo(no: No) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        val estado = no.estado
-        if (estado == null) {
-            Box(
-                Modifier
-                    .size(no.diametro)
-                    .clip(CircleShape)
-                    .background(Cartao)
-                    .border(BorderStroke(1.5.dp, BordaTracejada), CircleShape),
-                contentAlignment = Alignment.Center,
-            ) { Text("?", color = TextoSecundario, fontWeight = FontWeight.Bold) }
-        } else if (no.nome == NoSelecionado) {
-            // Nó em foco ganha um anel preto em volta.
-            Box(
-                Modifier.size(no.diametro).border(3.dp, TextoPrincipal, CircleShape).padding(5.dp),
-                contentAlignment = Alignment.Center,
-            ) { SeloEstado(estado, tamanho = no.diametro - 10.dp) }
-        } else {
-            SeloEstado(estado, tamanho = no.diametro)
+private fun NoDoGrafo(conceito: ConceitoGrafo, diametro: Dp, selecionado: Boolean, onClick: () -> Unit) {
+    val estado = conceito.estado
+    val descricao = buildString {
+        append(conceito.nome).append(": ")
+        if (estado == null || conceito.semDados) append("sem dados")
+        else append("${estado.rotulo}, domínio estimado ${porcento(conceito.media)}")
+    }
+    Column(
+        modifier = Modifier
+            .widthIn(max = LarguraRotulo)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = descricao }
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // Nó em foco ganha um anel preto em volta.
+        Box(
+            if (selecionado) Modifier.size(diametro).border(3.dp, TextoPrincipal, CircleShape).padding(5.dp)
+            else Modifier.size(diametro),
+            contentAlignment = Alignment.Center,
+        ) {
+            val interno = if (selecionado) diametro - 10.dp else diametro
+            if (estado == null || conceito.semDados) SeloSemDados(interno) else SeloEstado(estado, tamanho = interno)
         }
         Spacer(Modifier.height(4.dp))
         Text(
-            no.nome,
+            conceito.nome,
             color = TextoPrincipal,
             fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
+            lineHeight = 14.sp,
+            fontWeight = if (selecionado) FontWeight.Bold else FontWeight.SemiBold,
             textAlign = TextAlign.Center,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
+/** Conceito ainda sem respostas: círculo cinza com "?". */
+@Composable
+private fun SeloSemDados(tamanho: Dp) {
+    Box(
+        Modifier
+            .size(tamanho)
+            .clip(CircleShape)
+            .background(Pilula)
+            .border(BorderStroke(1.5.dp, BordaTracejada), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("?", color = TextoSecundario, fontSize = (tamanho.value * 0.45f).sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun CarregandoGrafo(modifier: Modifier = Modifier) {
+    Surface(shape = CantoCartao, color = Cartao, modifier = modifier) {
+        Column(
+            Modifier.fillMaxWidth().padding(48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
+        ) {
+            CircularProgressIndicator(color = Consolidado)
+            Text("Carregando o grafo da turma…", color = TextoCorpo, fontSize = 15.sp)
+        }
+    }
+}
+
+@Composable
+private fun ErroGrafo(mensagem: String, onTentarDeNovo: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(shape = CantoCartao, color = Cartao, modifier = modifier) {
+        Column(
+            Modifier.fillMaxWidth().padding(36.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
+        ) {
+            Box(
+                Modifier.size(64.dp).clip(CircleShape).background(EtiquetaVermelhaFundo),
+                contentAlignment = Alignment.Center,
+            ) { Text("!", color = EtiquetaVermelhaTexto, fontSize = 26.sp, fontWeight = FontWeight.Bold) }
+            Text(
+                "Não foi possível carregar o grafo", color = TextoPrincipal, fontSize = 20.sp,
+                fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+            )
+            Text(mensagem, color = TextoCorpo, fontSize = 15.sp, textAlign = TextAlign.Center)
+            Button(
+                onClick = onTentarDeNovo,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Consolidado),
+            ) { Text("Tentar de novo", fontWeight = FontWeight.SemiBold) }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
-// Linha do tempo (semanas)
+// Demonstração: simular respostas da turma
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun LinhaDoTempo(modifier: Modifier = Modifier) {
-    val semanaAtual = 8
-    val total = 16
-    val marcadas = listOf(2, 4, 6, 7, 8, 10, 13)
-
-    Surface(shape = CantoCartao, color = Cartao, modifier = modifier) {
-        Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier.size(50.dp).clip(CircleShape).background(TextoPrincipal),
-                contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Filled.PlayArrow, "Reproduzir", tint = Cartao) }
-            Spacer(Modifier.width(20.dp))
-            Column(Modifier.weight(1f)) {
-                Row {
+private fun FaixaDemonstracao(onSimular: () -> Unit, simulando: Boolean, modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(18.dp), color = Cartao, border = BorderStroke(1.dp, BordaTracejada),
+        modifier = modifier,
+    ) {
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
                     Text(
-                        "Semana $semanaAtual de $total",
-                        color = TextoPrincipal, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                        "Demonstração: simula 25 alunos respondendo",
+                        color = TextoCorpo, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                     )
-                    Spacer(Modifier.width(12.dp))
                     Text(
-                        "Arraste para ver a turma no tempo",
-                        color = TextoSecundario, fontSize = 12.sp, maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.weight(1f),
+                        if (simulando) "Registrando as respostas e atualizando o domínio estimado…"
+                        else "Pseudônimos, sem dados pessoais. Rodar de novo substitui a simulação anterior.",
+                        color = TextoSecundario, fontSize = 12.sp,
                     )
                 }
-                Canvas(Modifier.fillMaxWidth().height(28.dp)) {
-                    val y = size.height / 2
-                    fun xDa(semana: Int) = (semana - 1f) / (total - 1f) * size.width
-                    drawLine(Trilho, Offset(0f, y), Offset(size.width, y), 4.dp.toPx(), StrokeCap.Round)
-                    drawLine(TextoPrincipal, Offset(0f, y), Offset(xDa(semanaAtual), y), 4.dp.toPx(), StrokeCap.Round)
-                    marcadas.forEach { s ->
-                        val c = Offset(xDa(s), y)
-                        if (s == semanaAtual) {
-                            drawCircle(Cartao, 11.dp.toPx(), c)
-                            drawCircle(TextoPrincipal, 11.dp.toPx(), c, style = Stroke(3.dp.toPx()))
-                        } else if (s < semanaAtual) {
-                            drawCircle(Cartao, 5.dp.toPx(), c)
-                            drawCircle(TextoPrincipal, 5.dp.toPx(), c, style = Stroke(2.dp.toPx()))
-                        } else {
-                            drawCircle(BordaTracejada, 5.dp.toPx(), c)
-                        }
-                    }
-                }
-                Row {
-                    listOf("Sem 1", "Sem 4", "Sem 8", "Sem 12", "Sem 16").forEachIndexed { i, rotulo ->
-                        if (i > 0) Spacer(Modifier.weight(1f))
-                        Text(rotulo, color = TextoSecundario, fontSize = 11.sp)
-                    }
+                Spacer(Modifier.width(12.dp))
+                TextButton(onClick = onSimular, enabled = !simulando) {
+                    Text(
+                        if (simulando) "Simulando…" else "Simular respostas da turma",
+                        color = if (simulando) TextoSecundario else Consolidado, fontWeight = FontWeight.SemiBold,
+                    )
                 }
             }
+            if (simulando) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Consolidado, trackColor = Pilula)
         }
     }
 }
@@ -580,15 +661,24 @@ private fun LinhaDoTempo(modifier: Modifier = Modifier) {
 // Painel do conceito selecionado
 // ---------------------------------------------------------------------------
 
+private fun porcento(valor: Double?): String = valor?.let { "${(it * 100).roundToInt()}%" } ?: "—"
+
+private fun EstadoConceito.simbolo() = when (this) {
+    EstadoConceito.Consolidado -> "✓"
+    EstadoConceito.Desenvolvimento -> "~"
+    EstadoConceito.Revisar -> "!"
+}
+
 @Composable
 private fun PainelConceito(
-    alunos: Int,
-    onFechar: () -> Unit,
+    conceito: ConceitoGrafo,
+    grafo: GrafoTurma,
     onReforco: () -> Unit,
     onVerAlunos: () -> Unit,
     preencherAltura: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val estado = conceito.estado.takeUnless { conceito.semDados }
     Surface(shape = CantoCartao, color = Cartao, modifier = modifier) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             // No tablet o conteúdo rola e os botões ficam fixos no rodapé do painel.
@@ -596,19 +686,20 @@ private fun PainelConceito(
                 modifier = if (preencherAltura) Modifier.weight(1f).verticalScroll(rememberScrollState()) else Modifier,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Conceito", color = TextoSecundario, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                    Surface(onClick = onFechar, shape = CircleShape, color = Pilula, modifier = Modifier.size(40.dp)) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Filled.Close, "Fechar", tint = TextoPrincipal, modifier = Modifier.size(18.dp))
-                        }
-                    }
+                Text("Conceito", color = TextoSecundario, fontSize = 14.sp)
+                Text(conceito.nome, color = TextoPrincipal, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+
+                val (fundo, cor) = when (estado) {
+                    EstadoConceito.Revisar -> EtiquetaVermelhaFundo to EtiquetaVermelhaTexto
+                    EstadoConceito.Desenvolvimento -> AmareloFundo to AmareloTexto
+                    EstadoConceito.Consolidado -> EtiquetaAzulFundo to EtiquetaAzulTexto
+                    null -> Pilula to TextoCorpo
                 }
-                Text(NoSelecionado, color = TextoPrincipal, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                Surface(shape = RoundedCornerShape(10.dp), color = EtiquetaVermelhaFundo) {
+                Surface(shape = RoundedCornerShape(10.dp), color = fundo) {
                     Text(
-                        "! Revisar · domínio estimado 42%",
-                        color = EtiquetaVermelhaTexto, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                        if (estado == null) "? Sem dados · ainda sem respostas"
+                        else "${estado.simbolo()} ${estado.rotulo} · domínio estimado ${porcento(conceito.media)}",
+                        color = cor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     )
                 }
@@ -621,46 +712,27 @@ private fun PainelConceito(
                     )
                 }
 
-                Surface(shape = RoundedCornerShape(18.dp), color = LaranjaFundo, modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("Domínio da turma nas últimas semanas", color = TextoCorpo, fontSize = 12.sp)
-                        Canvas(Modifier.fillMaxWidth().height(56.dp).padding(vertical = 10.dp)) {
-                            val pontos = listOf(0.15f, 0.2f, 0.45f, 0.75f, 0.95f)
-                            val caminho = Path()
-                            pontos.forEachIndexed { i, v ->
-                                val p = Offset(i / (pontos.size - 1f) * size.width, size.height * (1 - v))
-                                if (i == 0) caminho.moveTo(p.x, p.y) else caminho.lineTo(p.x, p.y)
-                            }
-                            drawPath(caminho, Revisar, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
-                            drawCircle(Revisar, 4.dp.toPx(), Offset(size.width, size.height * (1 - pontos.last())))
-                        }
-                        Text("Subindo: +22 pontos desde a semana 5", color = LaranjaTexto, fontSize = 12.sp)
+                if (estado == null) {
+                    Text(
+                        "O domínio estimado aparece quando os alunos responderem a questões deste conceito.",
+                        color = TextoCorpo, fontSize = 14.sp,
+                    )
+                } else {
+                    MiniNumero(
+                        porcento(conceito.media),
+                        "domínio estimado médio · mediana ${porcento(conceito.mediana)}",
+                        Modifier.fillMaxWidth(),
+                    )
+                    Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        MiniNumero("${conceito.respostas}", "respostas", Modifier.weight(1f).fillMaxHeight())
+                        MiniNumero(
+                            "${conceito.alunosRevisar}/${conceito.alunos}", "alunos com dificuldade",
+                            Modifier.weight(1f).fillMaxHeight(),
+                        )
                     }
                 }
 
-                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // Exemplo coerente com a turma: ~3 respostas por aluno neste conceito e, com domínio
-                    // estimado de 42%, cerca de 58% dos alunos com dificuldade.
-                    val respostas = alunos * 3
-                    val comDificuldade = (alunos * 0.58).roundToInt()
-                    MiniNumero("$respostas", "respostas", Modifier.weight(1f).fillMaxHeight())
-                    MiniNumero(
-                        if (alunos == 0) "0" else "$comDificuldade/$alunos", "com dificuldade",
-                        Modifier.weight(1f).fillMaxHeight(),
-                    )
-                }
-
-                Surface(shape = RoundedCornerShape(16.dp), color = CremeFundo, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        buildAnnotatedString {
-                            append("Causa raiz provável: ")
-                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("Derivada") }
-                            append(", pré-requisito ainda em desenvolvimento.")
-                        },
-                        color = AmareloTexto, fontSize = 13.sp,
-                        modifier = Modifier.padding(14.dp),
-                    )
-                }
+                CausaRaiz(conceito, grafo)
             }
 
             Button(
@@ -679,6 +751,33 @@ private fun PainelConceito(
     }
 }
 
+/** "Causa raiz provável": o pré-requisito (direto ou indireto) mais fraco, se não estiver consolidado. */
+@Composable
+private fun CausaRaiz(conceito: ConceitoGrafo, grafo: GrafoTurma) {
+    val causa = grafo.causaRaiz(conceito.nome)
+    val texto = when {
+        causa != null -> buildAnnotatedString {
+            append("Causa raiz provável: ")
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(causa.nome) }
+            append(", pré-requisito ")
+            append(if (causa.nome in conceito.prerequisitos) "direto" else "indireto")
+            append(
+                if (causa.estado == EstadoConceito.Revisar) " a revisar"
+                else " ainda em desenvolvimento"
+            )
+            append(" (domínio estimado ${porcento(causa.media)}).")
+        }
+        conceito.semDados || conceito.estado == EstadoConceito.Consolidado -> null
+        grafo.ancestrais(conceito.nome).isEmpty() -> null
+        else -> buildAnnotatedString {
+            append("Os pré-requisitos estão consolidados: a dificuldade parece estar no próprio conceito.")
+        }
+    } ?: return
+    Surface(shape = RoundedCornerShape(16.dp), color = CremeFundo, modifier = Modifier.fillMaxWidth()) {
+        Text(texto, color = AmareloTexto, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
+    }
+}
+
 @Composable
 private fun MiniNumero(numero: String, legenda: String, modifier: Modifier = Modifier) {
     Surface(shape = RoundedCornerShape(16.dp), color = Fundo, modifier = modifier) {
@@ -690,7 +789,7 @@ private fun MiniNumero(numero: String, legenda: String, modifier: Modifier = Mod
 }
 
 // ---------------------------------------------------------------------------
-// Estado vazio (turma sem dados de aprendizagem)
+// Estado vazio (turma sem atividade publicada)
 // ---------------------------------------------------------------------------
 
 @Composable
@@ -745,7 +844,7 @@ private fun EstadoVazio(onNovaAtividade: () -> Unit, rolavel: Boolean, modifier:
                     onClick = onNovaAtividade,
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Consolidado),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 22.dp, vertical = 14.dp),
+                    contentPadding = PaddingValues(horizontal = 22.dp, vertical = 14.dp),
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
@@ -760,16 +859,31 @@ private fun EstadoVazio(onNovaAtividade: () -> Unit, rolavel: Boolean, modifier:
 // Previews
 // ---------------------------------------------------------------------------
 
+private val TurmaComDados = DadosExemplo.turmas.first().copy(atividades = 3)
+private val GrafoExemplo = EstadoGrafo.Pronto(DadosTurmaExemplo.grafo)
+
 @Preview(name = "Turma · Tablet", widthDp = 1280, heightDp = 800, showBackground = true)
 @Composable
 private fun PreviewTurmaTablet() {
-    EdutecTheme { TurmaScreen(DadosExemplo.turmas.first(), onVoltar = {}, onNovaAtividade = {}) }
+    EdutecTheme { TurmaScreen(TurmaComDados, GrafoExemplo, onVoltar = {}, onNovaAtividade = {}, onSimular = {}) }
 }
 
-@Preview(name = "Turma · Celular", widthDp = 400, heightDp = 1600, showBackground = true)
+@Preview(name = "Turma · Celular", widthDp = 400, heightDp = 1900, showBackground = true)
 @Composable
 private fun PreviewTurmaCelular() {
-    EdutecTheme { TurmaScreen(DadosExemplo.turmas.first(), onVoltar = {}, onNovaAtividade = {}) }
+    EdutecTheme { TurmaScreen(TurmaComDados, GrafoExemplo, onVoltar = {}, onNovaAtividade = {}, onSimular = {}) }
+}
+
+@Preview(name = "Turma publicada, sem respostas · Tablet", widthDp = 1280, heightDp = 800, showBackground = true)
+@Composable
+private fun PreviewTurmaSemRespostasTablet() {
+    val semRespostas = GrafoTurma(DadosTurmaExemplo.grafo.conceitos.map { ConceitoGrafo(it.nome, it.prerequisitos) }, emptyList())
+    EdutecTheme {
+        TurmaScreen(
+            TurmaComDados.copy(alunos = 0), EstadoGrafo.Pronto(semRespostas),
+            onVoltar = {}, onNovaAtividade = {}, onSimular = {}, simulando = true,
+        )
+    }
 }
 
 private val TurmaNova = Turma(
@@ -780,11 +894,11 @@ private val TurmaNova = Turma(
 @Preview(name = "Turma sem dados · Tablet", widthDp = 1280, heightDp = 800, showBackground = true)
 @Composable
 private fun PreviewTurmaVaziaTablet() {
-    EdutecTheme { TurmaScreen(TurmaNova, onVoltar = {}, onNovaAtividade = {}) }
+    EdutecTheme { TurmaScreen(TurmaNova, EstadoGrafo.Carregando, onVoltar = {}, onNovaAtividade = {}) }
 }
 
 @Preview(name = "Turma sem dados · Celular", widthDp = 400, heightDp = 1100, showBackground = true)
 @Composable
 private fun PreviewTurmaVaziaCelular() {
-    EdutecTheme { TurmaScreen(TurmaNova, onVoltar = {}, onNovaAtividade = {}) }
+    EdutecTheme { TurmaScreen(TurmaNova, EstadoGrafo.Carregando, onVoltar = {}, onNovaAtividade = {}) }
 }
