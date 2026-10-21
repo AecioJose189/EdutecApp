@@ -6,7 +6,7 @@
 //   formato      multipla_escolha | aberta | mista (padrão mista)
 //   dificuldade  facil | media | dificil (padrão media)
 //
-// Saída 200: { conceitos, questoes, arquivo, modelo, tokens, duracao_ms }
+// Saída 200: { conceitos, questoes, arquivo, modelo, nivel_raciocinio, tokens, duracao_ms }
 // Erro:      { erro: "..." } com status 4xx/5xx.
 //
 // Autenticação: verify_jwt = false (config.toml), porque a chave publishable (sb_publishable_...)
@@ -94,6 +94,7 @@ Deno.serve(async (req) => {
       questoes: resposta.dados.questoes,
       arquivo: `${BUCKET}/${caminho}`,
       modelo: resposta.modelo,
+      nivel_raciocinio: resposta.nivelRaciocinio,
       tokens: resposta.tokens,
       duracao_ms: Date.now() - inicio,
     });

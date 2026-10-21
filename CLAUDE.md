@@ -57,12 +57,13 @@ Back-end (Supabase, projeto `vuxnyjkykftecqgznswg`, em `supabase/`):
   `formato`, `dificuldade`; salva no bucket privado `materiais`; pede conceitos e questões ao Gemini
   numa única chamada (TODO: uma questão por chamada) e valida a resposta (RN07 etc.).
 - Gemini isolado em `supabase/functions/_shared/gemini.ts` (REST `generateContent`, modelo por
-  `GEMINI_MODEL`, padrão `gemini-3.8-flash`).
+  `GEMINI_MODEL`, padrão `gemini-3.8-flash`; raciocínio por `GEMINI_THINKING_LEVEL`, padrão `low`).
 - Autenticação: `verify_jwt = false`; a função aceita só a chave pública do projeto no cabeçalho
   `apikey` (publishable ou legacy anon). Qualquer um com o APK pode gastar a cota do Gemini.
 - Teste: `scripts/testar-geracao.sh [pdf]` (URL e chave pública em `local.properties`:
   `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`) → `amostras/resultado.json` (pasta fora do git).
-- Testado de ponta a ponta com PDF real (2,5 MB, 5 questões mistas): ~85 s dentro da função.
+- Testado de ponta a ponta com PDF real (2,5 MB, 5 questões mistas): ~67 s dentro da função com
+  raciocínio `low` (~85 s com o padrão do modelo, `medium`, sem ganho visível de qualidade).
   Perto do limite de 150 s; com mais questões, dividir as chamadas (ver TODO).
 
 Ainda não existe: integração do app com a função, login, RLS, lado do aluno, etapas Gerando/Revisão/Publicar.

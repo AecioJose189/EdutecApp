@@ -12,6 +12,12 @@ import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 // Pode ser trocado sem novo deploy do código: `supabase secrets set GEMINI_MODEL=...`.
 const MODELO_PADRAO = "gemini-3.8-flash";
 const URL_BASE = "https://generativelanguage.googleapis.com/v1beta";
+// Nível de raciocínio (thinkingConfig.thinkingLevel). O gemini-3.8-flash aceita low | medium | high
+// (padrão do modelo: medium; "minimal" não é suportado nele). "low" manteve a qualidade das
+// questões e reduz o tempo. Configurável por `supabase secrets set GEMINI_THINKING_LEVEL=...`.
+// Docs: https://ai.google.dev/gemini-api/docs/thinking
+const NIVEL_RACIOCINIO_PADRAO = "low";
+const NIVEIS_RACIOCINIO = ["minimal", "low", "medium", "high"];
 // A Edge Function tem 150 s de duração; deixa folga para o resto do pedido.
 const TEMPO_LIMITE_MS = 120_000;
 
@@ -35,11 +41,23 @@ export interface PedidoJsonComPdf {
 export interface RespostaJson<T> {
   dados: T;
   modelo: string;
-  tokens: { entrada: number; saida: number; total: number } | null;
+  nivelRaciocinio: string;
+  tokens: { entrada: number; saida: number; raciocinio: number; total: number } | null;
 }
 
 export function modeloAtual(): string {
   return Deno.env.get("GEMINI_MODEL")?.trim() || MODELO_PADRAO;
+}
+
+export function nivelRaciocinioAtual(): string {
+  const nivel = Deno.env.get("GEMINI_THINKING_LEVEL")?.trim().toLowerCase() || NIVEL_RACIOCINIO_PADRAO;
+  if (!NIVEIS_RACIOCINIO.includes(nivel)) {
+    throw new ErroGemini(
+      `GEMINI_THINKING_LEVEL inválido: "${nivel}" (use ${NIVEIS_RACIOCINIO.join(", ")}).`,
+      500,
+    );
+  }
+  return nivel;
 }
 
 /** Envia um PDF (inline, base64) e devolve a resposta já interpretada como JSON. */
@@ -49,6 +67,7 @@ export async function gerarJsonComPdf<T>(pedido: PedidoJsonComPdf): Promise<Resp
     throw new ErroGemini("GEMINI_API_KEY não está configurada nos secrets da função.", 500);
   }
   const modelo = modeloAtual();
+  const nivelRaciocinio = nivelRaciocinioAtual();
 
   const corpo = {
     systemInstruction: { parts: [{ text: pedido.instrucaoSistema }] },
@@ -63,6 +82,7 @@ export async function gerarJsonComPdf<T>(pedido: PedidoJsonComPdf): Promise<Resp
       responseMimeType: "application/json",
       responseSchema: pedido.schema,
       temperature: pedido.temperatura ?? 0.4,
+      thinkingConfig: { thinkingLevel: nivelRaciocinio },
     },
   };
 
@@ -120,10 +140,12 @@ export async function gerarJsonComPdf<T>(pedido: PedidoJsonComPdf): Promise<Resp
   return {
     dados,
     modelo: json.modelVersion ?? modelo,
+    nivelRaciocinio,
     tokens: uso
       ? {
         entrada: uso.promptTokenCount ?? 0,
         saida: uso.candidatesTokenCount ?? 0,
+        raciocinio: uso.thoughtsTokenCount ?? 0,
         total: uso.totalTokenCount ?? 0,
       }
       : null,
