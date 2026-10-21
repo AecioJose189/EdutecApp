@@ -30,6 +30,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -66,6 +67,9 @@ import com.edutec.app.ui.theme.TextoCorpo
 import com.edutec.app.ui.theme.TextoPrincipal
 import com.edutec.app.ui.theme.TextoSecundario
 import com.edutec.app.ui.theme.Trilho
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 private val CantoCartao = RoundedCornerShape(24.dp)
 private val Espaco = 14.dp
@@ -75,12 +79,18 @@ private val Espaco = 14.dp
  * Tablet: conceitos no topo e lista + detalhe das questões. Celular: tudo numa coluna.
  */
 @Composable
-fun RevisaoConteudo(estado: EstadoGeracao.Concluido, expandido: Boolean, modifier: Modifier = Modifier) {
+fun RevisaoConteudo(
+    estado: EstadoGeracao.Concluido,
+    expandido: Boolean,
+    /** "Gerar novas questões" quando o resultado foi reaproveitado (envia forcar_nova = true). */
+    onGerarNovas: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val atividade = estado.resultado
     if (expandido) {
         var selecionada by rememberSaveable { mutableIntStateOf(0) }
         Column(modifier, verticalArrangement = Arrangement.spacedBy(Espaco)) {
-            AvisoRevisao(estado)
+            AvisoRevisao(estado, onGerarNovas)
             CartaoConceitos(atividade.conceitos, emUmaLinha = true)
             Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(Espaco)) {
                 Surface(shape = CantoCartao, color = Cartao, modifier = Modifier.width(380.dp).fillMaxHeight()) {
@@ -111,7 +121,7 @@ fun RevisaoConteudo(estado: EstadoGeracao.Concluido, expandido: Boolean, modifie
         }
     } else {
         LazyColumn(modifier, verticalArrangement = Arrangement.spacedBy(Espaco)) {
-            item { AvisoRevisao(estado) }
+            item { AvisoRevisao(estado, onGerarNovas) }
             item { CartaoConceitos(atividade.conceitos, emUmaLinha = false) }
             itemsIndexed(atividade.questoes) { i, q ->
                 Surface(shape = CantoCartao, color = Cartao, modifier = Modifier.fillMaxWidth()) {
@@ -123,15 +133,19 @@ fun RevisaoConteudo(estado: EstadoGeracao.Concluido, expandido: Boolean, modifie
 }
 
 @Composable
-private fun AvisoRevisao(estado: EstadoGeracao.Concluido) {
+private fun AvisoRevisao(estado: EstadoGeracao.Concluido, onGerarNovas: () -> Unit) {
     val atividade = estado.resultado
     Surface(shape = RoundedCornerShape(18.dp), color = RoxoFundo, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 buildString {
-                    append("A IA gerou ${atividade.questoes.size} questões e ${atividade.conceitos.size} conceitos")
+                    if (atividade.reaproveitado) {
+                        append("${atividade.questoes.size} questões e ${atividade.conceitos.size} conceitos")
+                    } else {
+                        append("A IA gerou ${atividade.questoes.size} questões e ${atividade.conceitos.size} conceitos")
+                    }
                     append(" a partir de \"${estado.pedido.nomeArquivo}\"")
-                    atividade.duracaoMs?.let { append(" em ${(it + 500) / 1000} s") }
+                    if (!atividade.reaproveitado) atividade.duracaoMs?.let { append(" em ${(it + 500) / 1000} s") }
                     append(".")
                 },
                 color = RoxoTexto, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
@@ -142,6 +156,45 @@ private fun AvisoRevisao(estado: EstadoGeracao.Concluido) {
             )
         }
     }
+    if (atividade.reaproveitado) AvisoReaproveitado(atividade.geradoEm, onGerarNovas)
+}
+
+/** RN12: o mesmo PDF com os mesmos parâmetros não é processado de novo, a menos que o professor peça. */
+@Composable
+private fun AvisoReaproveitado(geradoEm: String?, onGerarNovas: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(18.dp), color = Cartao, border = BorderStroke(1.dp, Trilho),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        FlowRow(
+            modifier = Modifier.padding(start = 18.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(Modifier.align(Alignment.CenterVertically), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Info, null, tint = TextoSecundario, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Este material já tinha sido processado em ${formatarData(geradoEm)} — resultado " +
+                        "reaproveitado, sem nova chamada à IA",
+                    color = TextoCorpo, fontSize = 13.sp,
+                )
+            }
+            TextButton(onClick = onGerarNovas, modifier = Modifier.align(Alignment.CenterVertically)) {
+                Text("Gerar novas questões", color = Consolidado, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+/** "2026-10-21T02:28:23.983Z" → "20/10/2026 às 23:28" (fuso do aparelho). */
+private fun formatarData(iso: String?): String {
+    if (iso == null) return "uma geração anterior"
+    return runCatching {
+        val entrada = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
+        val data = entrada.parse(iso.take(19))!!
+        SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", Locale("pt", "BR")).format(data)
+    }.getOrDefault("uma geração anterior")
 }
 
 // ---------------------------------------------------------------------------
@@ -406,13 +459,16 @@ private fun PreviewRevisaoTablet() {
     }
 }
 
-@Preview(name = "Revisão · Celular", widthDp = 400, heightDp = 1800, showBackground = true)
+@Preview(name = "Revisão (reaproveitada) · Celular", widthDp = 400, heightDp = 1800, showBackground = true)
 @Composable
 private fun PreviewRevisaoCelular() {
     EdutecTheme {
         NovaAtividadeScreen(
             DadosExemplo.turmas.first(), onFechar = {},
-            estado = EstadoGeracao.Concluido(PedidoExemplo, AtividadeExemplo),
+            estado = EstadoGeracao.Concluido(
+                PedidoExemplo,
+                AtividadeExemplo.copy(reaproveitado = true, geradoEm = "2026-10-21T02:28:23.983Z"),
+            ),
         )
     }
 }

@@ -13,6 +13,8 @@ data class PedidoGeracao(
     val formato: String,
     /** facil | media | dificil */
     val dificuldade: String,
+    /** true: gera de novo mesmo que o servidor já tenha um resultado para este PDF e parâmetros. */
+    val forcarNova: Boolean = false,
 )
 
 // Espelho do JSON devolvido por supabase/functions/gerar-atividade.
@@ -26,6 +28,10 @@ data class AtividadeGerada(
     @SerialName("nivel_raciocinio") val nivelRaciocinio: String? = null,
     val tokens: TokensGeracao? = null,
     @SerialName("duracao_ms") val duracaoMs: Long? = null,
+    /** true: o servidor devolveu o resultado salvo de uma geração anterior do mesmo PDF (RN12). */
+    val reaproveitado: Boolean = false,
+    /** Data da geração original, em ISO 8601 UTC (ex.: 2026-10-21T02:28:23.983Z). */
+    @SerialName("gerado_em") val geradoEm: String? = null,
 )
 
 @Serializable

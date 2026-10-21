@@ -304,7 +304,11 @@ fun NovaAtividadeScreen(
             when (estado) {
                 is EstadoGeracao.Gerando -> GerandoConteudo(estado, onCancelar = onVoltar, modifier = Modifier.weight(1f))
                 is EstadoGeracao.Erro -> ErroGeracaoConteudo(estado, onTentarDeNovo, onVoltar, Modifier.weight(1f))
-                is EstadoGeracao.Concluido -> RevisaoConteudo(estado, expandido, Modifier.fillMaxWidth().weight(1f))
+                is EstadoGeracao.Concluido -> RevisaoConteudo(
+                    estado, expandido,
+                    onGerarNovas = { onGerar(estado.pedido.copy(forcarNova = true)) },
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                )
                 EstadoGeracao.Ocioso -> if (expandido) {
                     Row(
                         modifier = Modifier.fillMaxWidth().weight(1f),
