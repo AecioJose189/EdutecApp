@@ -59,7 +59,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -144,6 +148,19 @@ private data class MaterialPdf(
     val enviado get() = arquivoLocal != null
 }
 
+/** Guarda o PDF escolhido no estado salvo da tela (sobrevive a girar a tela). */
+private val SaverPdf = Saver<MaterialPdf?, List<String>>(
+    save = { pdf -> pdf?.let { listOf(it.uri.toString(), it.nome, it.tamanho.toString(), it.arquivoLocal?.path.orEmpty()) } },
+    restore = { (uri, nome, tamanho, caminho) ->
+        MaterialPdf(Uri.parse(uri), nome, tamanho.toLong(), caminho.takeIf { it.isNotEmpty() }?.let(::File))
+    },
+)
+
+private val SaverSelecionados = listSaver<SnapshotStateList<String>, String>(
+    save = { it.toList() },
+    restore = { it.toMutableStateList() },
+)
+
 @Composable
 fun NovaAtividadeScreen(
     turma: Turma,
@@ -159,15 +176,17 @@ fun NovaAtividadeScreen(
     val context = LocalContext.current
     fun avisar(mensagem: String) = Toast.makeText(context, mensagem, Toast.LENGTH_SHORT).show()
 
-    var origem by remember { mutableStateOf(Origem.Grafo) }
-    val selecionados = remember { mutableStateListOf<String>().apply { addAll(conceitosIniciais) } }
-    var pdf by remember { mutableStateOf<MaterialPdf?>(null) }
+    // rememberSaveable: as escolhas sobrevivem a girar a tela (e à ida e volta de Gerando/Revisão).
+    // Turma sem grafo ainda começa direto em "Material em PDF".
+    var origem by rememberSaveable { mutableStateOf(if (conceitos.isEmpty()) Origem.Pdf else Origem.Grafo) }
+    val selecionados = rememberSaveable(saver = SaverSelecionados) { conceitosIniciais.toMutableStateList() }
+    var pdf by rememberSaveable(stateSaver = SaverPdf) { mutableStateOf<MaterialPdf?>(null) }
     var progressoEnvio by remember { mutableFloatStateOf(0f) }
-    var formato by remember { mutableStateOf(Formato.Mista) }
-    var quantidade by remember { mutableIntStateOf(QuantidadePadrao) }
-    var dificuldade by remember { mutableStateOf("Média") }
-    var permitirRefazer by remember { mutableStateOf(true) }
-    var tempo by remember { mutableStateOf("30 min") }
+    var formato by rememberSaveable { mutableStateOf(Formato.Mista) }
+    var quantidade by rememberSaveable { mutableIntStateOf(QuantidadePadrao) }
+    var dificuldade by rememberSaveable { mutableStateOf("Média") }
+    var permitirRefazer by rememberSaveable { mutableStateOf(true) }
+    var tempo by rememberSaveable { mutableStateOf("30 min") }
 
     val seletorPdf = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -209,8 +228,8 @@ fun NovaAtividadeScreen(
         append("$quantidade questões ${formato.adjetivo} sobre ")
         append(
             when (origem) {
-                Origem.Grafo -> conceitosOrdenados.joinToString(", ").ifEmpty { "[escolha os conceitos]" }
-                Origem.Pdf -> pdf?.let { "o material \"${it.nome}\"" } ?: "[envie um PDF]"
+                Origem.Grafo -> conceitosOrdenados.joinToString(", ").ifEmpty { "os conceitos que você escolher" }
+                Origem.Pdf -> pdf?.let { "o material \"${it.nome}\"" } ?: "o PDF que você enviar"
             }
         )
         append(" · ${if (permitirRefazer) "refazer livre" else "tentativa única"}")
@@ -353,7 +372,7 @@ private fun Cabecalho(turma: Turma, expandido: Boolean, etapa: Int, onFechar: ()
             Spacer(Modifier.width(16.dp))
             Column {
                 Text("Nova atividade", color = TextoPrincipal, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("${turma.nome} · [${turma.codigo}]", color = TextoSecundario, fontSize = 14.sp)
+                Text("${turma.nome} · ${turma.codigo}", color = TextoSecundario, fontSize = 14.sp)
             }
             Spacer(Modifier.weight(1f))
             if (expandido) Etapas(etapa)
@@ -498,6 +517,14 @@ private fun ConteudoGrafo(
     onSelecionarRevisar: () -> Unit,
 ) {
     val aRevisar = conceitos.count { it.estado == EstadoConceito.Revisar }
+
+    if (conceitos.isEmpty()) {
+        Text(
+            "Esta turma ainda não tem conceitos no grafo. Gere a primeira atividade a partir de um PDF.",
+            color = TextoCorpo, fontSize = 14.sp,
+        )
+        return
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (aRevisar > 0) {

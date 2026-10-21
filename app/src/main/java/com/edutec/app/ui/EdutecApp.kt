@@ -4,42 +4,34 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.edutec.app.data.DadosExemplo
-import com.edutec.app.data.Turma
+import com.edutec.app.data.DadosTurmaExemplo
+import com.edutec.app.data.semDados
 
 /**
  * Navegação simples por estado: Minhas turmas → Turma → Nova atividade (Origem/Formato → Gerando → Revisão).
- * O botão "voltar" do Android volta uma tela ou uma etapa.
+ * O botão "voltar" do Android volta uma tela ou uma etapa. Navegação e geração ficam em ViewModels
+ * (escopo da Activity), então girar a tela não perde a tela atual, a geração em andamento nem o resultado.
  */
 @Composable
 fun EdutecApp() {
-    val turmas = remember { mutableStateListOf<Turma>().apply { addAll(DadosExemplo.turmas) } }
-    var turmaAberta by remember { mutableStateOf<Turma?>(null) }
-    // null = tela de nova atividade fechada; caso contrário, os conceitos já marcados ao abrir.
-    var novaAtividade by remember { mutableStateOf<Set<String>?>(null) }
-    // O ViewModel sobrevive à recriação da Activity, mas a navegação acima não: ao abrir
-    // a Nova atividade ele é zerado, para não mostrar o resultado de uma sessão anterior.
+    val navegacao: NavegacaoViewModel = viewModel()
     val geracao: NovaAtividadeViewModel = viewModel()
 
-    val turma = turmaAberta
-    val conceitosIniciais = novaAtividade
+    val turma = navegacao.turmaAberta
+    val conceitosIniciais = navegacao.novaAtividade
 
     when {
-        turma == null -> MinhasTurmasScreen(turmas = turmas, onTurma = { turmaAberta = it })
+        turma == null -> MinhasTurmasScreen(turmas = navegacao.turmas, onTurma = navegacao::abrirTurma)
 
         conceitosIniciais == null -> {
-            BackHandler { turmaAberta = null }
+            BackHandler { navegacao.fecharTurma() }
             TurmaScreen(
                 turma = turma,
-                onVoltar = { turmaAberta = null },
+                onVoltar = navegacao::fecharTurma,
                 onNovaAtividade = {
-                    geracao.voltar()
-                    novaAtividade = it
+                    geracao.voltar() // não mostrar o resultado de uma sessão anterior
+                    navegacao.abrirNovaAtividade(it)
                 },
             )
         }
@@ -48,12 +40,14 @@ fun EdutecApp() {
             val estado by geracao.estado.collectAsState()
             val fechar = {
                 geracao.voltar() // cancela uma geração em andamento
-                novaAtividade = null
+                navegacao.fecharNovaAtividade()
             }
             BackHandler { if (estado == EstadoGeracao.Ocioso) fechar() else geracao.voltar() }
             NovaAtividadeScreen(
                 turma = turma,
                 conceitosIniciais = conceitosIniciais,
+                // Turma sem dados de aprendizagem ainda não tem grafo: só dá para gerar a partir de PDF.
+                conceitos = if (turma.semDados) emptyList() else DadosTurmaExemplo.conceitos,
                 onFechar = fechar,
                 estado = estado,
                 onGerar = geracao::gerar,
