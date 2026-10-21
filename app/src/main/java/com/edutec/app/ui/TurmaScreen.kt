@@ -145,7 +145,8 @@ fun TurmaScreen(
         }
 
         val vazio: @Composable (Modifier) -> Unit = { mod ->
-            EstadoVazio(onNovaAtividade = { onNovaAtividade(emptySet()) }, modifier = mod)
+            // Só rola sozinho no tablet; no celular a coluna da tela já rola (rolagem dentro de rolagem quebra).
+            EstadoVazio(onNovaAtividade = { onNovaAtividade(emptySet()) }, rolavel = expandido, modifier = mod)
         }
 
         if (turma.semDados) {
@@ -693,14 +694,17 @@ private fun MiniNumero(numero: String, legenda: String, modifier: Modifier = Mod
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun EstadoVazio(onNovaAtividade: () -> Unit, modifier: Modifier = Modifier) {
+private fun EstadoVazio(onNovaAtividade: () -> Unit, rolavel: Boolean, modifier: Modifier = Modifier) {
     val passos = listOf(
         "Envie um material em PDF",
         "Gere e publique uma atividade",
         "Compartilhe o código de convite",
     )
     Surface(shape = CantoCartao, color = Cartao, modifier = modifier) {
-        Box(Modifier.verticalScroll(rememberScrollState()).padding(28.dp), contentAlignment = Alignment.Center) {
+        Box(
+            (if (rolavel) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(28.dp),
+            contentAlignment = Alignment.Center,
+        ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
