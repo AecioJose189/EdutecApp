@@ -50,11 +50,40 @@ resume o que importa para o código. Na dúvida sobre uma regra, pergunte antes 
 
 ## Estado atual (21/10/2026)
 
-Lado do professor: Minhas turmas, Turma › Grafo e Nova atividade. **O app não mostra dados de exemplo**:
-começa sem turmas ("Nenhuma turma ainda"), turmas são criadas pelo diálogo (só em memória, sem banco
-ainda) e nascem sem dados (estado vazio). `DadosExemplo`/`DadosTurmaExemplo` são usados só nos `@Preview`
-(e pelo ramo "turma com dados" da TurmaScreen, que hoje só os previews alcançam). Resumo do topo de
-Minhas turmas só aparece com algo real para contar; semestres vêm da data do aparelho.
+Lado do professor, caminho completo com dados reais: Minhas turmas → Turma › Grafo → Nova atividade
+(Origem/Formato → Gerando → Revisão → Publicar) → Simular respostas (demonstração) → grafo atualizado.
+**O app não mostra dados de exemplo**: `DadosExemplo`/`DadosTurmaExemplo` só nos `@Preview`. Resumo do
+topo de Minhas turmas só aparece com algo real para contar; semestres vêm da data do aparelho.
+
+Acesso a dados: **todas as tabelas com RLS e sem políticas** para anon/authenticated. O app só fala com
+Edge Functions (service_role): `gerar-atividade` e `turma-api` (POST JSON `{acao, ...}`; ações
+`listar_turmas`, `criar_turma`, `publicar`, `grafo`, `simular`). Ambas com `verify_jwt = false` e a
+checagem de chave pública em `supabase/functions/_shared/chave_publica.ts`. No app: `data/Supabase.kt`
+(cliente único), `data/TurmaRepositorio.kt` (turma-api), `data/GeracaoRepositorio.kt`.
+- Turmas persistidas (migration `..180000_turmas.sql`); `ui/NavegacaoViewModel` carrega/cria pela API,
+  com carregando/erro + "Tentar de novo" em Minhas turmas.
+- Publicar (etapa 5, barra no fim da Revisão): `publicar_atividade` (PL/pgSQL, migration
+  `..190000_atividades.sql`) grava `atividades` (questões copiadas de `geracoes`; `permitir_refazer` e
+  `tempo_minutos` do formulário; TODO prazo/liberação) e junta os conceitos em `conceitos_turma`
+  (sem duplicar), rejeitando ciclo (RN03, erro ED003) — tudo numa transação. Mesma geração duas vezes
+  na turma → 409. `gerar-atividade` devolve `geracao_id`. Depois de publicar, volta para a Turma.
+- Grafo (migration `..200000_dominio_por_turma.sql`): `respostas`/`dominio` com `turma_id` (nulo = dados
+  `demo-` antigos, ainda funcionam); `registrar_resposta(aluno, conceito, correta, turma default null)`;
+  `dominio_turma` por turma+conceito (média, mediana, moda, nº respostas, nº em revisar);
+  `resumo_turmas` para os cartões. `ui/TurmaViewModel` carrega o grafo.
+  - Tela Turma: sem atividade publicada → estado vazio; publicada sem respostas → nós cinza "?".
+    Layout em camadas em `ui/LayoutGrafo.kt` (profundidade = maior caminho de pré-requisitos; ordem
+    por baricentro), causa raiz em `data/GrafoTurma.kt` (pré-requisito direto/indireto de menor
+    média, se não consolidado), ambos com testes unitários. Tamanho do nó = nº de respostas.
+    Lista de alunos só com pseudônimos ("Aluno 01"). Linha do tempo por semana removida (sem histórico).
+- Simulação (DEMONSTRAÇÃO, migration `..210000_simular_respostas.sql`): `simular_respostas(turma)`
+  cria 25 pseudônimos `sim-<turma>-NN`, semente fixa (reproduzível), substitui a anterior. Modelo:
+  habilidade oculta, dificuldade crescente com a profundidade (−3,0 + 4,6·prof/max), penalidade 0,3
+  sem pré-requisito, acerto 0,9 / chute 0,2 / aprender 0,1, 3 respostas por questão e conceito. Com o
+  teste.pdf (geração reaproveitada): ✓ Jogos e Minimax, ~ Poda e Decisões, ! Quiescência (causa raiz:
+  Decisões...). Parâmetros mexidos mudam a história: confira antes de apresentar.
+- Apagar turma com respostas simuladas exige `set_config('edutec.limpar_demo','on',true)` (gatilho
+  só-inserção de `respostas` libera DELETE só de `demo-%`/`sim-%` com essa chave).
 - Testes de interface do caminho da demo: `./gradlew connectedDebugAndroidTest` (emulador ligado;
   ao terminar, o AGP desinstala o app — rode `installDebug` de novo).
 
@@ -66,8 +95,9 @@ Nova atividade integrada à função (item 3 da entrega), testada no emulador (c
   tempo esgotado, sem conexão, outro). Etapa 3 em `ui/GerandoAtividade.kt`, etapa 4 (Revisão, só
   leitura) em `ui/RevisaoAtividade.kt`; LaTeX vira texto legível em `ui/TextoLatex.kt` (com testes).
 - Revisão avisa quando o resultado foi reaproveitado, com "Gerar novas questões" (forcar_nova).
-- Girar a tela não perde nada: navegação e turmas no `ui/NavegacaoViewModel`, geração no
-  `NovaAtividadeViewModel` (ambos no escopo da Activity), formulário em `rememberSaveable`.
+- Girar a tela não perde nada: navegação e turmas no `ui/NavegacaoViewModel`, geração/publicação no
+  `NovaAtividadeViewModel`, grafo/simulação no `TurmaViewModel` (escopo da Activity), formulário em
+  `rememberSaveable`.
 - Turma sem dados (`Turma.semDados`, ex.: criada agora) mostra o estado vazio com primeiros passos;
   a Nova atividade dela abre em "Material em PDF". Sem marcadores "[...]" do wireframe.
 - supabase-kt ≥ 3.2 exige Kotlin ≥ 2.2: não atualizar sem subir o Kotlin.
@@ -90,8 +120,9 @@ Back-end (Supabase, projeto `vuxnyjkykftecqgznswg`, em `supabase/`):
   pseudônimo, RN13), `dominio` (aluno+conceito). `registrar_resposta(aluno, conceito, correta)` aplica
   posterior + transição e devolve p_dominio e estado; `estado_dominio` usa limiares **propostos**
   0,5/0,8; view `dominio_turma` (média, mediana, moda do estado). Nada exposto a anon/authenticated.
-  Ainda não ligado ao app nem às Edge Functions.
-  - Teste da fórmula: `npx supabase test db --linked supabase/tests/database` (pgTAP, rollback).
+  Por turma desde a migration `..200000` (ver acima); hoje só a simulação alimenta (não há lado do aluno).
+  - Testes pgTAP (BKT, publicar, domínio por turma, simular): `npx supabase test db --linked
+    supabase/tests/database` (rollback).
   - Demo: colar `supabase/tests/bkt_demo.sql` no SQL Editor (refaz os dados `demo-...`).
 - Teste: `scripts/testar-geracao.sh [pdf]` (URL e chave pública em `local.properties`:
   `SUPABASE_URL`, `SUPABASE_CHAVE_PUBLICA`) → `amostras/resultado.json` (pasta fora do git).
@@ -99,7 +130,9 @@ Back-end (Supabase, projeto `vuxnyjkykftecqgznswg`, em `supabase/`):
   raciocínio `low` (~85 s com o padrão do modelo, `medium`, sem ganho visível de qualidade).
   Perto do limite de 150 s; com mais questões, dividir as chamadas (ver TODO).
 
-Ainda não existe: login, RLS, lado do aluno, edição na Revisão, etapa Publicar, gerar a partir do grafo.
+Ainda não existe: login (e políticas de RLS), lado do aluno, edição na Revisão, prazo/liberação na
+publicação, gerar a partir do grafo, abas Atividades/Materiais/Estatísticas/Turma, histórico semanal,
+"Ver alunos com dificuldade".
 
 ## Próxima entrega (21/10/2026) — atividade da 1ª VA
 
