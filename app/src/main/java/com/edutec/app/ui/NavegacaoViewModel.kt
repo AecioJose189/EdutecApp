@@ -5,7 +5,6 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import com.edutec.app.data.DadosExemplo
 import com.edutec.app.data.Turma
 
 /**
@@ -13,7 +12,8 @@ import com.edutec.app.data.Turma
  * Fica num ViewModel para sobreviver à recriação da Activity (girar a tela, dividir a janela).
  */
 class NavegacaoViewModel : ViewModel() {
-    val turmas = mutableStateListOf<Turma>().apply { addAll(DadosExemplo.turmas) }
+    /** Começa vazia: as turmas são criadas pelo professor (só em memória até termos o banco). */
+    val turmas = mutableStateListOf<Turma>()
 
     var turmaAberta by mutableStateOf<Turma?>(null)
         private set
