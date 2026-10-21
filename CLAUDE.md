@@ -59,14 +59,22 @@ Nova atividade integrada à função (item 3 da entrega), testada no emulador (c
 - `ui/NovaAtividadeViewModel`: Ocioso → Gerando(segundos) → Concluido | Erro (cota, IA sobrecarregada,
   tempo esgotado, sem conexão, outro). Etapa 3 em `ui/GerandoAtividade.kt`, etapa 4 (Revisão, só
   leitura) em `ui/RevisaoAtividade.kt`; LaTeX vira texto legível em `ui/TextoLatex.kt` (com testes).
-- O estado do formulário vive em `remember` no topo da `NovaAtividadeScreen` (sobrevive a
-  Gerando/Erro/Revisão, mas não à recriação da Activity, assim como a navegação do `EdutecApp`).
+- Revisão avisa quando o resultado foi reaproveitado, com "Gerar novas questões" (forcar_nova).
+- Girar a tela não perde nada: navegação e turmas no `ui/NavegacaoViewModel`, geração no
+  `NovaAtividadeViewModel` (ambos no escopo da Activity), formulário em `rememberSaveable`.
+- Turma sem dados (`Turma.semDados`, ex.: criada agora) mostra o estado vazio com primeiros passos;
+  a Nova atividade dela abre em "Material em PDF". Sem marcadores "[...]" do wireframe.
 - supabase-kt ≥ 3.2 exige Kotlin ≥ 2.2: não atualizar sem subir o Kotlin.
 
 Back-end (Supabase, projeto `vuxnyjkykftecqgznswg`, em `supabase/`):
 - Edge Function `gerar-atividade` (deploy feito): recebe PDF multipart (até 20 MB) + `quantidade`,
-  `formato`, `dificuldade`; salva no bucket privado `materiais`; pede conceitos e questões ao Gemini
-  numa única chamada (TODO: uma questão por chamada) e valida a resposta (RN07 etc.).
+  `formato`, `dificuldade`, `forcar_nova`; pede conceitos e questões ao Gemini numa única chamada
+  (TODO: uma questão por chamada) e valida a resposta (RN07 etc.).
+- RN12 (cada PDF é processado uma vez): o PDF é salvo como `materiais/pdfs/<sha256>.pdf` e o
+  resultado vai para a tabela `geracoes` (RLS ligado, sem políticas: só a service_role acessa).
+  Mesmo hash + parâmetros → devolve o salvo na hora (`reaproveitado: true`, `gerado_em`), sem chamar o
+  Gemini (<1 s na função; 1,3–3,4 s no script, quase tudo envio do PDF e arranque a frio).
+  `forcar_nova=true` gera de novo (fica a linha mais recente).
 - Gemini isolado em `supabase/functions/_shared/gemini.ts` (REST `generateContent`, modelo por
   `GEMINI_MODEL`, padrão `gemini-3.8-flash`; raciocínio por `GEMINI_THINKING_LEVEL`, padrão `low`).
 - Autenticação: `verify_jwt = false`; a função aceita só a chave pública do projeto no cabeçalho
