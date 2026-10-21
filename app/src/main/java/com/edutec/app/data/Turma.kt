@@ -14,6 +14,18 @@ data class Turma(
     val rodape: String,
 )
 
+/** Turma ainda sem dados de aprendizagem (ex.: criada agora, sem alunos ou sem respostas). */
+val Turma.semDados: Boolean
+    get() = alunos == 0 || consolidado + desenvolvimento + revisar == 0
+
+/** "38 alunos", "1 aluno" ou "nenhum aluno". */
+val Turma.rotuloAlunos: String
+    get() = when (alunos) {
+        0 -> "nenhum aluno"
+        1 -> "1 aluno"
+        else -> "$alunos alunos"
+    }
+
 data class AtividadePendente(
     val disciplina: String,
     val turma: String,
@@ -22,27 +34,27 @@ data class AtividadePendente(
 object DadosExemplo {
     val turmas = listOf(
         Turma(
-            nome = "Cálculo I", codigo = "TURMA A", alunos = 38,
+            nome = "Cálculo I", codigo = "Turma A", alunos = 38,
             consolidado = 45, desenvolvimento = 30, revisar = 25,
             conceitosARevisar = 2, rodape = "1 atividade aguarda revisão",
         ),
         Turma(
-            nome = "Cálculo I", codigo = "TURMA B", alunos = 41,
+            nome = "Cálculo I", codigo = "Turma B", alunos = 41,
             consolidado = 60, desenvolvimento = 28, revisar = 12,
             conceitosARevisar = 1, rodape = "Última atividade: há 2 dias",
         ),
         Turma(
-            nome = "Álgebra Linear", codigo = "TURMA", alunos = 29,
+            nome = "Álgebra Linear", codigo = "Turma A", alunos = 29,
             consolidado = 72, desenvolvimento = 22, revisar = 6,
             rodape = "Última atividade: há 5 dias",
         ),
         Turma(
-            nome = "Estatística", codigo = "TURMA", alunos = 33,
+            nome = "Estatística", codigo = "Turma C", alunos = 33,
             consolidado = 50, desenvolvimento = 40, revisar = 10,
             status = "1 em revisão", rodape = "Gerando 1 atividade",
         ),
         Turma(
-            nome = "Geometria Analítica", codigo = "TURMA", alunos = 25,
+            nome = "Geometria Analítica", codigo = "Turma B", alunos = 25,
             consolidado = 30, desenvolvimento = 45, revisar = 25,
             conceitosARevisar = 3, rodape = "Última atividade: há 9 dias",
         ),

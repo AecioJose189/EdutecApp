@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.edutec.app.data.DadosExemplo
 import com.edutec.app.data.Turma
+import com.edutec.app.data.rotuloAlunos
 import com.edutec.app.ui.theme.AmareloFundo
 import com.edutec.app.ui.theme.AmareloIcone
 import com.edutec.app.ui.theme.AmareloTexto
@@ -163,7 +164,7 @@ fun MinhasTurmasScreen(
                 turmas.add(
                     Turma(
                         nome = nome,
-                        codigo = codigo.ifBlank { "TURMA" }.uppercase(),
+                        codigo = codigo.ifBlank { "Turma única" },
                         alunos = 0,
                         consolidado = 0, desenvolvimento = 0, revisar = 0,
                         rodape = "Nenhuma atividade ainda",
@@ -212,7 +213,7 @@ private fun BarraSuperior(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Semestre [$semestre]",
+                        text = "Semestre $semestre",
                         color = TextoPrincipal,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
@@ -229,7 +230,7 @@ private fun BarraSuperior(
             DropdownMenu(expanded = menuAberto, onDismissRequest = { menuAberto = false }) {
                 DadosExemplo.semestres.forEach { opcao ->
                     DropdownMenuItem(
-                        text = { Text("Semestre [$opcao]") },
+                        text = { Text("Semestre $opcao") },
                         onClick = {
                             menuAberto = false
                             onSemestreSelecionado(opcao)
@@ -488,7 +489,7 @@ private fun CartaoTurma(turma: Turma, onClick: () -> Unit, modifier: Modifier = 
                 Column(Modifier.weight(1f)) {
                     Text(turma.nome, color = TextoPrincipal, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "[${turma.codigo}] · ${turma.alunos} alunos",
+                        "${turma.codigo} · ${turma.rotuloAlunos}",
                         color = TextoSecundario,
                         fontSize = 14.sp,
                     )
