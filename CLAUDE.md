@@ -79,6 +79,14 @@ Back-end (Supabase, projeto `vuxnyjkykftecqgznswg`, em `supabase/`):
   `GEMINI_MODEL`, padrão `gemini-3.8-flash`; raciocínio por `GEMINI_THINKING_LEVEL`, padrão `low`).
 - Autenticação: `verify_jwt = false`; a função aceita só a chave pública do projeto no cabeçalho
   `apikey` (publishable ou legacy anon). Qualquer um com o APK pode gastar a cota do Gemini.
+- KT (BKT) no Postgres, migration `20261021150000_bkt.sql`: `bkt_parametros` (linha padrão `'*'`:
+  L0 0,3 · T 0,1 · G 0,2 · S 0,1; ajuste com pyBKT depois), `respostas` (só inserção por gatilho;
+  pseudônimo, RN13), `dominio` (aluno+conceito). `registrar_resposta(aluno, conceito, correta)` aplica
+  posterior + transição e devolve p_dominio e estado; `estado_dominio` usa limiares **propostos**
+  0,5/0,8; view `dominio_turma` (média, mediana, moda do estado). Nada exposto a anon/authenticated.
+  Ainda não ligado ao app nem às Edge Functions.
+  - Teste da fórmula: `npx supabase test db --linked supabase/tests/database` (pgTAP, rollback).
+  - Demo: colar `supabase/tests/bkt_demo.sql` no SQL Editor (refaz os dados `demo-...`).
 - Teste: `scripts/testar-geracao.sh [pdf]` (URL e chave pública em `local.properties`:
   `SUPABASE_URL`, `SUPABASE_CHAVE_PUBLICA`) → `amostras/resultado.json` (pasta fora do git).
 - Testado de ponta a ponta com PDF real (2,5 MB, 5 questões mistas): ~67 s dentro da função com
