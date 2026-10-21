@@ -51,7 +51,20 @@ resume o que importa para o código. Na dúvida sobre uma regra, pergunte antes 
 ## Estado atual (20/10/2026)
 
 Pronto, com dados de exemplo fixos: Minhas turmas, Turma › Grafo e Nova atividade (lado do professor).
-Ainda não existe: Supabase, Gemini, login, lado do aluno, etapas Gerando/Revisão/Publicar.
+
+Back-end (Supabase, projeto `vuxnyjkykftecqgznswg`, em `supabase/`):
+- Edge Function `gerar-atividade` (deploy feito): recebe PDF multipart (até 20 MB) + `quantidade`,
+  `formato`, `dificuldade`; salva no bucket privado `materiais`; pede conceitos e questões ao Gemini
+  numa única chamada (TODO: uma questão por chamada) e valida a resposta (RN07 etc.).
+- Gemini isolado em `supabase/functions/_shared/gemini.ts` (REST `generateContent`, modelo por
+  `GEMINI_MODEL`, padrão `gemini-3.8-flash`).
+- Autenticação: `verify_jwt = false`; a função aceita só a chave pública do projeto no cabeçalho
+  `apikey` (publishable ou legacy anon). Qualquer um com o APK pode gastar a cota do Gemini.
+- Teste: `scripts/testar-geracao.sh [pdf]` (URL e chave pública em `local.properties`:
+  `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`) → `amostras/resultado.json` (pasta fora do git).
+- Pendente: secret `GEMINI_API_KEY` no projeto e teste com PDF real.
+
+Ainda não existe: integração do app com a função, login, RLS, lado do aluno, etapas Gerando/Revisão/Publicar.
 
 ## Próxima entrega (21/10/2026) — atividade da 1ª VA
 
