@@ -22,6 +22,9 @@ fun EdutecApp() {
     var turmaAberta by remember { mutableStateOf<Turma?>(null) }
     // null = tela de nova atividade fechada; caso contrário, os conceitos já marcados ao abrir.
     var novaAtividade by remember { mutableStateOf<Set<String>?>(null) }
+    // O ViewModel sobrevive à recriação da Activity, mas a navegação acima não: ao abrir
+    // a Nova atividade ele é zerado, para não mostrar o resultado de uma sessão anterior.
+    val geracao: NovaAtividadeViewModel = viewModel()
 
     val turma = turmaAberta
     val conceitosIniciais = novaAtividade
@@ -34,12 +37,14 @@ fun EdutecApp() {
             TurmaScreen(
                 turma = turma,
                 onVoltar = { turmaAberta = null },
-                onNovaAtividade = { novaAtividade = it },
+                onNovaAtividade = {
+                    geracao.voltar()
+                    novaAtividade = it
+                },
             )
         }
 
         else -> {
-            val geracao: NovaAtividadeViewModel = viewModel()
             val estado by geracao.estado.collectAsState()
             val fechar = {
                 geracao.voltar() // cancela uma geração em andamento
