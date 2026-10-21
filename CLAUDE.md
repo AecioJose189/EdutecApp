@@ -62,7 +62,8 @@ Back-end (Supabase, projeto `vuxnyjkykftecqgznswg`, em `supabase/`):
   `apikey` (publishable ou legacy anon). Qualquer um com o APK pode gastar a cota do Gemini.
 - Teste: `scripts/testar-geracao.sh [pdf]` (URL e chave pública em `local.properties`:
   `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`) → `amostras/resultado.json` (pasta fora do git).
-- Pendente: secret `GEMINI_API_KEY` no projeto e teste com PDF real.
+- Testado de ponta a ponta com PDF real (2,5 MB, 5 questões mistas): ~85 s dentro da função.
+  Perto do limite de 150 s; com mais questões, dividir as chamadas (ver TODO).
 
 Ainda não existe: integração do app com a função, login, RLS, lado do aluno, etapas Gerando/Revisão/Publicar.
 
