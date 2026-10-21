@@ -4,6 +4,7 @@ package com.edutec.app.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -80,7 +81,7 @@ fun RevisaoConteudo(estado: EstadoGeracao.Concluido, expandido: Boolean, modifie
         var selecionada by rememberSaveable { mutableIntStateOf(0) }
         Column(modifier, verticalArrangement = Arrangement.spacedBy(Espaco)) {
             AvisoRevisao(estado)
-            CartaoConceitos(atividade.conceitos)
+            CartaoConceitos(atividade.conceitos, emUmaLinha = true)
             Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(Espaco)) {
                 Surface(shape = CantoCartao, color = Cartao, modifier = Modifier.width(380.dp).fillMaxHeight()) {
                     LazyColumn(
@@ -111,7 +112,7 @@ fun RevisaoConteudo(estado: EstadoGeracao.Concluido, expandido: Boolean, modifie
     } else {
         LazyColumn(modifier, verticalArrangement = Arrangement.spacedBy(Espaco)) {
             item { AvisoRevisao(estado) }
-            item { CartaoConceitos(atividade.conceitos) }
+            item { CartaoConceitos(atividade.conceitos, emUmaLinha = false) }
             itemsIndexed(atividade.questoes) { i, q ->
                 Surface(shape = CantoCartao, color = Cartao, modifier = Modifier.fillMaxWidth()) {
                     Box(Modifier.padding(20.dp)) { DetalheQuestao(i, q) }
@@ -147,24 +148,42 @@ private fun AvisoRevisao(estado: EstadoGeracao.Concluido) {
 // Conceitos extraídos
 // ---------------------------------------------------------------------------
 
+/** [emUmaLinha]: no tablet os conceitos ficam numa linha com rolagem, para sobrar altura às questões. */
 @Composable
-private fun CartaoConceitos(conceitos: List<ConceitoGerado>) {
+private fun CartaoConceitos(conceitos: List<ConceitoGerado>, emUmaLinha: Boolean) {
+    val legenda: @Composable () -> Unit = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Info, null, tint = TextoSecundario, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "? = sem dados: o domínio estimado aparece depois que os alunos responderem.",
+                color = TextoSecundario, fontSize = 12.sp,
+            )
+        }
+    }
     Surface(shape = CantoCartao, color = Cartao, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Conceitos extraídos", color = TextoPrincipal, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                conceitos.forEach { CartaoConceito(it) }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Info, null, tint = TextoSecundario, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    "? = sem dados: o domínio estimado aparece depois que os alunos responderem.",
-                    color = TextoSecundario, fontSize = 12.sp,
-                )
+        Column(Modifier.padding(if (emUmaLinha) 16.dp else 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (emUmaLinha) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Conceitos extraídos", color = TextoPrincipal, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(16.dp))
+                    legenda()
+                }
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    conceitos.forEach { CartaoConceito(it) }
+                }
+            } else {
+                Text("Conceitos extraídos", color = TextoPrincipal, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    conceitos.forEach { CartaoConceito(it) }
+                }
+                legenda()
             }
         }
     }
