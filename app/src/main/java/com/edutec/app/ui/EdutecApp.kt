@@ -5,8 +5,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.edutec.app.data.DadosTurmaExemplo
-import com.edutec.app.data.semDados
 
 /**
  * Navegação simples por estado: Minhas turmas → Turma → Nova atividade (Origem/Formato → Gerando → Revisão).
@@ -46,8 +44,8 @@ fun EdutecApp() {
             NovaAtividadeScreen(
                 turma = turma,
                 conceitosIniciais = conceitosIniciais,
-                // Turma sem dados de aprendizagem ainda não tem grafo: só dá para gerar a partir de PDF.
-                conceitos = if (turma.semDados) emptyList() else DadosTurmaExemplo.conceitos,
+                // Ainda não há banco com o grafo da turma: só dá para gerar a partir de PDF.
+                conceitos = emptyList(),
                 onFechar = fechar,
                 estado = estado,
                 onGerar = geracao::gerar,

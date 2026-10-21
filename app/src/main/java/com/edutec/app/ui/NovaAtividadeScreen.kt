@@ -167,7 +167,7 @@ fun NovaAtividadeScreen(
     onFechar: () -> Unit,
     modifier: Modifier = Modifier,
     conceitosIniciais: Set<String> = emptySet(),
-    conceitos: List<Conceito> = DadosTurmaExemplo.conceitos,
+    conceitos: List<Conceito> = emptyList(),
     estado: EstadoGeracao = EstadoGeracao.Ocioso,
     onGerar: (PedidoGeracao) -> Unit = {},
     onTentarDeNovo: () -> Unit = {},
@@ -996,6 +996,7 @@ private fun PreviewNovaAtividadeTablet() {
         NovaAtividadeScreen(
             DadosExemplo.turmas.first(), onFechar = {},
             conceitosIniciais = setOf("Regra da cadeia", "Derivada"),
+            conceitos = DadosTurmaExemplo.conceitos,
         )
     }
 }
@@ -1003,5 +1004,7 @@ private fun PreviewNovaAtividadeTablet() {
 @Preview(name = "Nova atividade · Celular", widthDp = 400, heightDp = 1800, showBackground = true)
 @Composable
 private fun PreviewNovaAtividadeCelular() {
-    EdutecTheme { NovaAtividadeScreen(DadosExemplo.turmas.first(), onFechar = {}) }
+    EdutecTheme {
+        NovaAtividadeScreen(DadosExemplo.turmas.first(), onFechar = {}, conceitos = DadosTurmaExemplo.conceitos)
+    }
 }
