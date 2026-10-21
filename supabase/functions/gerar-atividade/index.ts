@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
 
     return json({
       conceitos: resposta.dados.conceitos,
-      questoes: resposta.dados.questoes,
+      questoes: resposta.dados.questoes.map(normalizarQuestao),
       arquivo: `${BUCKET}/${caminho}`,
       modelo: resposta.modelo,
       nivel_raciocinio: resposta.nivelRaciocinio,
@@ -342,6 +342,11 @@ function validarAtividade(a: Atividade, quantidade: number, formato: Formato): s
   }
 
   return problemas;
+}
+
+/** Formato único para o app: aberta sem alternativas, múltipla escolha sem rubrica (sempre null). */
+function normalizarQuestao(q: Questao): Questao {
+  return q.tipo === "aberta" ? { ...q, alternativas: null } : { ...q, rubrica: null };
 }
 
 /** Devolve um ciclo do grafo de pré-requisitos (lista de nomes), ou null se não houver. */
