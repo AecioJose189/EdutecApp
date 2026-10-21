@@ -413,3 +413,8 @@ enabled = true
 # formatted with uppercase keywords, indent 2, max width 180, trailing commas,
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
+
+# A chave publishable (sb_publishable_...) não é JWT: o verify_jwt da plataforma a rejeitaria.
+# A própria função confere se o cabeçalho `apikey` é uma chave pública do projeto.
+[functions.gerar-atividade]
+verify_jwt = false
