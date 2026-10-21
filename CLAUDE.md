@@ -48,9 +48,15 @@ resume o que importa para o código. Na dúvida sobre uma regra, pergunte antes 
 ./gradlew installDebug    # instala no emulador/celular conectado
 ```
 
-## Estado atual (20/10/2026)
+## Estado atual (21/10/2026)
 
-Pronto, com dados de exemplo fixos: Minhas turmas, Turma › Grafo e Nova atividade (lado do professor).
+Lado do professor: Minhas turmas, Turma › Grafo e Nova atividade. **O app não mostra dados de exemplo**:
+começa sem turmas ("Nenhuma turma ainda"), turmas são criadas pelo diálogo (só em memória, sem banco
+ainda) e nascem sem dados (estado vazio). `DadosExemplo`/`DadosTurmaExemplo` são usados só nos `@Preview`
+(e pelo ramo "turma com dados" da TurmaScreen, que hoje só os previews alcançam). Resumo do topo de
+Minhas turmas só aparece com algo real para contar; semestres vêm da data do aparelho.
+- Testes de interface do caminho da demo: `./gradlew connectedDebugAndroidTest` (emulador ligado;
+  ao terminar, o AGP desinstala o app — rode `installDebug` de novo).
 
 Nova atividade integrada à função (item 3 da entrega), testada no emulador (celular e tablet):
 - "Gerar atividade" envia o PDF de `files/materiais/` via `data/GeracaoRepositorio` (supabase-kt
