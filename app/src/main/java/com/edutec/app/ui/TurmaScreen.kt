@@ -5,6 +5,7 @@ package com.edutec.app.ui
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -41,6 +42,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
@@ -101,6 +103,7 @@ import com.edutec.app.ui.theme.Pilula
 import com.edutec.app.ui.theme.TextoCorpo
 import com.edutec.app.ui.theme.TextoPrincipal
 import com.edutec.app.ui.theme.TextoSecundario
+import com.edutec.app.ui.theme.Trilho
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -681,9 +684,12 @@ private fun PainelConceito(
     val estado = conceito.estado.takeUnless { conceito.semDados }
     Surface(shape = CantoCartao, color = Cartao, modifier = modifier) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // No tablet o conteúdo rola e os botões ficam fixos no rodapé do painel.
+            // No tablet o conteúdo rola e os botões ficam fixos no rodapé do painel, separados por uma
+            // linha: o que passa da altura fica claramente "para rolar", não escondido atrás dos botões.
+            // Nova rolagem a cada conceito: o painel abre sempre no topo, com o nome completo visível.
+            val rolagem = remember(conceito.nome) { ScrollState(0) }
             Column(
-                modifier = if (preencherAltura) Modifier.weight(1f).verticalScroll(rememberScrollState()) else Modifier,
+                modifier = if (preencherAltura) Modifier.weight(1f).verticalScroll(rolagem).padding(bottom = 4.dp) else Modifier,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text("Conceito", color = TextoSecundario, fontSize = 14.sp)
@@ -723,7 +729,8 @@ private fun PainelConceito(
                 } else {
                     MiniNumero(
                         porcento(conceito.media),
-                        "domínio estimado médio · mediana ${porcento(conceito.mediana)}",
+                        "domínio estimado médio · mediana ${porcento(conceito.mediana)}" +
+                            if (turmaDividida(conceito)) " · turma dividida" else "",
                         Modifier.fillMaxWidth(),
                     )
                     Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -735,6 +742,7 @@ private fun PainelConceito(
                     }
                 }
             }
+            if (preencherAltura) HorizontalDivider(color = Trilho)
 
             Button(
                 onClick = onReforco,
@@ -750,6 +758,13 @@ private fun PainelConceito(
             ) { Text("Ver alunos com dificuldade", fontWeight = FontWeight.SemiBold) }
         }
     }
+}
+
+/** Média e mediana a mais de 15 pontos: parte da turma domina e parte não (a média esconde isso). */
+private fun turmaDividida(conceito: ConceitoGrafo): Boolean {
+    val media = conceito.media ?: return false
+    val mediana = conceito.mediana ?: return false
+    return kotlin.math.abs(media - mediana) > 0.15
 }
 
 /** "Causa raiz provável": o pré-requisito (direto ou indireto) mais fraco, se não estiver consolidado. */
