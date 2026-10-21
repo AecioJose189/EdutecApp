@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Envia um PDF para a Edge Function gerar-atividade e salva a resposta em amostras/resultado.json.
+#
+# Uso: scripts/testar-geracao.sh [arquivo.pdf] [quantidade] [formato] [dificuldade]
+#   arquivo.pdf  padrão: o primeiro PDF de amostras/
+#   quantidade   1–10 (padrão 5)
+#   formato      multipla_escolha | aberta | mista (padrão mista)
+#   dificuldade  facil | media | dificil (padrão media)
+#
+# URL e chave pública (publishable ou anon) vêm das variáveis SUPABASE_URL e
+# SUPABASE_PUBLISHABLE_KEY (ou SUPABASE_ANON_KEY), ou das mesmas chaves em local.properties.
+set -euo pipefail
+export LC_NUMERIC=C  # ponto decimal no printf, mesmo com locale pt_BR
+
+raiz="$(cd "$(dirname "$0")/.." && pwd)"
+
+ler_propriedade() {
+  [ -f "$raiz/local.properties" ] || return 0
+  sed -n "s/^$1[[:space:]]*=[[:space:]]*//p" "$raiz/local.properties" | tail -n 1
+}
+
+url="${SUPABASE_URL:-$(ler_propriedade SUPABASE_URL)}"
+chave="${SUPABASE_PUBLISHABLE_KEY:-${SUPABASE_ANON_KEY:-}}"
+chave="${chave:-$(ler_propriedade SUPABASE_PUBLISHABLE_KEY)}"
+chave="${chave:-$(ler_propriedade SUPABASE_ANON_KEY)}"
+
+if [ -z "$url" ] || [ -z "$chave" ]; then
+  echo "Defina SUPABASE_URL e SUPABASE_PUBLISHABLE_KEY (no ambiente ou em local.properties)." >&2
+  exit 1
+fi
+
+pdf="${1:-$(find "$raiz/amostras" -maxdepth 1 -iname '*.pdf' 2>/dev/null | sort | head -n 1)}"
+if [ -z "$pdf" ] || [ ! -f "$pdf" ]; then
+  echo "Nenhum PDF encontrado. Coloque um em amostras/ ou passe o caminho como 1º argumento." >&2
+  exit 1
+fi
+
+quantidade="${2:-5}"
+formato="${3:-mista}"
+dificuldade="${4:-media}"
+saida="$raiz/amostras/resultado.json"
+mkdir -p "$raiz/amostras"
+bruto="$(mktemp)"
+trap 'rm -f "$bruto"' EXIT
+
+echo "Enviando $(basename "$pdf") ($(du -h "$pdf" | cut -f1)): $quantidade questões, $formato, $dificuldade..."
+inicio=$(date +%s.%N)
+status=$(curl -sS -o "$bruto" -w '%{http_code}' --max-time 160 \
+  -X POST "${url%/}/functions/v1/gerar-atividade" \
+  -H "apikey: $chave" \
+  -F "pdf=@$pdf;type=application/pdf" \
+  -F "quantidade=$quantidade" \
+  -F "formato=$formato" \
+  -F "dificuldade=$dificuldade")
+fim=$(date +%s.%N)
+
+if command -v jq >/dev/null 2>&1 && jq . "$bruto" > "$saida" 2>/dev/null; then :; else cp "$bruto" "$saida"; fi
+
+printf 'HTTP %s em %.1f s. Resposta salva em %s\n' "$status" "$(awk "BEGIN{print $fim - $inicio}")" "$saida"
+if [ "$status" != "200" ]; then
+  cat "$saida" >&2
+  exit 1
+fi
