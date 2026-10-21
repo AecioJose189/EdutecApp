@@ -1,12 +1,8 @@
 package com.edutec.app.data
 
-import com.edutec.app.BuildConfig
-import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.exceptions.HttpRequestException
 import io.github.jan.supabase.exceptions.RestException
-import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.functions.functions
-import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
@@ -19,8 +15,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.toJavaDuration
 
 /** Falhas da geração, já separadas pelo que a tela precisa explicar ao professor. */
 sealed class ErroGeracao(mensagem: String) : Exception(mensagem) {
@@ -43,26 +37,10 @@ sealed class ErroGeracao(mensagem: String) : Exception(mensagem) {
 /** Acesso à Edge Function gerar-atividade (Supabase). */
 object GeracaoRepositorio {
     private const val FUNCAO = "gerar-atividade"
-    private val TEMPO_LIMITE = 160.seconds
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val supabase by lazy {
-        check(BuildConfig.SUPABASE_URL.isNotBlank() && BuildConfig.SUPABASE_CHAVE_PUBLICA.isNotBlank()) {
-            "Defina SUPABASE_URL e SUPABASE_CHAVE_PUBLICA no local.properties"
-        }
-        createSupabaseClient(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_CHAVE_PUBLICA) {
-            install(Functions)
-            requestTimeout = TEMPO_LIMITE
-            // Sem isto o OkHttp corta a leitura em 10 s (padrão dele) enquanto a função espera o Gemini.
-            httpEngine = OkHttp.create {
-                config {
-                    readTimeout(TEMPO_LIMITE.toJavaDuration())
-                    writeTimeout(TEMPO_LIMITE.toJavaDuration())
-                }
-            }
-        }
-    }
+    private val supabase get() = Supabase.cliente
 
     suspend fun gerar(pedido: PedidoGeracao): AtividadeGerada = withContext(Dispatchers.IO) {
         val bytes = pedido.arquivo.readBytes()

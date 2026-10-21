@@ -20,7 +20,17 @@ fun EdutecApp() {
     val conceitosIniciais = navegacao.novaAtividade
 
     when {
-        turma == null -> MinhasTurmasScreen(turmas = navegacao.turmas, onTurma = navegacao::abrirTurma)
+        turma == null -> {
+            val estadoTurmas = navegacao.turmas
+            MinhasTurmasScreen(
+                turmas = (estadoTurmas as? EstadoTurmas.Pronto)?.turmas.orEmpty(),
+                onTurma = navegacao::abrirTurma,
+                onCriarTurma = navegacao::criarTurma,
+                carregando = estadoTurmas == EstadoTurmas.Carregando,
+                erro = (estadoTurmas as? EstadoTurmas.Erro)?.mensagem,
+                onTentarDeNovo = { navegacao.recarregarTurmas() },
+            )
+        }
 
         conceitosIniciais == null -> {
             BackHandler { navegacao.fecharTurma() }

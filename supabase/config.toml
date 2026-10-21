@@ -418,3 +418,7 @@ enabled = true
 # A própria função confere se o cabeçalho `apikey` é uma chave pública do projeto.
 [functions.gerar-atividade]
 verify_jwt = false
+
+# Mesma regra da gerar-atividade: a função confere a chave pública no cabeçalho `apikey`.
+[functions.turma-api]
+verify_jwt = false

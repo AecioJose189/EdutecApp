@@ -15,6 +15,17 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/** Faz o papel do servidor (turma-api): cria a turma na lista e responde "deu certo". */
+private fun criarEmMemoria(turmas: MutableList<Turma>) = { nome: String, codigo: String, aoTerminar: (String?) -> Unit ->
+    turmas.add(
+        Turma(
+            id = "t${turmas.size}", nome = nome, codigo = codigo, alunos = 0,
+            consolidado = 0, desenvolvimento = 0, revisar = 0, rodape = "Nenhuma atividade ainda",
+        )
+    )
+    aoTerminar(null)
+}
+
 /** O caminho da demo ao vivo: app vazio → criar turma (com acento e ç) → turma sem dados de exemplo. */
 @RunWith(AndroidJUnit4::class)
 class CriarTurmaTest {
@@ -24,7 +35,7 @@ class CriarTurmaTest {
     @Test
     fun criaTurmaComAcentoECedilha() {
         val turmas = mutableStateListOf<Turma>()
-        regra.setContent { EdutecTheme { MinhasTurmasScreen(turmas = turmas) } }
+        regra.setContent { EdutecTheme { MinhasTurmasScreen(turmas = turmas, onCriarTurma = criarEmMemoria(turmas)) } }
 
         regra.onNodeWithText("Nenhuma turma ainda").assertIsDisplayed()
         regra.onNodeWithText("Nova turma").performClick()
@@ -46,7 +57,7 @@ class CriarTurmaTest {
     @Test
     fun codigoEmBrancoViraTurmaUnica() {
         val turmas = mutableStateListOf<Turma>()
-        regra.setContent { EdutecTheme { MinhasTurmasScreen(turmas = turmas) } }
+        regra.setContent { EdutecTheme { MinhasTurmasScreen(turmas = turmas, onCriarTurma = criarEmMemoria(turmas)) } }
 
         regra.onNodeWithText("Nova turma").performClick()
         regra.onNodeWithText("Disciplina").performTextInput("Física Experimental")

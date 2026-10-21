@@ -1,6 +1,8 @@
 package com.edutec.app.data
 
 data class Turma(
+    /** uuid da turma no banco; vazio nos dados de exemplo dos @Preview. */
+    val id: String = "",
     val nome: String,
     val codigo: String,
     val alunos: Int,
@@ -12,11 +14,17 @@ data class Turma(
     /** Status exibido quando não há conceitos a revisar, ex.: "1 em revisão". */
     val status: String? = null,
     val rodape: String,
+    /** Atividades publicadas para a turma. */
+    val atividades: Int = 0,
 )
 
 /** Turma ainda sem dados de aprendizagem (ex.: criada agora, sem alunos ou sem respostas). */
 val Turma.semDados: Boolean
     get() = alunos == 0 || consolidado + desenvolvimento + revisar == 0
+
+/** Sem atividade publicada: a tela da turma mostra os primeiros passos em vez do grafo. */
+val Turma.semAtividade: Boolean
+    get() = atividades == 0
 
 /** "38 alunos", "1 aluno" ou "nenhum aluno". */
 val Turma.rotuloAlunos: String
