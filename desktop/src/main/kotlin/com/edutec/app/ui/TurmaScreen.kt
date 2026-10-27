@@ -538,6 +538,7 @@ private fun NoDoGrafo(conceito: ConceitoGrafo, diametro: Dp, selecionado: Boolea
             .widthIn(max = LarguraRotulo)
             .clip(RoundedCornerShape(12.dp))
             .clickable(role = Role.Button, onClick = onClick)
+            .maoAoPassar()
             .semantics(mergeDescendants = true) { contentDescription = descricao }
             .padding(horizontal = 6.dp, vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

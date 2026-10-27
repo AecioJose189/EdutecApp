@@ -13,6 +13,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -60,6 +62,9 @@ fun SeloEstado(estado: EstadoConceito, modifier: Modifier = Modifier, tamanho: D
     }
 }
 
+/** Cursor de mão ao passar o mouse; o realce de hover vem da própria indicação do clique. */
+fun Modifier.maoAoPassar(): Modifier = pointerHoverIcon(PointerIcon.Hand)
+
 /** Botão quadrado arredondado usado para voltar / fechar no topo das telas. */
 @Composable
 fun BotaoTopo(icone: ImageVector, descricao: String, onClick: () -> Unit) {
@@ -67,7 +72,7 @@ fun BotaoTopo(icone: ImageVector, descricao: String, onClick: () -> Unit) {
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = Pilula,
-        modifier = Modifier.size(52.dp),
+        modifier = Modifier.size(52.dp).maoAoPassar(),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(icone, contentDescription = descricao, tint = TextoPrincipal, modifier = Modifier.size(22.dp))

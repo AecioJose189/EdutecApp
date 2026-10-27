@@ -448,7 +448,12 @@ private fun SeletorOrigem(origem: Origem, onOrigem: (Origem) -> Unit) {
 @Composable
 private fun OpcaoOrigem(texto: String, ativa: Boolean, onClick: () -> Unit, icone: @Composable (Color) -> Unit) {
     val cor = if (ativa) Cartao else TextoCorpo
-    Surface(onClick = onClick, shape = RoundedCornerShape(50), color = if (ativa) TextoPrincipal else Color.Transparent) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = if (ativa) TextoPrincipal else Color.Transparent,
+        modifier = Modifier.maoAoPassar(),
+    ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -567,6 +572,7 @@ private fun ChipConceito(conceito: Conceito, selecionado: Boolean, onClick: () -
         shape = RoundedCornerShape(50),
         color = if (selecionado) AzulFundo else Cartao,
         border = if (selecionado) BorderStroke(2.dp, Consolidado) else BorderStroke(1.dp, Trilho),
+        modifier = Modifier.maoAoPassar(),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 11.dp),
@@ -610,6 +616,7 @@ private fun ConteudoPdf(
                     .clip(RoundedCornerShape(20.dp))
                     .background(Fundo)
                     .clickable(onClick = onEscolherPdf)
+                    .maoAoPassar()
                     .drawBehind {
                         val e = 2.dp.toPx()
                         drawRoundRect(
@@ -769,7 +776,7 @@ private fun OpcaoFormato(formato: Formato, selecionado: Boolean, onClick: () -> 
         shape = RoundedCornerShape(16.dp),
         color = if (selecionado) AzulFundo else Cartao,
         border = if (selecionado) BorderStroke(2.dp, Consolidado) else BorderStroke(1.dp, Trilho),
-        modifier = modifier,
+        modifier = modifier.maoAoPassar(),
     ) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
             Text(

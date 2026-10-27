@@ -42,6 +42,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +52,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -509,7 +517,7 @@ private fun GradeTurmas(
 
 @Composable
 private fun CartaoTurma(turma: Turma, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(onClick = onClick, shape = CantoCartao, color = Cartao, modifier = modifier) {
+    Surface(onClick = onClick, shape = CantoCartao, color = Cartao, modifier = modifier.maoAoPassar()) {
         Column(Modifier.padding(horizontal = 22.dp, vertical = 20.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
@@ -604,6 +612,7 @@ private fun CartaoNovaTurma(onClick: () -> Unit, modifier: Modifier = Modifier) 
             .heightIn(min = 180.dp)
             .clip(CantoCartao)
             .clickable(onClick = onClick)
+            .maoAoPassar()
             .drawBehind {
                 val espessura = 2.dp.toPx()
                 drawRoundRect(
@@ -742,18 +751,40 @@ private fun DialogoNovaTurma(
     var codigo by remember { mutableStateOf("") }
     var criando by remember { mutableStateOf(false) }
     var falha by remember { mutableStateOf<String?>(null) }
+    val focoNome = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focoNome.requestFocus() }
+
+    val podeCriar = nome.isNotBlank() && !criando
+    fun criar() {
+        if (!podeCriar) return
+        criando = true
+        falha = null
+        onCriar(nome.trim(), codigo.trim()) { erro ->
+            criando = false
+            falha = erro
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onCancelar,
         containerColor = Cartao,
         title = { Text("Nova turma", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Enter em qualquer campo confirma (Esc fecha o diálogo).
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.onPreviewKeyEvent { evento ->
+                    val enter = evento.key == Key.Enter || evento.key == Key.NumPadEnter
+                    if (enter && evento.type == KeyEventType.KeyDown) criar()
+                    enter
+                },
+            ) {
                 OutlinedTextField(
                     value = nome,
                     onValueChange = { nome = it },
                     label = { Text("Disciplina") },
                     singleLine = true,
+                    modifier = Modifier.focusRequester(focoNome),
                 )
                 OutlinedTextField(
                     value = codigo,
@@ -772,17 +803,7 @@ private fun DialogoNovaTurma(
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = {
-                    criando = true
-                    falha = null
-                    onCriar(nome.trim(), codigo.trim()) { erro ->
-                        criando = false
-                        falha = erro
-                    }
-                },
-                enabled = nome.isNotBlank() && !criando,
-            ) {
+            TextButton(onClick = ::criar, enabled = podeCriar) {
                 Text(if (falha != null) "Tentar de novo" else "Criar")
             }
         },

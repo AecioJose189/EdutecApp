@@ -342,7 +342,7 @@ private fun ItemQuestao(indice: Int, questao: QuestaoGerada, selecionada: Boolea
         shape = RoundedCornerShape(16.dp),
         color = if (selecionada) AzulFundo else Cartao,
         border = if (selecionada) BorderStroke(2.dp, Consolidado) else BorderStroke(1.dp, Trilho),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().maoAoPassar(),
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
