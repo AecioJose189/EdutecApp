@@ -1,29 +1,40 @@
-# EDUTEC — contexto para o Claude Code
+# Lumini (projeto EDUTEC) — contexto para o Claude Code
 
-App Android para o ensino superior que combina **Knowledge Tracing (KT)** e **Learning Analytics** para o professor.
-O professor envia material em PDF, a IA gera atividades, os alunos respondem e o KT estima o domínio de cada
-conceito. O professor vê o grafo de conhecimento da turma e de cada aluno.
+**Lumini** é uma plataforma para o ensino superior que combina **Knowledge Tracing (KT)** e **Learning Analytics**
+para o professor. O professor envia material em PDF, a IA gera atividades, os alunos respondem e o KT estima o
+domínio de cada conceito. O professor vê o grafo de conhecimento da turma e de cada aluno.
+
+Nome: em todo texto visível o app se chama **"Lumini"**. Pacotes (`com.edutec.app`), classes (`EdutecApp`,
+`EdutecTheme`...), tabelas, projeto Supabase e repositório continuam com "edutec": não renomear.
 
 A especificação completa (casos de uso, regras de negócio, telas) fica fora do repositório. Este arquivo
 resume o que importa para o código. Na dúvida sobre uma regra, pergunte antes de inventar.
 
 ## Stack (decisões fechadas — não trocar sem perguntar)
 
-- **App:** um único app Android, **Kotlin + Jetpack Compose (Material 3)**, com dois perfis: professor (tablet,
-  horizontal) e aluno (celular, vertical). Layout adaptativo por largura de janela, não por orientação travada.
+Plataforma decidida com o professor da disciplina:
+
+- **Professor: app desktop** em **Kotlin + Compose Multiplatform (Desktop/JVM, Material 3)**, módulo `:desktop`
+  (Linux, Windows, macOS). Usa o layout de tela larga (o antigo de tablet) e se adapta ao redimensionar a janela.
+- **Aluno: site web para o celular** em **Vite + React + TypeScript + supabase-js** (ainda não começou).
+- **Login com Google** e **sessão com QR code rotativo**: decididos, ainda não implementados (detalhes na
+  especificação; perguntar antes de implementar).
+- **Android congelado** na tag `demo-nivel2` (módulo `:app`, Kotlin + Jetpack Compose). Não evoluir; só manter
+  o build funcionando. O código do desktop começou como cópia adaptada dele.
 - **Back-end: 100% Supabase** — Auth, Postgres (com RLS por turma), Storage (PDFs), Realtime e
   **Edge Functions em TypeScript**. Não existe servidor Python nesta versão.
 - **IA: API do Gemini, plano gratuito** (modelos Flash), chamada **somente** de Edge Functions.
   Todas as chamadas ao Gemini ficam isoladas num único módulo, para poder trocar de provedor depois.
 - **KT:** BKT implementado como função no Postgres (PL/pgSQL), com parâmetros guardados numa tabela.
-- **Cliente Supabase no app:** supabase-kt.
-- **Offline (futuro):** Room + WorkManager.
+- **Cliente Supabase:** supabase-kt no desktop (e no Android congelado); supabase-js no site do aluno.
+- **Offline (futuro):** era Room + WorkManager no Android; rever para o desktop.
 
 ## Regras que valem para todo código
 
-- **Nenhuma chave secreta no app nem no git.** A chave do Gemini e a `service_role` do Supabase ficam só como
-  secrets das Edge Functions. No app, apenas a URL e a chave `anon` do Supabase, lidas de `local.properties`
-  (que está no `.gitignore`) via `BuildConfig`.
+- **Nenhuma chave secreta no app, no site nem no git.** A chave do Gemini e a `service_role` do Supabase ficam
+  só como secrets das Edge Functions. No desktop, apenas a URL e a chave pública (publishable/anon) do Supabase,
+  lidas de variáveis de ambiente ou de `lumini.properties` fora do git (`data/Configuracao.kt`; ver README).
+  O Android lia de `local.properties` via `BuildConfig`.
 - **Privacidade (RN13):** nenhum dado pessoal de aluno (nome, matrícula, e-mail) é enviado ao Gemini.
 - **RN04:** nada gerado por IA chega ao aluno sem aprovação do professor.
 - **RN07:** toda questão precisa estar ligada a pelo menos um conceito.
@@ -35,20 +46,38 @@ resume o que importa para o código. Na dúvida sobre uma regra, pergunte antes 
 - Nomes de classes, funções, variáveis e textos da interface em **português**, como no código existente
   (`Turma`, `Conceito`, `EstadoConceito`, `NovaAtividadeScreen`...).
 - Pacote base `com.edutec.app`: `data/` (modelos e acesso a dados) e `ui/` (telas, componentes, `theme/`).
+  Desktop em `desktop/src/main/kotlin/`, Android (congelado) em `app/src/main/java/`.
 - Seguir o visual já existente (cores em `ui/theme/Color.kt`, cantos grandes, abas em pílula). Estado de
   aprendizagem sempre com **símbolo além da cor**: ✓ consolidado, ~ em desenvolvimento, ! revisar, ? sem dados.
 - Usar "**refazer**" (nunca "reteste") e "**domínio estimado**" (deixar claro que não é nota).
 - Lógica de rede e de estado em **ViewModel**, não dentro dos Composables.
-- Manter os `@Preview` de tablet e celular nas telas.
+- Manter os `@Preview` nas telas (no desktop, `org.jetbrains.compose.ui.tooling.preview.Preview`, sem tamanho).
+- Desktop: avisos por `LocalAvisar` (Snackbar), voltar por `TeclaVoltar { }` (tecla Esc) — ambos em
+  `ui/Avisos.kt`; cursor de mão com `Modifier.maoAoPassar()` em itens clicáveis feitos à mão; Enter confirma diálogos.
 
 ## Como compilar e rodar
 
 ```bash
-./gradlew assembleDebug   # gera app/build/outputs/apk/debug/app-debug.apk
-./gradlew installDebug    # instala no emulador/celular conectado
+./gradlew :desktop:run          # professor (desktop); em dev usa SUPABASE_* do local.properties
+./gradlew :desktop:test         # testes unitários (layout do grafo, causa raiz, LaTeX, semestres)
+./gradlew :desktop:packageDeb   # instalador Linux; no Windows: gradlew.bat :desktop:packageMsi
+./gradlew assembleDebug         # Android congelado: app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## Estado atual (21/10/2026)
+Versões presas (não subir uma sem as outras): Kotlin **2.1.0** (por causa do supabase-kt 3.1.4), Compose
+Multiplatform **1.8.2** (a última linha que funciona com Kotlin 2.1.0), lifecycle-viewmodel-compose 2.9.1 da
+JetBrains. O compilador do Kotlin 2.1.0 **não roda no JDK 25**: o daemon do Gradle usa o JDK 21
+(`gradle/gradle-daemon-jvm.properties`) e o `:desktop` tem `jvmToolchain(21)` (o foojay baixa se faltar);
+o runtime embutido nos instaladores também é o 21.
+
+## Estado atual (27/10/2026)
+
+Desktop (`:desktop`, branch `desktop`): porta completa do lado do professor, testada de ponta a ponta com
+`:desktop:run` (criar turma → Nova atividade → PDF → Gerar → Revisão → Publicar → Simular → grafo) e com o
+pacote gerado. Trocas em relação ao Android: janela "Lumini" (1280×800, mínimo 1024×680 para não cair no
+layout de celular) em `Main.kt`; diálogo "Abrir arquivo" nativo (AWT `FileDialog`, filtro .pdf) e o PDF é
+enviado direto do disco, sem cópia; Snackbar no lugar do Toast; Esc no lugar do BackHandler.
+Tudo abaixo vale para os dois, salvo o que fala de Android/emulador.
 
 Lado do professor, caminho completo com dados reais: Minhas turmas → Turma › Grafo → Nova atividade
 (Origem/Formato → Gerando → Revisão → Publicar) → Simular respostas (demonstração) → grafo atualizado.
@@ -130,16 +159,16 @@ Back-end (Supabase, projeto `vuxnyjkykftecqgznswg`, em `supabase/`):
   raciocínio `low` (~85 s com o padrão do modelo, `medium`, sem ganho visível de qualidade).
   Perto do limite de 150 s; com mais questões, dividir as chamadas (ver TODO).
 
-Ainda não existe: login (e políticas de RLS), lado do aluno, edição na Revisão, prazo/liberação na
-publicação, gerar a partir do grafo, abas Atividades/Materiais/Estatísticas/Turma, histórico semanal,
-"Ver alunos com dificuldade".
+Ainda não existe: login Google (e políticas de RLS), sessão com QR rotativo, site do aluno, edição na
+Revisão, prazo/liberação na publicação, gerar a partir do grafo, abas Atividades/Materiais/Estatísticas/Turma,
+histórico semanal, "Ver alunos com dificuldade".
 
-## Próxima entrega (21/10/2026) — atividade da 1ª VA
+## Entrega anterior (21/10/2026) — atividade da 1ª VA (feita no Android, tag `demo-nivel2`)
 
 1. Protótipo hi-fi do caminho feliz (feito fora do código, no Figma).
 2. Demonstrar a tecnologia: PDF real → Edge Function → Gemini → conceitos e questões.
 3. Uma tela com um botão integrada à tecnologia: o botão **"Gerar atividade"** da tela Nova atividade chama a
    Edge Function e mostra as questões geradas.
 
-Prioridade: fazer o item 3 funcionar de ponta a ponta com o mínimo necessário. Não implementar login,
-RLS completo, offline nem lado do aluno agora.
+Prioridade agora: o desktop no lugar do Android. Não implementar login, QR, RLS completo, offline nem o site
+do aluno sem combinar antes.
