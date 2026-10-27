@@ -1,8 +1,61 @@
-# Edutec – Minhas turmas
+# Lumini
+
+Plataforma de **Knowledge Tracing** e **Learning Analytics** para o ensino superior (projeto EDUTEC).
+
+- **Professor:** app desktop em Compose Multiplatform, módulo [`desktop/`](#app-do-professor-desktop) (Linux, Windows, macOS).
+- **Aluno:** site web para o celular (Vite + React + TypeScript + supabase-js), ainda não começou.
+- **Back-end:** Supabase (Postgres, Edge Functions, Storage), em `supabase/`.
+- **Android:** o app original do professor (módulo `app/`) está **congelado** na tag `demo-nivel2`.
+  O resto deste README depois da seção do desktop descreve esse app.
+
+## App do professor (desktop)
+
+Precisa de JDK 21 (o Gradle baixa um se não houver). O código fica em
+`desktop/src/main/kotlin/com/edutec/app/` (cópia adaptada do Android: mesmas telas, ViewModels e acesso ao Supabase).
+
+### Configuração (URL e chave pública do Supabase)
+
+Nada disso vai para o git. O app procura, nesta ordem:
+
+1. variáveis de ambiente `SUPABASE_URL` e `SUPABASE_CHAVE_PUBLICA`;
+2. o arquivo indicado na variável `LUMINI_CONFIG`;
+3. `lumini.properties` na pasta de configuração do usuário:
+   - Linux: `~/.config/lumini/lumini.properties`
+   - Windows: `%APPDATA%\Lumini\lumini.properties`
+   - macOS: `~/Library/Application Support/Lumini/lumini.properties`
+4. `lumini.properties` na pasta atual.
+
+Conteúdo do arquivo (só a chave **pública**, publishable ou anon; nunca a `service_role`):
+
+```properties
+SUPABASE_URL=https://<projeto>.supabase.co
+SUPABASE_CHAVE_PUBLICA=sb_publishable_...
+```
+
+Em desenvolvimento, `./gradlew :desktop:run` já usa os valores do `local.properties` (o mesmo do Android)
+se as variáveis de ambiente não estiverem definidas. Sem configuração, Minhas turmas mostra onde criar o arquivo.
+
+### Rodar, testar e empacotar
+
+| Ação | Linux / macOS | Windows |
+|------|---------------|---------|
+| Rodar | `./gradlew :desktop:run` | `gradlew.bat :desktop:run` |
+| Testes unitários | `./gradlew :desktop:test` | `gradlew.bat :desktop:test` |
+| Instalador | `./gradlew :desktop:packageDeb` (Linux) · `./gradlew :desktop:packageDmg` (macOS) | `gradlew.bat :desktop:packageMsi` |
+
+Os instaladores saem em `desktop/build/compose/binaries/main/<formato>/` (ex.: `deb/lumini_1.0.0_amd64.deb`).
+Cada formato só é gerado no próprio sistema (o `.msi` precisa de Windows com o [WiX Toolset 3](https://wixtoolset.org/),
+que o plugin baixa sozinho). No Linux, o `.deb` precisa de `fakeroot` e `dpkg-deb`.
+
+Teclado e mouse: **Esc** volta uma tela (ou cancela a geração), **Enter** confirma o diálogo Nova turma.
+
+---
+
+## App Android (congelado)
 
 App Android em **Kotlin + Jetpack Compose** que reproduz a tela "Minhas turmas" de [`images/image.png`](images/image.png).
 
-## Estrutura
+### Estrutura
 
 ```
 app/src/main/java/com/edutec/app/
@@ -35,7 +88,7 @@ Interações:
   as etapas 3–5 (Gerando, Revisão, Publicar) ainda não existem.
 - O botão "voltar" do Android volta uma tela.
 
-## Como testar
+### Como testar
 
 1. Instale o [Android Studio](https://developer.android.com/studio) (já vem com JDK e Android SDK).
 2. **File → Open** e selecione a pasta `EdutecApp`. Espere o *Gradle Sync* terminar.
