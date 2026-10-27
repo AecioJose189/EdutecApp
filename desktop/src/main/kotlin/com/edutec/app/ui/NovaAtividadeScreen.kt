@@ -667,7 +667,7 @@ private fun ConteudoPdf(
                     }
 
                     if (pdf.enviado) {
-                        Text("Enviado ao sistema. Pronto para gerar as questões.", color = Consolidado, fontSize = 13.sp)
+                        Text("Pronto para gerar as questões. O PDF é enviado ao gerar.", color = Consolidado, fontSize = 13.sp)
                     } else {
                         LinearProgressIndicator(
                             progress = { progressoEnvio },
