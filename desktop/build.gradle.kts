@@ -44,8 +44,8 @@ compose.desktop {
             packageVersion = "1.0.0"
             description = "Lumini: Knowledge Tracing e Learning Analytics para o professor"
             vendor = "Lumini"
-            // java.net.http etc. não são usados; jdk.unsupported é pedido pelo OkHttp/Ktor.
-            modules("java.naming", "jdk.unsupported")
+            // Saída de ./gradlew :desktop:suggestRuntimeModules (refaça ao trocar dependências).
+            modules("java.instrument", "java.management", "java.prefs", "jdk.unsupported")
             linux { debPackageVersion = "1.0.0" }
             windows {
                 menu = true
