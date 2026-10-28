@@ -8,7 +8,13 @@
 //   forcar_nova  "true" para gerar de novo mesmo havendo resultado salvo (padrão false)
 //
 // Saída 200: { conceitos, questoes, arquivo, modelo, nivel_raciocinio, tokens, duracao_ms,
-//              reaproveitado, gerado_em, geracao_id }
+//              reaproveitado, gerado_em, geracao_id, reserva, tentativas }
+// modelo = quem gerou; reserva = true se foi o modelo reserva; tentativas = [{ modelo, ms, resultado }]
+// (vazia quando reaproveitado).
+//
+// Robustez (_shared/gemini.ts, gerarComReserva): em 503/429/rede/tempo, repete o modelo principal uma
+// vez e depois tenta o modelo reserva (GEMINI_MODELO_RESERVA). Tudo termina até ~140 s depois do
+// início do pedido (a função morre em 150 s); sem sucesso, 503 (ou 429 se foi só cota) com mensagem clara.
 // geracao_id identifica a linha de `geracoes`; a turma-api usa para publicar (null se não foi salva).
 //
 // RN12 (cada PDF é processado uma vez): o PDF é identificado pelo SHA-256 e salvo como
@@ -21,9 +27,11 @@
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { usuarioDoPedido } from "../_shared/auth.ts";
-import { ErroGemini, gerarJsonComPdf } from "../_shared/gemini.ts";
+import { ErroGemini, gerarComReserva } from "../_shared/gemini.ts";
 
 const TAMANHO_MAXIMO = 20 * 1024 * 1024;
+/** Prazo total do pedido (a Edge Function é encerrada em 150 s). */
+const PRAZO_TOTAL_MS = 140_000;
 const BUCKET = "materiais";
 const FORMATOS = ["multipla_escolha", "aberta", "mista"] as const;
 const DIFICULDADES = ["facil", "media", "dificil"] as const;
@@ -99,6 +107,8 @@ Deno.serve(async (req) => {
           reaproveitado: true,
           gerado_em: new Date(salvo.criado_em).toISOString(),
           geracao_id: salvo.id,
+          reserva: false,
+          tentativas: [],
         });
       }
     }
@@ -109,13 +119,17 @@ Deno.serve(async (req) => {
     // orquestradas pelo app ou por uma fila.
     const [, resposta] = await Promise.all([
       salvarPdf(supabase, caminho, pdf),
-      gerarJsonComPdf<Atividade>({
+      gerarComReserva<Atividade>({
         pdf,
         instrucaoSistema: INSTRUCAO_SISTEMA,
         prompt: montarPrompt(quantidade, formato, dificuldade),
         schema: SCHEMA_ATIVIDADE,
-      }),
+      }, inicio + PRAZO_TOTAL_MS),
     ]);
+    console.log(
+      `Gerado por ${resposta.modelo}${resposta.reserva ? " (RESERVA)" : ""} em ${Date.now() - inicio} ms; ` +
+        `tentativas: ${resposta.tentativas.map((t) => `${t.modelo} ${t.resultado} ${t.ms} ms`).join(", ")}`,
+    );
 
     const problemas = validarAtividade(resposta.dados, quantidade, formato);
     if (problemas.length > 0) {
@@ -142,6 +156,8 @@ Deno.serve(async (req) => {
       reaproveitado: false,
       gerado_em: geradoEm,
       geracao_id: id,
+      reserva: resposta.reserva,
+      tentativas: resposta.tentativas,
     });
   } catch (e) {
     if (e instanceof ErroPedido || e instanceof ErroGemini) {
