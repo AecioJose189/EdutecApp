@@ -76,7 +76,7 @@ interface TurmaLinha {
   professor: { nome: string } | null;
 }
 
-const SELECT_TURMA = "id, nome, codigo, professor:perfis(nome)";
+const SELECT_TURMA = "id, nome, codigo, professor:perfis!turmas_professor_id_fkey(nome)";
 
 function turmaDoContrato(t: TurmaLinha) {
   return { id: t.id, nome: t.nome, codigo: t.codigo, professor_nome: t.professor?.nome ?? "" };

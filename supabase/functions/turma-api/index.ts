@@ -397,7 +397,7 @@ async function grafo(ctx: Contexto, corpo: Corpo) {
   const [conceitos, dominioTurma, dominioAlunos] = await Promise.all([
     supabase.from("conceitos_turma").select("nome, prerequisitos").eq("turma_id", turma).order("criado_em"),
     supabase.from("dominio_turma").select("*").eq("turma_id", turma),
-    supabase.from("dominio").select("aluno_pseudonimo, aluno_id, p_dominio, perfis(nome)").eq("turma_id", turma),
+    supabase.from("dominio").select("aluno_pseudonimo, aluno_id, p_dominio, perfis!dominio_aluno_id_fkey(nome)").eq("turma_id", turma),
   ]);
   for (const r of [conceitos, dominioTurma, dominioAlunos]) {
     if (r.error) throw falhaBanco("carregar o grafo da turma", r.error);
