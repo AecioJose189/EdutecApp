@@ -292,7 +292,8 @@ async function registrarGeracao(
 
 const INSTRUCAO_SISTEMA = `Você é um assistente pedagógico de ensino superior.
 A partir do material em PDF do professor, você identifica os conceitos ensinados e cria questões
-para avaliar o domínio de cada conceito. Escreva tudo em português do Brasil.
+para avaliar o domínio de cada conceito. Escreva tudo em português do Brasil, com acentuação
+correta (inclusive nos nomes dos conceitos).
 Use LaTeX para fórmulas, delimitado por $...$ (inline) ou $$...$$ (bloco).
 Baseie-se apenas no conteúdo do PDF.`;
 
