@@ -147,6 +147,22 @@ Back-end (Supabase, projeto `vuxnyjkykftecqgznswg`, em `supabase/`):
   `forcar_nova=true` gera de novo (fica a linha mais recente).
 - Gemini isolado em `supabase/functions/_shared/gemini.ts` (REST `generateContent`, modelo por
   `GEMINI_MODEL`, padrão `gemini-3.8-flash`; raciocínio por `GEMINI_THINKING_LEVEL`, padrão `low`).
+- **Robustez** (`gerarComReserva`, 27/10/2026): em 503/429/falha de rede/tempo esgotado, espera 2 s e
+  repete o principal uma vez; depois usa o **modelo reserva** `GEMINI_MODELO_RESERVA` (padrão
+  `gemini-3.5-flash-lite`: Flash-Lite estável, plano gratuito, aceita PDF, raciocínio por
+  `GEMINI_THINKING_LEVEL_RESERVA`, padrão `low`; cota gratuita é por modelo). Prazo total de **140 s**
+  desde o início do pedido (`PRAZO_TOTAL_MS`): o principal nunca avança sobre os 50 s guardados para o
+  reserva, nenhuma tentativa começa com menos de 20 s, e depois de um tempo esgotado não repete o
+  principal (vai direto ao reserva). Sem sucesso: 503 "A IA está sobrecarregada agora (...)" (429 se
+  todas foram por cota), nunca o estouro de 150 s. Erros não transitórios (chave, modelo inexistente,
+  bloqueio, JSON inválido) não repetem. A resposta ganhou `reserva` e `tentativas` [{modelo, ms,
+  resultado}] (o desktop ignora); o log tem "Gerado por <modelo> (RESERVA) em N ms; tentativas: ...".
+  `GEMINI_FORCAR_RESERVA=true` (secret) pula o principal, só para teste — **não deixar ligado**.
+  Testes: `npx deno test -A supabase/functions/_shared/gemini_test.ts` (fetch simulado).
+  Medido com o teste.pdf: reserva forçado 6 s (3 questões) e 9 s (10 questões); numa chamada normal
+  o principal deu 503 duas vezes (13 s e 33 s) e o reserva salvou em 6 s (56 s no total).
+  Logo depois de um deploy a plataforma pode devolver 502 (HTML) uma vez: não fazer deploy durante a
+  apresentação.
 - Autenticação: `verify_jwt = true` e só usuários logados (`_shared/auth.ts`); `geracoes` continua um
   cache por PDF sem dono, acessado pela service_role.
 - KT (BKT) no Postgres, migration `20261021150000_bkt.sql`: `bkt_parametros` (linha padrão `'*'`:
@@ -248,8 +264,11 @@ que obtém a chave está no cabeçalho do script). Cada execução cria uma turm
 - Testado no Xvfb com sessão de teste importada (o Google em si não dá para automatizar): criar turma →
   convite (QR lido pelo ZXing) → gerar → publicar → projeção → 3 alunos pelo script → contadores ao vivo →
   grafo com nomes → encerrar entrada/sessão → Sair → entrada; sessão revogada no servidor → 401 → entrada
-  com aviso. Na noite do teste o Gemini deu 503/timeout para múltipla escolha: **gere a atividade da
-  apresentação antes** (o resultado fica salvo e volta na hora, RN12).
+  com aviso. Na noite do teste o Gemini deu 503/timeout para múltipla escolha (antes do modelo reserva):
+  **gere a atividade da apresentação antes** (o resultado fica salvo e volta na hora, RN12).
+- **IA sobrecarregada** (sobrecarga, tempo esgotado ou cota): a tela de erro da geração explica em
+  linguagem simples e oferece "Tentar de novo" e "Gerar menos questões (3)"
+  (`NovaAtividadeViewModel.gerarMenos`, `QUESTOES_SE_SOBRECARREGADA`).
 
 Ainda não existe: correção das abertas, edição na Revisão, prazo/liberação na publicação, gerar a partir do
 grafo, abas Materiais/Estatísticas, histórico semanal, "Ver alunos com dificuldade".
