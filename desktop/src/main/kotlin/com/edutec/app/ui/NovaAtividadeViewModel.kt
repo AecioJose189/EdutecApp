@@ -8,6 +8,7 @@ import com.edutec.app.data.ErroTurmaApi
 import com.edutec.app.data.TurmaRepositorio
 import com.edutec.app.data.GeracaoRepositorio
 import com.edutec.app.data.PedidoGeracao
+import com.edutec.app.data.SessaoExpirada
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -38,7 +39,7 @@ enum class TipoErro { Cota, Indisponivel, TempoEsgotado, SemConexao, Outro }
 
 class NovaAtividadeViewModel(
     private val gerarAtividade: suspend (PedidoGeracao) -> AtividadeGerada = GeracaoRepositorio::gerar,
-    private val publicarAtividade: suspend (String, Long, Boolean, Int?) -> String = TurmaRepositorio::publicar,
+    private val publicarAtividade: suspend (String, Long, Boolean, Int?, String?) -> String = TurmaRepositorio::publicar,
 ) : ViewModel() {
 
     private val _estado = MutableStateFlow<EstadoGeracao>(EstadoGeracao.Ocioso)
@@ -68,6 +69,9 @@ class NovaAtividadeViewModel(
                     is ErroGeracao.SemConexao -> EstadoGeracao.Erro(pedido, TipoErro.SemConexao)
                     is ErroGeracao.Servidor -> EstadoGeracao.Erro(pedido, TipoErro.Outro, e.detalhe)
                 }
+            } catch (e: SessaoExpirada) {
+                // Volta para a tela de entrada; depois do login, "Tentar de novo" refaz o mesmo pedido.
+                EstadoGeracao.Erro(pedido, TipoErro.Outro, e.message)
             } catch (e: Exception) {
                 EstadoGeracao.Erro(pedido, TipoErro.Outro)
             } finally {
@@ -88,12 +92,12 @@ class NovaAtividadeViewModel(
         _estado.value = atual.copy(publicando = true, erroPublicacao = null)
         trabalho = viewModelScope.launch {
             _estado.value = try {
-                publicarAtividade(turmaId, geracaoId, atual.pedido.permitirRefazer, atual.pedido.tempoMinutos)
+                publicarAtividade(turmaId, geracaoId, atual.pedido.permitirRefazer, atual.pedido.tempoMinutos, atual.pedido.titulo)
                 EstadoGeracao.Publicado(turmaId)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                atual.copy(erroPublicacao = (e as? ErroTurmaApi)?.message ?: "Não foi possível publicar a atividade.")
+                atual.copy(erroPublicacao = (e as? ErroTurmaApi ?: e as? SessaoExpirada)?.message ?: "Não foi possível publicar a atividade.")
             }
         }
     }

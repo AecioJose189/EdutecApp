@@ -3,6 +3,9 @@ package com.edutec.app.data
 import io.github.jan.supabase.exceptions.HttpRequestException
 import io.github.jan.supabase.exceptions.RestException
 import io.github.jan.supabase.functions.functions
+import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.query.Order
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -22,7 +25,11 @@ import kotlinx.serialization.json.jsonPrimitive
 /** Falha ao falar com a turma-api; [message] já é um texto para mostrar ao professor. */
 class ErroTurmaApi(mensagem: String) : Exception(mensagem)
 
-/** Acesso à Edge Function turma-api (Supabase): turmas, publicação, grafo e simulação. */
+/**
+ * Acesso à Edge Function turma-api (Supabase) com o JWT do professor logado: turmas, convites,
+ * publicação, sessões em sala, grafo e simulação. Membros da turma vêm direto da tabela (RLS).
+ * HTTP 401 → [SessaoExpirada] (e a sessão local é apagada: o app volta para a tela de entrada).
+ */
 object TurmaRepositorio {
     private const val FUNCAO = "turma-api"
 
@@ -35,12 +42,55 @@ object TurmaRepositorio {
         chamar<RespostaTurma>("criar_turma", "nome" to nome, "codigo" to codigo).turma.paraTurma()
 
     /** Publica a geração (já revisada pelo professor) na turma; devolve o id da atividade. */
-    suspend fun publicar(turmaId: String, geracaoId: Long, permitirRefazer: Boolean, tempoMinutos: Int?): String =
+    suspend fun publicar(
+        turmaId: String, geracaoId: Long, permitirRefazer: Boolean, tempoMinutos: Int?, titulo: String? = null,
+    ): String =
         chamar<RespostaPublicar>(
             "publicar",
             "turma_id" to turmaId, "geracao_id" to geracaoId,
             "permitir_refazer" to permitirRefazer, "tempo_minutos" to tempoMinutos,
+            "titulo" to titulo?.trim()?.ifEmpty { null },
         ).atividadeId
+
+    /** Convite ativo da turma (cria um se não houver); [novo] troca o código. */
+    suspend fun convite(turmaId: String, novo: Boolean = false): Convite =
+        chamar<RespostaConvite>("criar_convite", "turma_id" to turmaId, "novo" to novo).convite
+
+    suspend fun atividades(turmaId: String): List<AtividadePublicada> =
+        chamar<RespostaAtividades>("listar_atividades", "turma_id" to turmaId).atividades
+
+    /** Abre a sessão em sala da atividade (ou devolve a que já está aberta). */
+    suspend fun abrirSessao(atividadeId: String): SessaoSala =
+        chamar<RespostaSessao>("abrir_sessao", "atividade_id" to atividadeId).sessao
+
+    suspend fun tokenQr(sessaoId: String): TokenQr = chamar("token_qr", "sessao_id" to sessaoId)
+
+    suspend fun encerrarEntrada(sessaoId: String): SessaoSala =
+        chamar<RespostaSessao>("encerrar_entrada", "sessao_id" to sessaoId).sessao
+
+    suspend fun encerrarSessao(sessaoId: String): SessaoSala =
+        chamar<RespostaSessao>("encerrar_sessao", "sessao_id" to sessaoId).sessao
+
+    /** A sessão e quem entrou nela (com quem já enviou). */
+    suspend fun participantes(sessaoId: String): PainelSessao = chamar("sessao", "sessao_id" to sessaoId)
+
+    /** Alunos da turma com nome e e-mail, lidos direto das tabelas (o RLS só mostra os da turma do professor). */
+    suspend fun membros(turmaId: String): List<Membro> = withContext(Dispatchers.IO) {
+        try {
+            Supabase.cliente.from("membros_turma")
+                .select(Columns.raw("entrou_em, aluno:perfis!membros_turma_aluno_id_fkey(nome, email)")) {
+                    filter { eq("turma_id", turmaId) }
+                    order("entrou_em", Order.ASCENDING)
+                }
+                .decodeList<MembroApi>()
+                .map { Membro(it.aluno?.nome ?: "Aluno", it.aluno?.email, it.entrouEm) }
+        } catch (e: RestException) {
+            if (e.statusCode == 401) { Login.sessaoExpirou(); throw SessaoExpirada() }
+            throw ErroTurmaApi("Não foi possível carregar os alunos da turma.")
+        } catch (e: HttpRequestException) {
+            throw ErroTurmaApi("Sem conexão com o servidor. Verifique a internet e tente de novo.")
+        }
+    }
 
     /** Conceitos da turma com o resumo do domínio estimado, e os alunos (pseudônimos). */
     suspend fun grafo(turmaId: String): GrafoTurma =
@@ -70,6 +120,10 @@ object TurmaRepositorio {
                 }
             } catch (e: RestException) {
                 // Atenção: e.message inclui os cabeçalhos da requisição (com a chave); não exibir nem logar.
+                if (e.statusCode == 401) {
+                    Login.sessaoExpirou()
+                    throw SessaoExpirada()
+                }
                 throw ErroTurmaApi(mensagemDeErro(e.error))
             } catch (e: HttpRequestTimeoutException) {
                 throw ErroTurmaApi("O servidor demorou demais para responder. Tente de novo.")
@@ -100,6 +154,24 @@ private data class RespostaTurma(val turma: TurmaApi)
 
 @Serializable
 private data class RespostaPublicar(@SerialName("atividade_id") val atividadeId: String)
+
+@Serializable
+private data class RespostaConvite(val convite: Convite)
+
+@Serializable
+private data class RespostaAtividades(val atividades: List<AtividadePublicada>)
+
+@Serializable
+private data class RespostaSessao(val sessao: SessaoSala)
+
+@Serializable
+private data class MembroApi(
+    @SerialName("entrou_em") val entrouEm: String,
+    val aluno: PerfilApi? = null,
+)
+
+@Serializable
+private data class PerfilApi(val nome: String, val email: String? = null)
 
 @Serializable
 private data class RespostaSimular(@SerialName("n_respostas") val respostas: Int)

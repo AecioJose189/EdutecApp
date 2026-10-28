@@ -22,6 +22,9 @@ object Configuracao {
     /** Onde o professor deve criar o arquivo (aparece na mensagem de erro quando falta configuração). */
     val arquivoDoUsuario: File by lazy { File(pastaDoUsuario(), ARQUIVO) }
 
+    /** Sessão do login Google (tokens), ao lado da configuração e fora do repositório. */
+    val arquivoSessao: File by lazy { File(pastaDoUsuario(), "sessao.json") }
+
     /** Arquivos procurados, na ordem. */
     val arquivos: List<File> by lazy {
         listOfNotNull(

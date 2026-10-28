@@ -64,6 +64,10 @@ object GeracaoRepositorio {
             supabase.functions.invoke(FUNCAO) { setBody(corpo) }
         } catch (e: RestException) {
             // Atenção: e.message inclui os cabeçalhos da requisição (com a chave); não exibir nem logar.
+            if (e.statusCode == 401) {
+                Login.sessaoExpirou()
+                throw SessaoExpirada()
+            }
             val detalhe = mensagemDeErro(e.error)
             throw when (e.statusCode) {
                 429 -> ErroGeracao.Cota(detalhe)

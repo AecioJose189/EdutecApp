@@ -19,6 +19,8 @@ data class PedidoGeracao(
     val permitirRefazer: Boolean = true,
     /** null = sem limite de tempo. */
     val tempoMinutos: Int? = null,
+    /** Título da atividade; vazio = o servidor usa os primeiros conceitos. */
+    val titulo: String = "",
 )
 
 // Espelho do JSON devolvido por supabase/functions/gerar-atividade.

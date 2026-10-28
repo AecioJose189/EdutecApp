@@ -25,6 +25,13 @@ dependencies {
     // Mesmo cliente do Android (ver app/build.gradle.kts): supabase-kt 3.1.x por causa do Kotlin 2.1.
     implementation(platform("io.github.jan-tennert.supabase:bom:3.1.4"))
     implementation("io.github.jan-tennert.supabase:functions-kt")
+    // Login Google (navegador do sistema + servidor local na porta 3737) e o painel ao vivo da sessão.
+    implementation("io.github.jan-tennert.supabase:auth-kt")
+    implementation("io.github.jan-tennert.supabase:realtime-kt")
+    // Membros da turma (nome e e-mail) lidos direto das tabelas, pelas políticas de RLS.
+    implementation("io.github.jan-tennert.supabase:postgrest-kt")
+    // QR code gerado localmente (convite e projeção da sessão).
+    implementation("com.google.zxing:core:3.5.3")
     implementation("io.ktor:ktor-client-okhttp:3.1.2")
 
     testImplementation("junit:junit:4.13.2")
@@ -44,8 +51,9 @@ compose.desktop {
             packageVersion = "1.0.0"
             description = "Lumini: Knowledge Tracing e Learning Analytics para o professor"
             vendor = "Lumini"
-            // Saída de ./gradlew :desktop:suggestRuntimeModules (refaça ao trocar dependências).
-            modules("java.instrument", "java.management", "java.prefs", "jdk.unsupported")
+            // Saída de ./gradlew :desktop:suggestRuntimeModules (refaça ao trocar dependências)
+            // + jdk.httpserver, do retorno do login Google (data/Login.kt).
+            modules("java.instrument", "java.management", "java.prefs", "jdk.unsupported", "jdk.httpserver")
             linux { debPackageVersion = "1.0.0" }
             windows {
                 menu = true
