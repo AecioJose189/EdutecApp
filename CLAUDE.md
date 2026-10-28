@@ -19,7 +19,7 @@ Plataforma decidida com o professor da disciplina:
 - **Aluno: site web para o celular** em **Vite + React + TypeScript + supabase-js**, pasta `web-aluno/`
   (branch `web-aluno`, feito em paralelo pelo Aécio; briefing em `docs/briefing-web-aluno.md`).
 - **Login com Google** (Supabase Auth, configurado no painel) e **sessão com QR code rotativo**: back-end
-  pronto (ver "MVP com login"); falta o login no desktop.
+  e desktop prontos (ver "MVP com login" e "Desktop com login"); o site do aluno está em andamento.
 - **Papel por turma:** quem cria a turma é o professor dela; quem aceita o convite é aluno dela. A mesma
   conta pode ser professor numa turma e aluno em outra (nunca as duas na mesma).
 - **Android congelado** na tag `demo-nivel2` (módulo `:app`, Kotlin + Jetpack Compose). Não evoluir; só manter
@@ -75,24 +75,24 @@ JetBrains. O compilador do Kotlin 2.1.0 **não roda no JDK 25**: o daemon do Gra
 (`gradle/gradle-daemon-jvm.properties`) e o `:desktop` tem `jvmToolchain(21)` (o foojay baixa se faltar);
 o runtime embutido nos instaladores também é o 21.
 
-## Estado atual (27/10/2026)
+## Estado atual (27/10/2026, noite)
 
-Desktop (`:desktop`, branch `desktop`): porta completa do lado do professor, testada de ponta a ponta com
-`:desktop:run` (criar turma → Nova atividade → PDF → Gerar → Revisão → Publicar → Simular → grafo) e com o
-pacote gerado. Trocas em relação ao Android: janela "Lumini" (1280×800, mínimo 1024×680 para não cair no
+Desktop (`:desktop`, branch `desktop`): porta completa do lado do professor, já com login Google e as
+ações do MVP (ver "Desktop com login" abaixo). Trocas em relação ao Android: janela "Lumini" (1280×800, mínimo 1024×680 para não cair no
 layout de celular) em `Main.kt`; diálogo "Abrir arquivo" nativo (AWT `FileDialog`, filtro .pdf) e o PDF é
 enviado direto do disco, sem cópia; Snackbar no lugar do Toast; Esc no lugar do BackHandler.
 Tudo abaixo vale para os dois, salvo o que fala de Android/emulador.
 
-Lado do professor, caminho completo com dados reais: Minhas turmas → Turma › Grafo → Nova atividade
-(Origem/Formato → Gerando → Revisão → Publicar) → Simular respostas (demonstração) → grafo atualizado.
+Lado do professor, caminho completo com dados reais: Entrar com Google → Minhas turmas → Turma › Grafo /
+Atividades / Turma → Convidar alunos → Nova atividade (Origem/Formato → Gerando → Revisão → Publicar) →
+Abrir sessão em sala (projeção com QR) → alunos respondem → grafo atualizado. "Simular respostas" (25
+pseudônimos) fica no menu Demonstração da Turma.
 **O app não mostra dados de exemplo**: `DadosExemplo`/`DadosTurmaExemplo` só nos `@Preview`. Resumo do
 topo de Minhas turmas só aparece com algo real para contar; semestres vêm da data do aparelho.
 
-Acesso a dados: ver "MVP com login" abaixo (RLS com políticas, funções com `verify_jwt = true`).
-**O desktop ainda manda só a chave pública**: até ganhar o login Google, as chamadas dele à turma-api e à
-gerar-atividade voltam 401. No app: `data/Supabase.kt` (cliente único), `data/TurmaRepositorio.kt`
-(turma-api), `data/GeracaoRepositorio.kt`.
+Acesso a dados: ver "MVP com login" abaixo (RLS com políticas, funções com `verify_jwt = true`). No app:
+`data/Supabase.kt` (cliente único, com Auth), `data/TurmaRepositorio.kt` (turma-api e membros),
+`data/GeracaoRepositorio.kt`; todas as chamadas levam o JWT do professor logado.
 - Turmas persistidas (migration `..180000_turmas.sql`); `ui/NavegacaoViewModel` carrega/cria pela API,
   com carregando/erro + "Tentar de novo" em Minhas turmas.
 - Publicar (etapa 5, barra no fim da Revisão): `publicar_atividade` (PL/pgSQL, migration
@@ -158,9 +158,8 @@ Back-end (Supabase, projeto `vuxnyjkykftecqgznswg`, em `supabase/`):
   - Testes pgTAP (BKT, publicar, domínio por turma, simular): `npx supabase test db --linked
     supabase/tests/database` (rollback).
   - Demo: colar `supabase/tests/bkt_demo.sql` no SQL Editor (refaz os dados `demo-...`).
-- Teste: `scripts/testar-geracao.sh [pdf]` → `amostras/resultado.json` (pasta fora do git). **Desatualizado
-  desde o verify_jwt** (manda só a chave pública → 401); a geração agora é testada pelo
-  `scripts/testar-fluxo-mvp.ts`.
+- Teste: `scripts/testar-geracao.sh [pdf]` → `amostras/resultado.json` (pasta fora do git). Usa o JWT da
+  sessão do Lumini desktop (`~/.config/lumini/sessao.json`; entre no app antes) ou `SUPABASE_JWT`.
 - Testado de ponta a ponta com PDF real (2,5 MB, 5 questões mistas): ~67 s dentro da função com
   raciocínio `low` (~85 s com o padrão do modelo, `medium`, sem ganho visível de qualidade).
   Perto do limite de 150 s; com mais questões, dividir as chamadas (ver TODO).
@@ -219,9 +218,41 @@ inteiro com dois usuários de teste contra o projeto real:
 que obtém a chave está no cabeçalho do script). Cada execução cria uma turma na conta
 `professor.teste@lumini-teste.example.com`.
 
-Ainda não existe: login Google no desktop (e o desktop usando as ações novas: convite, sessão, QR, ao
-vivo), correção das abertas, edição na Revisão, prazo/liberação na publicação, gerar a partir do grafo,
-abas Atividades/Materiais/Estatísticas/Turma, histórico semanal, "Ver alunos com dificuldade".
+## Desktop com login (27/10/2026, noite)
+
+- **Login Google** (`data/Login.kt`): PKCE do Supabase Auth; o app abre o navegador do sistema
+  (`Desktop.browse`, com `xdg-open`/`open`/`rundll32` de reserva e "Copiar o link" na tela) e recebe
+  `?code=` num `HttpServer` do JDK na porta **fixa 3737**, em `http://localhost:3737/callback`, só
+  durante o login (5 min). Não usa o servidor de retorno do supabase-kt 3.1.4, que sorteia a porta.
+  O módulo `jdk.httpserver` vai no pacote.
+- **Sessão** (`data/SessaoEmArquivo.kt`): `~/.config/lumini/sessao.json` (Windows `%APPDATA%\Lumini\`;
+  respeita `XDG_CONFIG_HOME`), legível só pelo dono; o Auth renova o token sozinho. "Sair" (menu do
+  nome/foto em Minhas turmas) apaga. **401** em qualquer chamada → `SessaoExpirada` + sessão local apagada
+  → tela de entrada com aviso; os ViewModels são da janela, então com a mesma conta volta à mesma tela
+  (outra conta recomeça em Minhas turmas). `ui/SessaoViewModel` segue o `sessionStatus` do Auth.
+- **Turma**: "Convidar alunos" (código grande, link com Copiar, QR do link), aba **Atividades**
+  (`listar_atividades`; "Abrir sessão em sala"/"Voltar à sessão"), aba **Turma** (membros com nome e
+  e-mail, lidos direto de `membros_turma`+`perfis` pelo RLS, com postgrest-kt — a turma-api não tem ação
+  para isso), menu **Demonstração** (simular). Aba aberta fica no `TurmaViewModel`.
+- **Projeção** (`ui/ProjecaoScreen.kt` + `ProjecaoViewModel`): tela cheia (`LocalJanela`), QR novo a cada
+  15 s (token vale ~40 s) com anel de contagem, "entraram/enviaram" e lista ao vivo (Realtime
+  `postgres_changes` em `tentativas` filtrado por `sessao_id`, + consulta a cada 10 s de reserva), sem
+  acertos na tela. Encerrar entrada; Encerrar sessão (confirmação, Enter confirma). Esc sai da tela cheia;
+  de novo, sai da projeção (a sessão continua aberta até "Encerrar sessão"). "Copiar link" do QR para ensaio.
+- **QR** (`ui/Qr.kt`): ZXing `core` gera a matriz, desenhada no Canvas com módulo e origem em pixels
+  inteiros (com origem fracionária apareciam linhas cinza e o leitor do ZXing não lia).
+- **Nova atividade**: Múltipla escolha por padrão (abertas ficam fora do KT no MVP) e título editável
+  (vazio = o servidor usa os primeiros conceitos).
+- **Ensaio sem celular**: `scripts/simular-aluno.ts <convite> <url-do-qr> [n] [alternativa]` faz n alunos de
+  teste aceitarem o convite, lerem o QR e responderem (precisa de `SUPABASE_CHAVE_SECRETA` no ambiente).
+- Testado no Xvfb com sessão de teste importada (o Google em si não dá para automatizar): criar turma →
+  convite (QR lido pelo ZXing) → gerar → publicar → projeção → 3 alunos pelo script → contadores ao vivo →
+  grafo com nomes → encerrar entrada/sessão → Sair → entrada; sessão revogada no servidor → 401 → entrada
+  com aviso. Na noite do teste o Gemini deu 503/timeout para múltipla escolha: **gere a atividade da
+  apresentação antes** (o resultado fica salvo e volta na hora, RN12).
+
+Ainda não existe: correção das abertas, edição na Revisão, prazo/liberação na publicação, gerar a partir do
+grafo, abas Materiais/Estatísticas, histórico semanal, "Ver alunos com dificuldade".
 
 ## Entrega anterior (21/10/2026) — atividade da 1ª VA (feita no Android, tag `demo-nivel2`)
 

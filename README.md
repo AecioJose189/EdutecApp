@@ -35,6 +35,18 @@ SUPABASE_CHAVE_PUBLICA=sb_publishable_...
 Em desenvolvimento, `./gradlew :desktop:run` já usa os valores do `local.properties` (o mesmo do Android)
 se as variáveis de ambiente não estiverem definidas. Sem configuração, Minhas turmas mostra onde criar o arquivo.
 
+### Login
+
+"Entrar com Google" abre o navegador do sistema; o retorno chega ao Lumini em `http://localhost:3737/callback`
+(porta fixa, aberta só durante o login). No painel do Supabase, **Authentication → URL Configuration →
+Redirect URLs** precisa ter `http://localhost:3737/**` (ou exatamente `http://localhost:3737/callback`).
+A sessão fica em `~/.config/lumini/sessao.json` (Windows: `%APPDATA%\Lumini\sessao.json`) e é renovada sozinha;
+"Sair" (menu do nome no topo de Minhas turmas) apaga o arquivo.
+
+Para ensaiar sem celular: na projeção da sessão, "Copiar link" do QR e, em até ~40 s,
+`npx deno run -A scripts/simular-aluno.ts <código-do-convite> <link-do-qr> 3` (precisa de
+`SUPABASE_CHAVE_SECRETA` no ambiente; ver o cabeçalho do script).
+
 ### Rodar, testar e empacotar
 
 | Ação | Linux / macOS | Windows |
