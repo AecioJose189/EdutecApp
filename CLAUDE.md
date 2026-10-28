@@ -16,9 +16,12 @@ Plataforma decidida com o professor da disciplina:
 
 - **Professor: app desktop** em **Kotlin + Compose Multiplatform (Desktop/JVM, Material 3)**, módulo `:desktop`
   (Linux, Windows, macOS). Usa o layout de tela larga (o antigo de tablet) e se adapta ao redimensionar a janela.
-- **Aluno: site web para o celular** em **Vite + React + TypeScript + supabase-js** (ainda não começou).
-- **Login com Google** e **sessão com QR code rotativo**: decididos, ainda não implementados (detalhes na
-  especificação; perguntar antes de implementar).
+- **Aluno: site web para o celular** em **Vite + React + TypeScript + supabase-js**, pasta `web-aluno/`
+  (branch `web-aluno`, feito em paralelo pelo Aécio; briefing em `docs/briefing-web-aluno.md`).
+- **Login com Google** (Supabase Auth, configurado no painel) e **sessão com QR code rotativo**: back-end
+  pronto (ver "MVP com login"); falta o login no desktop.
+- **Papel por turma:** quem cria a turma é o professor dela; quem aceita o convite é aluno dela. A mesma
+  conta pode ser professor numa turma e aluno em outra (nunca as duas na mesma).
 - **Android congelado** na tag `demo-nivel2` (módulo `:app`, Kotlin + Jetpack Compose). Não evoluir; só manter
   o build funcionando. O código do desktop começou como cópia adaptada dele.
 - **Back-end: 100% Supabase** — Auth, Postgres (com RLS por turma), Storage (PDFs), Realtime e
@@ -31,6 +34,8 @@ Plataforma decidida com o professor da disciplina:
 
 ## Regras que valem para todo código
 
+- **Contrato da API do aluno:** `docs/contrato-api-mvp.md` (ações, campos e códigos de erro da `aluno-api`).
+  Campos novos podem ser acrescentados; renomear ou remover, não — combinar antes com quem faz o site.
 - **Nenhuma chave secreta no app, no site nem no git.** A chave do Gemini e a `service_role` do Supabase ficam
   só como secrets das Edge Functions. No desktop, apenas a URL e a chave pública (publishable/anon) do Supabase,
   lidas de variáveis de ambiente ou de `lumini.properties` fora do git (`data/Configuracao.kt`; ver README).
@@ -84,11 +89,10 @@ Lado do professor, caminho completo com dados reais: Minhas turmas → Turma ›
 **O app não mostra dados de exemplo**: `DadosExemplo`/`DadosTurmaExemplo` só nos `@Preview`. Resumo do
 topo de Minhas turmas só aparece com algo real para contar; semestres vêm da data do aparelho.
 
-Acesso a dados: **todas as tabelas com RLS e sem políticas** para anon/authenticated. O app só fala com
-Edge Functions (service_role): `gerar-atividade` e `turma-api` (POST JSON `{acao, ...}`; ações
-`listar_turmas`, `criar_turma`, `publicar`, `grafo`, `simular`). Ambas com `verify_jwt = false` e a
-checagem de chave pública em `supabase/functions/_shared/chave_publica.ts`. No app: `data/Supabase.kt`
-(cliente único), `data/TurmaRepositorio.kt` (turma-api), `data/GeracaoRepositorio.kt`.
+Acesso a dados: ver "MVP com login" abaixo (RLS com políticas, funções com `verify_jwt = true`).
+**O desktop ainda manda só a chave pública**: até ganhar o login Google, as chamadas dele à turma-api e à
+gerar-atividade voltam 401. No app: `data/Supabase.kt` (cliente único), `data/TurmaRepositorio.kt`
+(turma-api), `data/GeracaoRepositorio.kt`.
 - Turmas persistidas (migration `..180000_turmas.sql`); `ui/NavegacaoViewModel` carrega/cria pela API,
   com carregando/erro + "Tentar de novo" em Minhas turmas.
 - Publicar (etapa 5, barra no fim da Revisão): `publicar_atividade` (PL/pgSQL, migration
@@ -104,7 +108,7 @@ checagem de chave pública em `supabase/functions/_shared/chave_publica.ts`. No 
     Layout em camadas em `ui/LayoutGrafo.kt` (profundidade = maior caminho de pré-requisitos; ordem
     por baricentro), causa raiz em `data/GrafoTurma.kt` (pré-requisito direto/indireto de menor
     média, se não consolidado), ambos com testes unitários. Tamanho do nó = nº de respostas.
-    Lista de alunos só com pseudônimos ("Aluno 01"). Linha do tempo por semana removida (sem histórico).
+    Lista de alunos: simulação por pseudônimo ("Aluno 01"); alunos reais pelo nome (turma-api `grafo`). Linha do tempo por semana removida (sem histórico).
 - Simulação (DEMONSTRAÇÃO, migration `..210000_simular_respostas.sql`): `simular_respostas(turma)`
   cria 25 pseudônimos `sim-<turma>-NN`, semente fixa (reproduzível), substitui a anterior. Modelo:
   habilidade oculta, dificuldade crescente com a profundidade (−3,0 + 4,6·prof/max), penalidade 0,3
@@ -112,7 +116,8 @@ checagem de chave pública em `supabase/functions/_shared/chave_publica.ts`. No 
   teste.pdf (geração reaproveitada): ✓ Jogos e Minimax, ~ Poda e Decisões, ! Quiescência (causa raiz:
   Decisões...). Parâmetros mexidos mudam a história: confira antes de apresentar.
 - Apagar turma com respostas simuladas exige `set_config('edutec.limpar_demo','on',true)` (gatilho
-  só-inserção de `respostas` libera DELETE só de `demo-%`/`sim-%` com essa chave).
+  só-inserção de `respostas` libera DELETE só de `demo-%`/`sim-%` com essa chave). Turma com respostas
+  de alunos reais não pode ser apagada (o gatilho barra a cascata) — de propósito, por enquanto.
 - Testes de interface do caminho da demo: `./gradlew connectedDebugAndroidTest` (emulador ligado;
   ao terminar, o AGP desinstala o app — rode `installDebug` de novo).
 
@@ -142,8 +147,8 @@ Back-end (Supabase, projeto `vuxnyjkykftecqgznswg`, em `supabase/`):
   `forcar_nova=true` gera de novo (fica a linha mais recente).
 - Gemini isolado em `supabase/functions/_shared/gemini.ts` (REST `generateContent`, modelo por
   `GEMINI_MODEL`, padrão `gemini-3.8-flash`; raciocínio por `GEMINI_THINKING_LEVEL`, padrão `low`).
-- Autenticação: `verify_jwt = false`; a função aceita só a chave pública do projeto no cabeçalho
-  `apikey` (publishable ou legacy anon). Qualquer um com o APK pode gastar a cota do Gemini.
+- Autenticação: `verify_jwt = true` e só usuários logados (`_shared/auth.ts`); `geracoes` continua um
+  cache por PDF sem dono, acessado pela service_role.
 - KT (BKT) no Postgres, migration `20261021150000_bkt.sql`: `bkt_parametros` (linha padrão `'*'`:
   L0 0,3 · T 0,1 · G 0,2 · S 0,1; ajuste com pyBKT depois), `respostas` (só inserção por gatilho;
   pseudônimo, RN13), `dominio` (aluno+conceito). `registrar_resposta(aluno, conceito, correta)` aplica
@@ -153,15 +158,70 @@ Back-end (Supabase, projeto `vuxnyjkykftecqgznswg`, em `supabase/`):
   - Testes pgTAP (BKT, publicar, domínio por turma, simular): `npx supabase test db --linked
     supabase/tests/database` (rollback).
   - Demo: colar `supabase/tests/bkt_demo.sql` no SQL Editor (refaz os dados `demo-...`).
-- Teste: `scripts/testar-geracao.sh [pdf]` (URL e chave pública em `local.properties`:
-  `SUPABASE_URL`, `SUPABASE_CHAVE_PUBLICA`) → `amostras/resultado.json` (pasta fora do git).
+- Teste: `scripts/testar-geracao.sh [pdf]` → `amostras/resultado.json` (pasta fora do git). **Desatualizado
+  desde o verify_jwt** (manda só a chave pública → 401); a geração agora é testada pelo
+  `scripts/testar-fluxo-mvp.ts`.
 - Testado de ponta a ponta com PDF real (2,5 MB, 5 questões mistas): ~67 s dentro da função com
   raciocínio `low` (~85 s com o padrão do modelo, `medium`, sem ganho visível de qualidade).
   Perto do limite de 150 s; com mais questões, dividir as chamadas (ver TODO).
 
-Ainda não existe: login Google (e políticas de RLS), sessão com QR rotativo, site do aluno, edição na
-Revisão, prazo/liberação na publicação, gerar a partir do grafo, abas Atividades/Materiais/Estatísticas/Turma,
-histórico semanal, "Ver alunos com dificuldade".
+## MVP com login (back-end pronto em 27/10/2026, para a avaliação por pares de 28/10, 18:30)
+
+Fluxo: professor (desktop) loga com Google → cria turma → gera convite → publica atividade → abre sessão
+com QR rotativo; aluno (site) loga com Google → aceita convite → lê o QR → responde → BKT atualiza;
+professor vê o grafo da turma (e a sessão ao vivo), aluno vê o próprio grafo.
+
+Migrations (`supabase/migrations/20261027*`):
+- `..120000_perfis_membros_convites`: `perfis` (id = auth.users; nome, email, avatar; gatilho
+  `criar_perfil` no cadastro, nome de `full_name`/`name` do Google); `turmas.professor_id` (padrão
+  `auth.uid()`); `membros_turma` (gatilho impede o professor de ser aluno da própria turma, LU403);
+  `convites` (código de 6 caracteres sem 0/O/1/I, um ativo por turma). Apagou as turmas de teste sem
+  professor; ficaram `geracoes` e os dados `demo-` do BKT.
+- `..130000_sessoes_tentativas`: `atividades.titulo` (padrão: dois primeiros conceitos + "e outros") e
+  `atividades.questoes_aluno` (coluna gerada, **sem gabarito**: id da questão = posição "1", "2"...,
+  alternativas `a`, `b`...); `sessoes` (aberta, entrada_aberta, `segredo` do HMAC, aberta_em,
+  encerrada_em; uma aberta por atividade); `tentativas` (uma por aluno e sessão; prazo_em, acertos,
+  totais, `respostas` jsonb, `aluno_nome` para o painel ao vivo); `respostas`/`dominio` com `aluno_id`
+  (uuid; `aluno_pseudonimo` = o uuid em texto, RN13) e `respostas.tentativa_id`;
+  `registrar_resposta(aluno, conceito, correta, turma, aluno_id, tentativa)`;
+  `enviar_tentativa(tentativa, aluno, respostas)` corrige no Postgres, numa transação: múltipla escolha →
+  `registrar_resposta` por conceito; sem resposta conta no total mas não entra no BKT; abertas ficam
+  `aguardando_correcao`, fora do KT. Erros LU403/LU409/LU410/LU408 (prazo + 30 s de tolerância).
+- `..140000_rls_politicas`: professor lê/escreve só as próprias turmas e tudo delas; aluno lê turmas de
+  que é membro, atividades **sem a coluna `questoes`** (sem GRANT; lê `questoes_aluno`), sessões (sem a
+  coluna `segredo`) e só os próprios domínios/respostas/tentativas; perfis: o próprio e quem divide turma
+  (professor↔aluno, não aluno↔aluno). anon: nada. Realtime: `tentativas` e `respostas` na publicação.
+- `..150000_funcoes_privadas`: `eh_professor`, `eh_membro`, `compartilha_turma`,
+  `eh_professor_da_sessao` (security definer, usadas pelas políticas) no schema `privado`, fora da API.
+
+Edge Functions (todas com `verify_jwt = true`; usuário por `getUser` em `_shared/auth.ts`; a service_role
+só depois de conferir o papel na turma):
+- `turma-api` (professor; erro `{erro: "texto"}`): `listar_turmas`, `criar_turma`, `criar_convite`
+  (link `<SITE_URL>/convite/<codigo>`), `publicar` (+ `titulo` opcional), `listar_atividades`,
+  `abrir_sessao`, `token_qr` (URL `<SITE_URL>/s/<token>`, `expira_em`, janela 20 s), `encerrar_entrada`,
+  `encerrar_sessao`, `sessao` (participantes), `grafo` (alunos reais pelo nome; simulação "Aluno NN"),
+  `simular`. Turma/atividade/sessão de outro professor → 404.
+- `aluno-api` (site): exatamente o contrato. Pedido malformado usa o código do contrato mais próximo
+  (token ilegível → `qr_expirado`; turma/tentativa inválida → `nao_matriculado`; ação desconhecida →
+  `erro_interno` 400). Sem JWT a plataforma responde 401 antes da função (corpo da plataforma, não o do
+  contrato): o site deve tratar **qualquer 401** como `nao_autenticado`.
+- QR (`_shared/qr.ts`, testes em `qr_test.ts`): token `<sessao_id b64url>.<janela b36>.<HMAC-SHA256 de
+  "sessao:janela" truncado em 96 bits>`, ~46 caracteres. Vale a janela atual e a anterior (~40 s) para
+  entrar; com tentativa já criada, um token velho válido devolve a mesma tentativa (recarregar a página).
+- Secret `SITE_URL` (hoje `http://localhost:5173`; trocar pela URL da Vercel quando houver:
+  `npx supabase secrets set SITE_URL=...`).
+- Ao vivo no desktop: Realtime `postgres_changes` em `public.tentativas` com filtro `sessao_id=eq.<id>`
+  e o JWT do professor (INSERT = entrou; UPDATE com `enviada_em` = enviou).
+
+Testes: pgTAP (6 arquivos, 67 testes, inclusive `rls.test.sql` e `tentativas.test.sql`) e o fluxo
+inteiro com dois usuários de teste contra o projeto real:
+`SUPABASE_CHAVE_SECRETA=<service_role> npx deno run -A scripts/testar-fluxo-mvp.ts` (o comando
+que obtém a chave está no cabeçalho do script). Cada execução cria uma turma na conta
+`professor.teste@lumini-teste.example.com`.
+
+Ainda não existe: login Google no desktop (e o desktop usando as ações novas: convite, sessão, QR, ao
+vivo), correção das abertas, edição na Revisão, prazo/liberação na publicação, gerar a partir do grafo,
+abas Atividades/Materiais/Estatísticas/Turma, histórico semanal, "Ver alunos com dificuldade".
 
 ## Entrega anterior (21/10/2026) — atividade da 1ª VA (feita no Android, tag `demo-nivel2`)
 
@@ -170,5 +230,5 @@ histórico semanal, "Ver alunos com dificuldade".
 3. Uma tela com um botão integrada à tecnologia: o botão **"Gerar atividade"** da tela Nova atividade chama a
    Edge Function e mostra as questões geradas.
 
-Prioridade agora: o desktop no lugar do Android. Não implementar login, QR, RLS completo, offline nem o site
-do aluno sem combinar antes.
+Prioridade agora: MVP com login para a avaliação por pares (28/10, 18:30). Não mexer em `web-aluno/` (é do
+Aécio) nem mudar o contrato sem combinar.
