@@ -414,11 +414,13 @@ enabled = true
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
 
-# A chave publishable (sb_publishable_...) não é JWT: o verify_jwt da plataforma a rejeitaria.
-# A própria função confere se o cabeçalho `apikey` é uma chave pública do projeto.
+# Todas as funções exigem o JWT de um usuário logado (Google via Supabase Auth); cada uma confere o
+# usuário com getUser e o papel dele na turma (ver supabase/functions/_shared/auth.ts).
 [functions.gerar-atividade]
-verify_jwt = false
+verify_jwt = true
 
-# Mesma regra da gerar-atividade: a função confere a chave pública no cabeçalho `apikey`.
 [functions.turma-api]
-verify_jwt = false
+verify_jwt = true
+
+[functions.aluno-api]
+verify_jwt = true

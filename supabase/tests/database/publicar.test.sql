@@ -6,7 +6,9 @@ set local search_path = public, extensions;
 
 select plan(7);
 
-insert into turmas (id, nome, codigo) values ('00000000-0000-4000-8000-000000000001', 'Teste', 'Turma T');
+-- Turmas agora têm professor (perfil criado pelo gatilho do cadastro).
+insert into auth.users (id, email) values ('00000000-0000-4000-8000-00000000f001', 'prof-teste@exemplo.com');
+insert into turmas (id, nome, codigo, professor_id) values ('00000000-0000-4000-8000-000000000001', 'Teste', 'Turma T', '00000000-0000-4000-8000-00000000f001');
 
 -- Geração 1: A ← B ← C (B requer A; C requer B). Geração 2: D requer A, e B passa a requerer D.
 -- Geração 3: A requer C → ciclo A → C → B → A.

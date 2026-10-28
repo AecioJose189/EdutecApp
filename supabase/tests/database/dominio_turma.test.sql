@@ -7,9 +7,11 @@ set local search_path = public, extensions;
 
 select plan(7);
 
-insert into turmas (id, nome, codigo) values
-  ('00000000-0000-4000-8000-0000000000a1', 'Teste', 'A'),
-  ('00000000-0000-4000-8000-0000000000b2', 'Teste', 'B');
+-- Turmas agora têm professor (perfil criado pelo gatilho do cadastro).
+insert into auth.users (id, email) values ('00000000-0000-4000-8000-00000000f001', 'prof-teste@exemplo.com');
+insert into turmas (id, nome, codigo, professor_id) values
+  ('00000000-0000-4000-8000-0000000000a1', 'Teste', 'A', '00000000-0000-4000-8000-00000000f001'),
+  ('00000000-0000-4000-8000-0000000000b2', 'Teste', 'B', '00000000-0000-4000-8000-00000000f001');
 
 -- Turma A: sim-x acerta duas vezes (0,9192 → consolidado); sim-y erra uma (0,1458 → revisar).
 select registrar_resposta('sim-x', 'Conceito T', true, '00000000-0000-4000-8000-0000000000a1');
