@@ -703,3 +703,11 @@ a.cartao:active {
     animation-duration: 3s;
   }
 }
+
+/* Política de privacidade: texto corrido */
+.privacidade ul {
+  padding-left: 20px;
+}
+.privacidade li {
+  margin-bottom: 8px;
+}

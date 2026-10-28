@@ -5,6 +5,7 @@ import { Convite } from './telas/Convite'
 import { Entrar } from './telas/Entrar'
 import { MinhasTurmas } from './telas/MinhasTurmas'
 import { NaoEncontrada } from './telas/NaoEncontrada'
+import { Privacidade } from './telas/Privacidade'
 import { Atividade } from './telas/atividade/Atividade'
 import { MeuGrafo } from './telas/grafo/MeuGrafo'
 
@@ -14,6 +15,7 @@ export function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/entrar" element={<Entrar />} />
+          <Route path="/privacidade" element={<Privacidade />} />
           <Route element={<RotaProtegida />}>
             <Route path="/" element={<MinhasTurmas />} />
             <Route path="/convite/:codigo" element={<Convite />} />

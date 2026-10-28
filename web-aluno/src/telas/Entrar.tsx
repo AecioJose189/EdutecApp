@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { apiSimulada } from '../api/config'
 import { Carregando } from '../componentes/Carregando'
 import { Marca } from '../componentes/Topo'
@@ -73,6 +73,9 @@ export function Entrar() {
           </p>
         )}
         {apiSimulada && <p className="secundario">Modo simulado: o login é de mentira e nenhum dado sai do celular.</p>}
+        <p className="secundario">
+          <Link to="/privacidade">Política de privacidade</Link>
+        </p>
       </div>
     </main>
   )
