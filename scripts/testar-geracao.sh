@@ -11,6 +11,10 @@
 # URL e chave pública (publishable ou anon) vêm das variáveis SUPABASE_URL e SUPABASE_CHAVE_PUBLICA
 # (ou SUPABASE_PUBLISHABLE_KEY / SUPABASE_ANON_KEY), ou de SUPABASE_URL e SUPABASE_CHAVE_PUBLICA
 # em local.properties (as mesmas que o app lê).
+#
+# Desde o MVP com login, a função exige o JWT de um usuário (verify_jwt = true). O script usa, nesta
+# ordem: a variável SUPABASE_JWT, ou o access_token da sessão do Lumini desktop
+# (~/.config/lumini/sessao.json; no Windows %APPDATA%/Lumini/sessao.json) — entre no app antes.
 set -euo pipefail
 export LC_NUMERIC=C  # ponto decimal no printf, mesmo com locale pt_BR
 
@@ -27,6 +31,17 @@ chave="${chave:-$(ler_propriedade SUPABASE_CHAVE_PUBLICA)}"
 
 if [ -z "$url" ] || [ -z "$chave" ]; then
   echo "Defina SUPABASE_URL e SUPABASE_CHAVE_PUBLICA (no ambiente ou em local.properties)." >&2
+  exit 1
+fi
+
+sessao="${LUMINI_SESSAO:-${XDG_CONFIG_HOME:-$HOME/.config}/lumini/sessao.json}"
+[ -f "$sessao" ] || sessao="${APPDATA:-}/Lumini/sessao.json"
+jwt="${SUPABASE_JWT:-}"
+if [ -z "$jwt" ] && [ -f "$sessao" ]; then
+  jwt="$(sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p' "$sessao" | head -n 1)"
+fi
+if [ -z "$jwt" ]; then
+  echo "Sem JWT: entre no Lumini desktop (a sessão fica em $sessao) ou defina SUPABASE_JWT." >&2
   exit 1
 fi
 
@@ -50,6 +65,7 @@ inicio=$(date +%s.%N)
 status=$(curl -sS -o "$bruto" -w '%{http_code}' --max-time 160 \
   -X POST "${url%/}/functions/v1/gerar-atividade" \
   -H "apikey: $chave" \
+  -H "Authorization: Bearer $jwt" \
   -F "pdf=@$pdf;type=application/pdf" \
   -F "quantidade=$quantidade" \
   -F "formato=$formato" \
