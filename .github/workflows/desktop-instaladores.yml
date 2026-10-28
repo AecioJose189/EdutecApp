@@ -1,0 +1,149 @@
+# Instaladores do Lumini (app do professor) para Windows, Linux e macOS, publicados num GitHub Release.
+# Dispara com uma tag v* (git tag v1.0.0 && git push origin v1.0.0) ou à mão em Actions
+# (gh workflow run, que só enxerga o workflow depois que ele estiver na branch padrão).
+name: Instaladores do desktop
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      versao:
+        description: "Versão (MAJOR.MINOR.BUILD); o Release fica na tag v<versão>"
+        required: true
+        default: "1.0.0"
+
+permissions:
+  contents: write
+
+jobs:
+  instalador:
+    name: ${{ matrix.nome }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nome: Windows (.msi)
+            so: windows-latest
+            tarefa: packageMsi
+            formato: msi
+            sufixo: windows-x64
+          - nome: Linux (.deb)
+            so: ubuntu-latest
+            tarefa: packageDeb
+            formato: deb
+            sufixo: linux-amd64
+          - nome: macOS Apple Silicon (.dmg)
+            so: macos-latest
+            tarefa: packageDmg
+            formato: dmg
+            sufixo: macos-apple-silicon
+          - nome: macOS Intel (.dmg)
+            so: macos-15-intel
+            tarefa: packageDmg
+            formato: dmg
+            sufixo: macos-intel
+    runs-on: ${{ matrix.so }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Versão
+        id: versao
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then v="${GITHUB_REF_NAME#v}"; else v="${{ inputs.versao }}"; fi
+          echo "versao=$v" >> "$GITHUB_OUTPUT"
+
+      # JDK 21: o compilador do Kotlin 2.1.0 não roda em JDKs mais novos, e o runtime embutido é o 21.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Dependências do .deb
+        if: matrix.formato == 'deb'
+        run: sudo apt-get update && sudo apt-get install -y fakeroot
+
+      - name: Testes
+        if: matrix.formato == 'deb'
+        shell: bash
+        run: ./gradlew :desktop:test --no-daemon
+
+      - name: Empacotar
+        shell: bash
+        run: ./gradlew :desktop:${{ matrix.tarefa }} -PluminiVersao=${{ steps.versao.outputs.versao }} --no-daemon
+
+      - name: Renomear
+        shell: bash
+        run: |
+          mkdir saida
+          arquivo=$(ls desktop/build/compose/binaries/main/${{ matrix.formato }}/*.${{ matrix.formato }})
+          cp "$arquivo" "saida/Lumini-${{ steps.versao.outputs.versao }}-${{ matrix.sufixo }}.${{ matrix.formato }}"
+          ls -l saida
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lumini-${{ matrix.sufixo }}
+          path: saida/*
+          if-no-files-found: error
+
+  release:
+    name: Publicar o Release
+    needs: instalador
+    # Publica o que deu certo mesmo se um sistema falhar (ex.: o macOS Intel).
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: instaladores
+          merge-multiple: true
+
+      - name: Versão
+        id: versao
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then v="${GITHUB_REF_NAME#v}"; else v="${{ inputs.versao }}"; fi
+          echo "versao=$v" >> "$GITHUB_OUTPUT"
+          ls -l instaladores
+
+      - name: Notas
+        run: |
+          cat > notas.md <<NOTAS
+          ## Lumini ${{ steps.versao.outputs.versao }} — app do professor
+
+          **Como testar:** siga o [Guia do avaliador](https://github.com/${{ github.repository }}/blob/${{ github.sha }}/docs/GUIA-AVALIADOR.md).
+          O site do aluno (para abrir no celular) é https://lumini-aluno.vercel.app.
+
+          | Sistema | Arquivo |
+          |---|---|
+          | Windows 10/11 | \`Lumini-${{ steps.versao.outputs.versao }}-windows-x64.msi\` |
+          | Ubuntu/Debian (64 bits) | \`Lumini-${{ steps.versao.outputs.versao }}-linux-amd64.deb\` |
+          | macOS (M1, M2, M3...) | \`Lumini-${{ steps.versao.outputs.versao }}-macos-apple-silicon.dmg\` |
+          | macOS (Intel) | \`Lumini-${{ steps.versao.outputs.versao }}-macos-intel.dmg\` |
+
+          Os instaladores não são assinados:
+          - **Windows:** em "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**.
+          - **macOS:** arraste o Lumini para Aplicativos e abra com **botão direito → Abrir → Abrir**
+            (no macOS 15 ou mais novo: Ajustes do Sistema → Privacidade e Segurança → **Abrir Mesmo Assim**).
+          - **Linux:** \`sudo apt install ./Lumini-${{ steps.versao.outputs.versao }}-linux-amd64.deb\`.
+
+          Para entrar, o Lumini abre o navegador no login do Google e recebe a resposta em \`localhost:3737\`
+          (só no próprio computador).
+
+          **Limitações conhecidas:** questões abertas ainda não são corrigidas (ficam fora do grafo); o feedback
+          com IA para o aluno fica para a entrega final; quando a IA está sobrecarregada, o app pede para tentar
+          de novo (ou gerar menos questões).
+          NOTAS
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.versao.outputs.versao }}
+          target_commitish: ${{ github.sha }}
+          name: Lumini ${{ steps.versao.outputs.versao }}
+          body_path: notas.md
+          files: instaladores/*
+          fail_on_unmatched_files: true
