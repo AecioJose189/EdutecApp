@@ -37,8 +37,9 @@ Plataforma decidida com o professor da disciplina:
 - **Contrato da API do aluno:** `docs/contrato-api-mvp.md` (ações, campos e códigos de erro da `aluno-api`).
   Campos novos podem ser acrescentados; renomear ou remover, não — combinar antes com quem faz o site.
 - **Nenhuma chave secreta no app, no site nem no git.** A chave do Gemini e a `service_role` do Supabase ficam
-  só como secrets das Edge Functions. No desktop, apenas a URL e a chave pública (publishable/anon) do Supabase,
-  lidas de variáveis de ambiente ou de `lumini.properties` fora do git (`data/Configuracao.kt`; ver README).
+  só como secrets das Edge Functions. No desktop, apenas a URL e a chave pública (`sb_publishable_`) do Supabase:
+  **embutidas como padrão** em `data/Configuracao.kt` (o app instalado funciona sem arquivo), sobrescrevíveis por
+  variáveis de ambiente ou `lumini.properties` (ver README).
   O Android lia de `local.properties` via `BuildConfig`.
 - **Privacidade (RN13):** nenhum dado pessoal de aluno (nome, matrícula, e-mail) é enviado ao Gemini.
 - **RN04:** nada gerado por IA chega ao aluno sem aprovação do professor.
@@ -75,7 +76,7 @@ JetBrains. O compilador do Kotlin 2.1.0 **não roda no JDK 25**: o daemon do Gra
 (`gradle/gradle-daemon-jvm.properties`) e o `:desktop` tem `jvmToolchain(21)` (o foojay baixa se faltar);
 o runtime embutido nos instaladores também é o 21.
 
-## Estado atual (27/10/2026, noite)
+## Estado atual (28/10/2026)
 
 Desktop (`:desktop`, branch `desktop`): porta completa do lado do professor, já com login Google e as
 ações do MVP (ver "Desktop com login" abaixo). Trocas em relação ao Android: janela "Lumini" (1280×800, mínimo 1024×680 para não cair no
@@ -269,6 +270,20 @@ que obtém a chave está no cabeçalho do script). Cada execução cria uma turm
 - **IA sobrecarregada** (sobrecarga, tempo esgotado ou cota): a tela de erro da geração explica em
   linguagem simples e oferece "Tentar de novo" e "Gerar menos questões (3)"
   (`NovaAtividadeViewModel.gerarMenos`, `QUESTOES_SE_SOBRECARREGADA`).
+
+## Distribuição (28/10/2026, para a avaliação por pares)
+
+- Workflow `.github/workflows/desktop-instaladores.yml`: tag `v*` (ou à mão, quando estiver na `main`) →
+  `.msi` (windows-latest), `.deb` (ubuntu-latest), `.dmg` (macos-latest = Apple Silicon e macos-15-intel)
+  → GitHub Release `v<versão>` com notas em português. Versão por `-PluminiVersao` (padrão 1.0.0).
+  Instaladores **não assinados** (avisos do Windows/macOS explicados no guia). `.msi` com
+  `perUserInstall` (sem administrador).
+- O servidor de retorno do login escuta só em `127.0.0.1:3737` (sem aviso de firewall); testado no `.deb`
+  extraído e rodado no Xvfb sem `lumini.properties`: turmas e grafo reais, URL do Google gerada, retorno
+  recebido (o login Google em si não dá para automatizar).
+- Guia de uma página para os avaliadores: `docs/GUIA-AVALIADOR.md` (marcadores `[LINK DOS PDFs DE TESTE]`
+  e `[CONTATO]`). Site do aluno: https://lumini-aluno.vercel.app. Os PDFs de teste devem ser gerados antes
+  com as opções padrão (5, múltipla escolha, média) para a resposta vir na hora (RN12).
 
 Ainda não existe: correção das abertas, edição na Revisão, prazo/liberação na publicação, gerar a partir do
 grafo, abas Materiais/Estatísticas, histórico semanal, "Ver alunos com dificuldade".
