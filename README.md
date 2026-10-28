@@ -2,8 +2,11 @@
 
 Plataforma de **Knowledge Tracing** e **Learning Analytics** para o ensino superior (projeto EDUTEC).
 
+- **Instaladores do app do professor** (Windows, Linux, macOS): [Releases](https://github.com/AecioJose189/EdutecApp/releases/latest)
+- **Para testar:** [Guia do avaliador](docs/GUIA-AVALIADOR.md) · site do aluno: https://lumini-aluno.vercel.app
+
 - **Professor:** app desktop em Compose Multiplatform, módulo [`desktop/`](#app-do-professor-desktop) (Linux, Windows, macOS).
-- **Aluno:** site web para o celular (Vite + React + TypeScript + supabase-js), ainda não começou.
+- **Aluno:** site web para o celular (Vite + React + TypeScript + supabase-js), https://lumini-aluno.vercel.app (branch `web-aluno`).
 - **Back-end:** Supabase (Postgres, Edge Functions, Storage), em `supabase/`.
 - **Android:** o app original do professor (módulo `app/`) está **congelado** na tag `demo-nivel2`.
   O resto deste README depois da seção do desktop descreve esse app.
@@ -15,7 +18,9 @@ Precisa de JDK 21 (o Gradle baixa um se não houver). O código fica em
 
 ### Configuração (URL e chave pública do Supabase)
 
-Nada disso vai para o git. O app procura, nesta ordem:
+O app já vem com a URL e a chave **pública** (`sb_publishable_...`) do projeto Lumini
+(`data/Configuracao.kt`), então o instalado funciona sem arquivo extra. Para apontar para outro projeto,
+o app procura, nesta ordem (o primeiro que tiver o valor vence):
 
 1. variáveis de ambiente `SUPABASE_URL` e `SUPABASE_CHAVE_PUBLICA`;
 2. o arquivo indicado na variável `LUMINI_CONFIG`;
@@ -25,7 +30,7 @@ Nada disso vai para o git. O app procura, nesta ordem:
    - macOS: `~/Library/Application Support/Lumini/lumini.properties`
 4. `lumini.properties` na pasta atual.
 
-Conteúdo do arquivo (só a chave **pública**, publishable ou anon; nunca a `service_role`):
+Conteúdo do arquivo (só a chave **pública**, publishable ou anon; nunca a `service_role` nem `sb_secret_`):
 
 ```properties
 SUPABASE_URL=https://<projeto>.supabase.co
@@ -33,12 +38,12 @@ SUPABASE_CHAVE_PUBLICA=sb_publishable_...
 ```
 
 Em desenvolvimento, `./gradlew :desktop:run` já usa os valores do `local.properties` (o mesmo do Android)
-se as variáveis de ambiente não estiverem definidas. Sem configuração, Minhas turmas mostra onde criar o arquivo.
+se as variáveis de ambiente não estiverem definidas.
 
 ### Login
 
 "Entrar com Google" abre o navegador do sistema; o retorno chega ao Lumini em `http://localhost:3737/callback`
-(porta fixa, aberta só durante o login). No painel do Supabase, **Authentication → URL Configuration →
+(porta fixa, só no loopback e só durante o login; vale igual no app instalado). No painel do Supabase, **Authentication → URL Configuration →
 Redirect URLs** precisa ter `http://localhost:3737/**` (ou exatamente `http://localhost:3737/callback`).
 A sessão fica em `~/.config/lumini/sessao.json` (Windows: `%APPDATA%\Lumini\sessao.json`) e é renovada sozinha;
 "Sair" (menu do nome no topo de Minhas turmas) apaga o arquivo.
@@ -55,9 +60,16 @@ Para ensaiar sem celular: na projeção da sessão, "Copiar link" do QR e, em at
 | Testes unitários | `./gradlew :desktop:test` | `gradlew.bat :desktop:test` |
 | Instalador | `./gradlew :desktop:packageDeb` (Linux) · `./gradlew :desktop:packageDmg` (macOS) | `gradlew.bat :desktop:packageMsi` |
 
-Os instaladores saem em `desktop/build/compose/binaries/main/<formato>/` (ex.: `deb/lumini_1.0.0_amd64.deb`).
+Os instaladores saem em `desktop/build/compose/binaries/main/<formato>/` (ex.: `deb/lumini_1.0.0_amd64.deb`);
+a versão vem de `-PluminiVersao=1.0.1` (padrão 1.0.0).
 Cada formato só é gerado no próprio sistema (o `.msi` precisa de Windows com o [WiX Toolset 3](https://wixtoolset.org/),
 que o plugin baixa sozinho). No Linux, o `.deb` precisa de `fakeroot` e `dpkg-deb`.
+
+**Release no GitHub:** o workflow [`desktop-instaladores.yml`](.github/workflows/desktop-instaladores.yml)
+gera `.msi` (Windows), `.deb` (Ubuntu) e `.dmg` (macOS Apple Silicon e Intel) e publica no
+[Release](https://github.com/AecioJose189/EdutecApp/releases/latest). Dispara com uma tag:
+`git tag v1.0.0 && git push origin v1.0.0` (ou em Actions → "Instaladores do desktop" → Run workflow,
+quando o workflow estiver na `main`). Os instaladores não são assinados (ver o [guia](docs/GUIA-AVALIADOR.md)).
 
 Teclado e mouse: **Esc** volta uma tela (ou cancela a geração), **Enter** confirma o diálogo Nova turma.
 
