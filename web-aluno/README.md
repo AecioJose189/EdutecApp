@@ -39,6 +39,7 @@ O aluno começa sem turmas. As respostas seguem `docs/contrato-api-mvp.md`, e al
 | `/s/semprazo` | `prazo_em: null` (sem cronômetro). |
 | `/s/enviada` | `ja_enviada: true` |
 | `/s/expirado` · `/s/encerrada` · `/s/fora` | `qr_expirado` · `sessao_encerrada` · `nao_matriculado` |
+| `/s/deslogado` | `nao_autenticado`: sai e vai para o login, que depois volta para `/s/deslogado`. |
 
 Para recomeçar do zero, feche a aba (o estado simulado fica no sessionStorage).
 
@@ -56,13 +57,16 @@ Comportamentos combinados:
 
 - **Atividade:** uma questão por vez, uma tela de revisão e "Enviar" com confirmação. As respostas ficam no
   `localStorage` do aparelho até o envio, então recarregar não perde nada; depois do envio fica só o resultado.
-  A tentativa fica no `sessionStorage` por token, porque o token do QR muda a cada ~20 s e recarregar não deve
-  dar "QR expirado".
+  Ao recarregar, o site pergunta de novo ao servidor, que aceita o token velho de quem já tem tentativa. Uma
+  cópia no `sessionStorage` só é usada se a rede cair.
 - **Cronômetro:** aviso laranja no último minuto. A 3 s do fim, envia sozinho o que já foi respondido.
 - **Grafo:** mesma regra de layout do desktop (`src/grafo/layoutEmCamadas.ts` é a porta do `LayoutGrafo.kt`,
   com os mesmos testes). Tocar num nó (ou na lista) mostra o nome completo, o domínio estimado em % e o nº de
   respostas.
 - **Erros:** `src/api/erros.ts` traduz cada código do contrato num título simples e no que fazer.
+- **Login vencido:** um 401 da plataforma (token ausente ou vencido, sem o JSON do contrato) vira
+  `nao_autenticado`. Nesse caso, o site tenta renovar o login uma vez; se não conseguir, sai e leva para
+  `/entrar`, que depois volta para a mesma página.
 
 ## Estrutura
 

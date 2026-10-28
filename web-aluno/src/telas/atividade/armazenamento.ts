@@ -22,7 +22,7 @@ function gravar(armazem: Storage, chave: string, valor: unknown) {
   }
 }
 
-// O token do QR muda a cada ~20 s; recarregar a página não deve dar "QR expirado".
+// Cópia da última tentativa por token, para abrir a atividade mesmo se a rede da sala cair ao recarregar.
 export const tentativaDoToken = (token: string) => ler<Tentativa>(sessionStorage, `lumini.tentativa.${token}`)
 export const guardarTentativa = (token: string, t: Tentativa) => gravar(sessionStorage, `lumini.tentativa.${token}`, t)
 

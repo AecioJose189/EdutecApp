@@ -26,12 +26,18 @@ import { ConfirmarEnvio, Revisao } from './Revisao'
 /** Envia sozinho quando faltam estes segundos, para chegar antes do prazo no servidor. */
 const ENVIO_AUTOMATICO_S = 3
 
+// O servidor aceita o token velho de quem já tem tentativa (recarregar funciona e traz ja_enviada
+// atualizado). A cópia guardada só entra quando a rede da sala falha.
 async function carregarTentativa(token: string): Promise<Tentativa> {
-  const salva = tentativaDoToken(token)
-  if (salva) return salva
-  const t = await chamarAlunoApi('entrar_sessao', { token })
-  guardarTentativa(token, t)
-  return t
+  try {
+    const t = await chamarAlunoApi('entrar_sessao', { token })
+    guardarTentativa(token, t)
+    return t
+  } catch (e) {
+    const salva = codigoErro(e) === 'sem_conexao' ? tentativaDoToken(token) : null
+    if (salva) return salva
+    throw e
+  }
 }
 
 export function Atividade() {

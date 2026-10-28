@@ -2,6 +2,7 @@
 // Supabase. Valores especiais disparam os erros do contrato, para testar todas as telas:
 //   convite  XXXXXX                     → convite_invalido
 //   token    expirado | encerrada | fora → qr_expirado | sessao_encerrada | nao_matriculado
+//   token    deslogado                  → nao_autenticado (sai e volta para o login)
 //   token    enviada                    → tentativa com ja_enviada = true
 //   token    rapida                     → prazo de 45 s (para ver o cronômetro acabar)
 //   token    semprazo                   → prazo_em = null
@@ -170,6 +171,11 @@ export async function chamarSimulada<A extends Acao>(
 
     case 'entrar_sessao': {
       const token = String(p.token)
+      // Só na primeira vez: depois de entrar de novo, a atividade abre (como no servidor de verdade).
+      if (token === 'deslogado' && !lerGuardado('sim.deslogou', false)) {
+        guardar('sim.deslogou', true)
+        throw new ErroApi('nao_autenticado', 'Sua sessão expirou. Entre com o Google de novo.')
+      }
       if (token === 'expirado') throw new ErroApi('qr_expirado', 'Este código QR já expirou.')
       if (token === 'encerrada') throw new ErroApi('sessao_encerrada', 'O professor já encerrou esta atividade.')
       if (token === 'fora') throw new ErroApi('nao_matriculado', 'Sua conta não faz parte da turma desta atividade.')

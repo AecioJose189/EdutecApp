@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { quandoSessaoExpirar } from '../api/alunoApi'
 import { apiSimulada } from '../api/config'
 import { supabase } from '../api/supabase'
 
@@ -29,6 +30,14 @@ function lerSimulado(): Usuario | null {
 
 export function SessaoProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null | undefined>(apiSimulada ? lerSimulado() : undefined)
+
+  // Servidor recusou o login (401 / nao_autenticado): sai e a RotaProtegida leva para /entrar,
+  // lembrando a página atual para voltar depois.
+  useEffect(() => {
+    // 'local': o token já não vale no servidor, então só limpa o aparelho.
+    quandoSessaoExpirar(() => void (apiSimulada ? sair() : supabase().auth.signOut({ scope: 'local' })))
+    return () => quandoSessaoExpirar(null)
+  })
 
   useEffect(() => {
     if (apiSimulada) return
