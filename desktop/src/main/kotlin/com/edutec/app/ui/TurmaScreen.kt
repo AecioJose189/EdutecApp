@@ -48,6 +48,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import com.edutec.app.data.AtividadePublicada
+import com.edutec.app.data.Membro
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -108,6 +114,7 @@ import kotlin.math.sqrt
 private val CantoCartao = RoundedCornerShape(24.dp)
 private val Espaco = 14.dp
 private val Abas = listOf("Grafo", "Atividades", "Materiais", "Estatísticas", "Turma")
+private val AbasProntas = setOf("Grafo", "Atividades", "Turma")
 
 /**
  * Tela de uma turma: grafo de conhecimento com o domínio estimado de cada conceito (dados reais da
@@ -122,12 +129,18 @@ fun TurmaScreen(
     onNovaAtividade: (conceitosIniciais: Set<String>) -> Unit,
     modifier: Modifier = Modifier,
     onTentarDeNovo: () -> Unit = {},
-    /** Botão de demonstração "Simular respostas da turma"; null esconde o botão. */
+    /** "Simular respostas da turma", no menu Demonstração; null esconde o menu. */
     onSimular: (() -> Unit)? = null,
     simulando: Boolean = false,
+    /** Aba aberta (fica no ViewModel para a volta da projeção cair na mesma aba). */
+    aba: String = Abas.first(),
+    onAba: (String) -> Unit = {},
+    atividades: Carga<List<AtividadePublicada>> = Carga.Carregando,
+    onAbrirSessao: (AtividadePublicada) -> Unit = {},
+    membros: Carga<List<Membro>> = Carga.Carregando,
+    onRecarregarAba: () -> Unit = {},
+    onConvidar: () -> Unit = {},
 ) {
-    var aba by rememberSaveable { mutableStateOf(Abas.first()) }
-
     val avisar = LocalAvisar.current
 
     BoxWithConstraints(
@@ -143,9 +156,14 @@ fun TurmaScreen(
                 turma = turma,
                 expandido = expandido,
                 aba = aba,
-                onAba = { aba = it; if (it != "Grafo") avisar("Aba \"$it\" ainda não implementada") },
+                onAba = {
+                    if (it in AbasProntas) onAba(it) else avisar("Aba \"$it\" ainda não implementada")
+                },
                 onVoltar = onVoltar,
                 onNovaAtividade = { onNovaAtividade(emptySet()) },
+                onConvidar = onConvidar,
+                onSimular = onSimular,
+                simulando = simulando,
             )
         }
         val colunaTablet = Modifier
@@ -159,7 +177,17 @@ fun TurmaScreen(
             .padding(horizontal = margem, vertical = 12.dp)
 
         val dados = (grafo as? EstadoGrafo.Pronto)?.grafo
-        if (turma.semAtividade || dados == null) {
+        if (aba != Abas.first()) {
+            Column(colunaTablet, verticalArrangement = Arrangement.spacedBy(Espaco)) {
+                cabecalho()
+                val mod = Modifier.fillMaxWidth().weight(1f)
+                if (aba == "Atividades") {
+                    AbaAtividades(atividades, onAbrirSessao, { onNovaAtividade(emptySet()) }, onRecarregarAba, mod)
+                } else {
+                    AbaMembros(membros, onConvidar, onRecarregarAba, mod)
+                }
+            }
+        } else if (turma.semAtividade || dados == null) {
             // Sem atividade publicada (primeiros passos), ou o grafo ainda carregando / com erro.
             val centro: @Composable (Modifier) -> Unit = { mod ->
                 when {
@@ -189,7 +217,7 @@ fun TurmaScreen(
                 }
             }
         } else {
-            ConteudoGrafo(turma, dados, expandido, colunaTablet, colunaCelular, cabecalho, onNovaAtividade, onSimular, simulando)
+            ConteudoGrafo(turma, dados, expandido, colunaTablet, colunaCelular, cabecalho, onNovaAtividade, simulando)
         }
     }
 }
@@ -203,7 +231,6 @@ private fun ConteudoGrafo(
     colunaCelular: Modifier,
     cabecalho: @Composable () -> Unit,
     onNovaAtividade: (Set<String>) -> Unit,
-    onSimular: (() -> Unit)?,
     simulando: Boolean,
 ) {
     val avisar = LocalAvisar.current
@@ -215,7 +242,7 @@ private fun ConteudoGrafo(
         CartaoGrafo(dados, conceito?.nome, onSelecionar = { selecionado = it }, modifier = mod)
     }
     val demonstracao: @Composable () -> Unit = {
-        onSimular?.let { FaixaDemonstracao(it, simulando, Modifier.fillMaxWidth()) }
+        if (simulando) FaixaSimulando(Modifier.fillMaxWidth())
     }
     val painel: @Composable (Modifier) -> Unit = { mod ->
         if (conceito != null) {
@@ -265,38 +292,59 @@ private fun Cabecalho(
     onAba: (String) -> Unit,
     onVoltar: () -> Unit,
     onNovaAtividade: () -> Unit,
+    onConvidar: () -> Unit,
+    onSimular: (() -> Unit)?,
+    simulando: Boolean,
 ) {
-    val botaoNova: @Composable () -> Unit = {
-        Button(
-            onClick = onNovaAtividade,
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Consolidado),
-            contentPadding = PaddingValues(horizontal = 22.dp, vertical = 14.dp),
-        ) {
-            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Nova atividade", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+    val acoes: @Composable () -> Unit = {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            onSimular?.let { MenuDemonstracao(it, simulando) }
+            OutlinedButton(
+                onClick = onConvidar,
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Consolidado),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
+                modifier = Modifier.maoAoPassar(),
+            ) {
+                Text("Convidar alunos", color = Consolidado, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Button(
+                onClick = onNovaAtividade,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Consolidado),
+                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 14.dp),
+                modifier = Modifier.maoAoPassar(),
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Nova atividade", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            BotaoTopo(Icons.AutoMirrored.Filled.ArrowBack, "Voltar", onVoltar)
-            Spacer(Modifier.width(16.dp))
-            Column {
-                Text(turma.nome, color = TextoPrincipal, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("${turma.codigo} · ${turma.rotuloAlunos}", color = TextoSecundario, fontSize = 14.sp)
+    // Abas na mesma linha do título só em janela bem larga; senão, numa linha própria.
+    BoxWithConstraints {
+        val umaLinha = expandido && maxWidth >= 1440.dp
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                BotaoTopo(Icons.AutoMirrored.Filled.ArrowBack, "Voltar", onVoltar)
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f, fill = !umaLinha)) {
+                    Text(turma.nome, color = TextoPrincipal, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text("${turma.codigo} · ${turma.rotuloAlunos}", color = TextoSecundario, fontSize = 14.sp, maxLines = 1)
+                }
+                if (umaLinha) {
+                    Spacer(Modifier.width(36.dp))
+                    SeletorAbas(aba, onAba)
+                    Spacer(Modifier.weight(1f))
+                }
+                if (expandido) acoes()
             }
-            if (expandido) {
-                Spacer(Modifier.width(36.dp))
-                SeletorAbas(aba, onAba)
+            if (expandido && !umaLinha) SeletorAbas(aba, onAba)
+            if (!expandido) {
+                Box(Modifier.horizontalScroll(rememberScrollState())) { SeletorAbas(aba, onAba) }
+                Box(Modifier.fillMaxWidth()) { acoes() }
             }
-            Spacer(Modifier.weight(1f))
-            if (expandido) botaoNova()
-        }
-        if (!expandido) {
-            Box(Modifier.horizontalScroll(rememberScrollState())) { SeletorAbas(aba, onAba) }
-            Box(Modifier.fillMaxWidth()) { botaoNova() }
         }
     }
 }
@@ -625,34 +673,37 @@ private fun ErroGrafo(mensagem: String, onTentarDeNovo: () -> Unit, modifier: Mo
 // Demonstração: simular respostas da turma
 // ---------------------------------------------------------------------------
 
+/** Menu "Demonstração" (fora de destaque): simular 25 alunos respondendo. */
 @Composable
-private fun FaixaDemonstracao(onSimular: () -> Unit, simulando: Boolean, modifier: Modifier = Modifier) {
-    Surface(
-        shape = RoundedCornerShape(18.dp), color = Cartao, border = BorderStroke(1.dp, BordaTracejada),
-        modifier = modifier,
-    ) {
+private fun MenuDemonstracao(onSimular: () -> Unit, simulando: Boolean) {
+    var aberto by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { aberto = true }, modifier = Modifier.maoAoPassar()) {
+            Text(if (simulando) "Simulando…" else "Demonstração", color = TextoSecundario, fontSize = 14.sp)
+            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = TextoSecundario, modifier = Modifier.size(18.dp))
+        }
+        DropdownMenu(expanded = aberto, onDismissRequest = { aberto = false }) {
+            DropdownMenuItem(
+                text = {
+                    Column {
+                        Text("Simular respostas da turma")
+                        Text("25 alunos fictícios (pseudônimos); refazer substitui a anterior", color = TextoSecundario, fontSize = 12.sp)
+                    }
+                },
+                enabled = !simulando,
+                onClick = { aberto = false; onSimular() },
+            )
+        }
+    }
+}
+
+@Composable
+private fun FaixaSimulando(modifier: Modifier = Modifier) {
+    Surface(shape = RoundedCornerShape(18.dp), color = Cartao, border = BorderStroke(1.dp, BordaTracejada), modifier = modifier) {
         Column(Modifier.padding(horizontal = 18.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Demonstração: simula 25 alunos respondendo",
-                        color = TextoCorpo, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        if (simulando) "Registrando as respostas e atualizando o domínio estimado…"
-                        else "Pseudônimos, sem dados pessoais. Rodar de novo substitui a simulação anterior.",
-                        color = TextoSecundario, fontSize = 12.sp,
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                TextButton(onClick = onSimular, enabled = !simulando) {
-                    Text(
-                        if (simulando) "Simulando…" else "Simular respostas da turma",
-                        color = if (simulando) TextoSecundario else Consolidado, fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
-            if (simulando) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Consolidado, trackColor = Pilula)
+            Text("Demonstração: registrando as respostas simuladas e atualizando o domínio estimado…",
+                color = TextoCorpo, fontSize = 13.sp)
+            LinearProgressIndicator(Modifier.fillMaxWidth(), color = Consolidado, trackColor = Pilula)
         }
     }
 }

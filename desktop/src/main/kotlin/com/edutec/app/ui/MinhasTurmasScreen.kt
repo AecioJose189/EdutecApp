@@ -78,6 +78,7 @@ import com.edutec.app.data.Turma
 import com.edutec.app.data.rotuloAlunos
 import com.edutec.app.data.semDados
 import com.edutec.app.data.semestresRecentes
+import com.edutec.app.data.Usuario
 import com.edutec.app.ui.theme.AmareloFundo
 import com.edutec.app.ui.theme.AmareloIcone
 import com.edutec.app.ui.theme.AmareloTexto
@@ -122,6 +123,9 @@ fun MinhasTurmasScreen(
     onTentarDeNovo: () -> Unit = {},
     /** Atividades geradas aguardando revisão; ainda não há banco, então o app passa vazia. */
     pendentes: List<AtividadePendente> = emptyList(),
+    /** Professor logado (nome e foto no topo, com "Sair"). */
+    usuario: Usuario? = null,
+    onSair: () -> Unit = {},
 ) {
     val semestres = remember { semestresRecentes() }
     var semestre by rememberSaveable { mutableStateOf(semestres.first()) }
@@ -159,7 +163,8 @@ fun MinhasTurmasScreen(
                 semestres = semestres,
                 semestre = semestre,
                 onSemestreSelecionado = { semestre = it; avisar("Semestre $it selecionado") },
-                onPerfil = { avisar("Perfil do professor") },
+                usuario = usuario,
+                onSair = onSair,
             )
             Spacer(Modifier.height(8.dp))
             Cabecalho(expandido = expandido, mostrarLegenda = turmas.isNotEmpty() && !carregando && erro == null)
@@ -219,7 +224,8 @@ private fun BarraSuperior(
     semestres: List<String>,
     semestre: String,
     onSemestreSelecionado: (String) -> Unit,
-    onPerfil: () -> Unit,
+    usuario: Usuario?,
+    onSair: () -> Unit,
 ) {
     var menuAberto by remember { mutableStateOf(false) }
 
@@ -276,15 +282,32 @@ private fun BarraSuperior(
 
         Spacer(Modifier.width(16.dp))
 
+        if (usuario != null) MenuUsuario(usuario, onSair)
+    }
+}
+
+/** Nome e foto do professor logado; o menu mostra o e-mail e "Sair". */
+@Composable
+private fun MenuUsuario(usuario: Usuario, onSair: () -> Unit) {
+    var aberto by remember { mutableStateOf(false) }
+    Box {
         Surface(
-            onClick = onPerfil,
-            shape = CircleShape,
+            onClick = { aberto = true },
+            shape = RoundedCornerShape(50),
             color = Pilula,
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.maoAoPassar(),
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text("P", color = TextoPrincipal, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Row(Modifier.padding(start = 6.dp, end = 16.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                FotoUsuario(usuario.nome, usuario.fotoUrl, tamanho = 36.dp)
+                Spacer(Modifier.width(10.dp))
+                Text(usuario.nome, color = TextoPrincipal, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1)
             }
+        }
+        DropdownMenu(expanded = aberto, onDismissRequest = { aberto = false }) {
+            usuario.email?.let {
+                Text(it, color = TextoSecundario, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
+            DropdownMenuItem(text = { Text("Sair") }, onClick = { aberto = false; onSair() })
         }
     }
 }

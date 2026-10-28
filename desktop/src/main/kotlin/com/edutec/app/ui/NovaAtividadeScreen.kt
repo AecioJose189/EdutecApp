@@ -43,6 +43,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -121,7 +122,7 @@ private enum class Origem { Grafo, Pdf }
 /** [valor] é o que a Edge Function gerar-atividade espera. */
 private enum class Formato(val titulo: String, val descricao: String, val adjetivo: String, val valor: String) {
     MultiplaEscolha("Múltipla escolha", "Correção e feedback imediatos", "de múltipla escolha", "multipla_escolha"),
-    Aberta("Aberta", "Corrigida pela IA com rubrica", "abertas", "aberta"),
+    Aberta("Aberta", "Aguarda correção; fora do domínio estimado nesta versão", "abertas", "aberta"),
     Mista("Mista", "Metade de cada tipo", "mistas", "mista"),
 }
 
@@ -174,7 +175,9 @@ fun NovaAtividadeScreen(
     val selecionados = rememberSaveable(saver = SaverSelecionados) { conceitosIniciais.toMutableStateList() }
     var pdf by rememberSaveable(stateSaver = SaverPdf) { mutableStateOf<MaterialPdf?>(null) }
     val progressoEnvio = 1f
-    var formato by rememberSaveable { mutableStateOf(Formato.Mista) }
+    // Múltipla escolha por padrão: no MVP só ela é corrigida na hora e entra no domínio estimado (KT).
+    var formato by rememberSaveable { mutableStateOf(Formato.MultiplaEscolha) }
+    var titulo by rememberSaveable { mutableStateOf("") }
     var quantidade by rememberSaveable { mutableIntStateOf(QuantidadePadrao) }
     var dificuldade by rememberSaveable { mutableStateOf("Média") }
     var permitirRefazer by rememberSaveable { mutableStateOf(true) }
@@ -240,6 +243,8 @@ fun NovaAtividadeScreen(
         }
         val cartaoFormato: @Composable () -> Unit = {
             CartaoFormato(
+                titulo = titulo,
+                onTitulo = { titulo = it.take(200) },
                 formato = formato,
                 onFormato = { formato = it },
                 quantidade = quantidade,
@@ -270,6 +275,7 @@ fun NovaAtividadeScreen(
                                 dificuldade = ValorDificuldade.getValue(dificuldade),
                                 permitirRefazer = permitirRefazer,
                                 tempoMinutos = tempo.removeSuffix(" min").toIntOrNull(),
+                                titulo = titulo.trim(),
                             )
                         )
                     }
@@ -698,6 +704,8 @@ private fun ConteudoPdf(
 
 @Composable
 private fun CartaoFormato(
+    titulo: String,
+    onTitulo: (String) -> Unit,
     formato: Formato,
     onFormato: (Formato) -> Unit,
     quantidade: Int,
@@ -708,6 +716,14 @@ private fun CartaoFormato(
 ) {
     Surface(shape = CantoCartao, color = Cartao, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            OutlinedTextField(
+                value = titulo,
+                onValueChange = onTitulo,
+                label = { Text("Título da atividade") },
+                placeholder = { Text("Em branco: os primeiros conceitos do material") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
             Text("Formato das questões", color = TextoPrincipal, fontSize = 19.sp, fontWeight = FontWeight.Bold)
 
             if (compacto) {

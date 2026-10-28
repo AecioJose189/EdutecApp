@@ -41,3 +41,6 @@ fun TeclaVoltar(onVoltar: () -> Unit) {
         onDispose { acoes.remover(acao) }
     }
 }
+
+/** Estado da janela (a projeção da sessão entra e sai da tela cheia). Nulo nos @Preview. */
+val LocalJanela = staticCompositionLocalOf<androidx.compose.ui.window.WindowState?> { null }

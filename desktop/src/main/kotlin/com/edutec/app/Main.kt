@@ -23,6 +23,7 @@ import com.edutec.app.ui.AcoesVoltar
 import com.edutec.app.ui.EdutecApp
 import com.edutec.app.ui.LocalAcoesVoltar
 import com.edutec.app.ui.LocalAvisar
+import com.edutec.app.ui.LocalJanela
 import com.edutec.app.ui.theme.EdutecTheme
 import kotlinx.coroutines.launch
 import java.awt.Dimension
@@ -30,10 +31,11 @@ import java.awt.Dimension
 /** Lumini para o professor (desktop). Abre direto no layout de tela larga, o mesmo do tablet. */
 fun main() = application {
     val acoesVoltar = remember { AcoesVoltar() }
+    val estadoJanela = rememberWindowState(size = DpSize(1280.dp, 800.dp))
     Window(
         onCloseRequest = ::exitApplication,
         title = "Lumini",
-        state = rememberWindowState(size = DpSize(1280.dp, 800.dp)),
+        state = estadoJanela,
         onPreviewKeyEvent = { evento ->
             evento.type == KeyEventType.KeyDown && evento.key == Key.Escape && acoesVoltar.voltar()
         },
@@ -46,6 +48,7 @@ fun main() = application {
         CompositionLocalProvider(
             LocalAvisar provides { mensagem: String -> escopo.launch { avisos.showSnackbar(mensagem) } },
             LocalAcoesVoltar provides acoesVoltar,
+            LocalJanela provides estadoJanela,
         ) {
             EdutecTheme {
                 Box(Modifier.fillMaxSize()) {

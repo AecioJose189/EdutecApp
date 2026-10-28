@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.edutec.app.data.AtividadePublicada
 import com.edutec.app.data.ConfiguracaoAusente
 import com.edutec.app.data.ErroTurmaApi
 import com.edutec.app.data.Turma
@@ -21,8 +22,9 @@ sealed interface EstadoTurmas {
 }
 
 /**
- * Onde o professor está no app (Minhas turmas → Turma → Nova atividade) e as turmas do servidor.
- * Fica num ViewModel para sobreviver à recriação da Activity (girar a tela, dividir a janela).
+ * Onde o professor está no app (Minhas turmas → Turma → Nova atividade / Projeção) e as turmas do
+ * servidor. Fica num ViewModel da janela: se a sessão expirar, o app mostra a entrada e, depois do
+ * login com a mesma conta, volta para a mesma tela.
  */
 class NavegacaoViewModel(
     private val listar: suspend () -> List<Turma> = TurmaRepositorio::listarTurmas,
@@ -48,10 +50,33 @@ class NavegacaoViewModel(
     var novaAtividade by mutableStateOf<Set<String>?>(null)
         private set
 
-    private var carregamento: Job? = null
+    /** Atividade cuja sessão em sala está projetada; null = projeção fechada. */
+    var projecao by mutableStateOf<AtividadePublicada?>(null)
+        private set
 
-    init {
-        recarregarTurmas()
+    private var carregamento: Job? = null
+    private var usuarioId: String? = null
+
+    /** Login concluído (ou sessão restaurada). Outra conta → começa do zero, em Minhas turmas. */
+    fun entrou(usuario: String) {
+        val mesmo = usuario == usuarioId
+        if (!mesmo) {
+            usuarioId = usuario
+            idTurmaAberta = null
+            ultimaTurmaAberta = null
+            novaAtividade = null
+            projecao = null
+            turmas = EstadoTurmas.Carregando
+        }
+        recarregarTurmas(silencioso = mesmo)
+    }
+
+    fun abrirProjecao(atividade: AtividadePublicada) {
+        projecao = atividade
+    }
+
+    fun fecharProjecao() {
+        projecao = null
     }
 
     /** Busca as turmas de novo. Com [silencioso], mantém a lista atual na tela enquanto carrega. */
