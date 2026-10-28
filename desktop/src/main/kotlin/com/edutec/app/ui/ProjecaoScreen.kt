@@ -31,6 +31,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -111,8 +117,10 @@ fun ProjecaoScreen(
                     Text(atividade.titulo, color = TextoPrincipal, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     Text(nomeTurma, color = TextoSecundario, fontSize = 17.sp)
                 }
-                IndicadorAoVivo(aoVivo && !encerrada)
-                Spacer(Modifier.width(16.dp))
+                if (!encerrada) {
+                    IndicadorAoVivo(aoVivo)
+                    Spacer(Modifier.width(16.dp))
+                }
                 if (!encerrada) {
                     if (!entradaFechada) {
                         OutlinedButton(onClick = onEncerrarEntrada, border = BorderStroke(1.dp, Consolidado),
@@ -130,7 +138,7 @@ fun ProjecaoScreen(
             erro?.let { Text(it, color = EtiquetaVermelhaTexto, fontSize = 15.sp) }
 
             val painelQr: @Composable (Modifier) -> Unit = { mod ->
-                PainelQr(qr, segundosParaTrocar, sessao, mod)
+                PainelQr(qr, segundosParaTrocar, sessao, enviaram, mod)
             }
             val painelAlunos: @Composable (Modifier) -> Unit = { mod ->
                 PainelParticipantes(participantes, enviaram, mod)
@@ -155,10 +163,15 @@ fun ProjecaoScreen(
             containerColor = Cartao,
             title = { Text("Encerrar a sessão?") },
             text = {
+                // O foco fica aqui para o Enter confirmar (Esc fecha o diálogo).
+                val foco = remember { FocusRequester() }
+                LaunchedEffect(Unit) { foco.requestFocus() }
                 Text(
                     "Quem ainda não enviou não poderá mais enviar. $enviaram de ${participantes.size} já enviaram.",
-                    modifier = Modifier.onPreviewKeyEvent {
-                        if (it.key == Key.Enter && it.type == KeyEventType.KeyDown) { confirmarEncerrar = false; onEncerrarSessao(); true } else false
+                    modifier = Modifier.focusRequester(foco).focusable().onPreviewKeyEvent {
+                        val enter = it.key == Key.Enter || it.key == Key.NumPadEnter
+                        if (enter && it.type == KeyEventType.KeyDown) { confirmarEncerrar = false; onEncerrarSessao() }
+                        enter
                     },
                 )
             },
@@ -172,13 +185,18 @@ fun ProjecaoScreen(
 }
 
 @Composable
-private fun PainelQr(qr: TokenQr?, segundosParaTrocar: Int, sessao: SessaoSala?, modifier: Modifier) {
+private fun PainelQr(qr: TokenQr?, segundosParaTrocar: Int, sessao: SessaoSala?, enviaram: Int, modifier: Modifier) {
+    val avisar = LocalAvisar.current
+    val area = LocalClipboardManager.current
     Surface(shape = RoundedCornerShape(28.dp), color = Cartao, modifier = modifier) {
         Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)) {
             when {
                 sessao == null -> CircularProgressIndicator(color = Consolidado)
-                !sessao.aberta -> MensagemGrande("Sessão encerrada", "Obrigado! O grafo da turma já tem as respostas.")
+                !sessao.aberta -> MensagemGrande(
+                    "Sessão encerrada",
+                    if (enviaram > 0) "Obrigado! O grafo da turma já tem as respostas." else "Ninguém enviou respostas nesta sessão.",
+                )
                 !sessao.entradaAberta -> MensagemGrande("Entrada encerrada", "Quem já entrou ainda pode enviar as respostas.")
                 qr == null -> CircularProgressIndicator(color = Consolidado)
                 else -> {
@@ -194,6 +212,12 @@ private fun PainelQr(qr: TokenQr?, segundosParaTrocar: Int, sessao: SessaoSala?,
                         }
                         Spacer(Modifier.width(12.dp))
                         Text("O código muda a cada ${ProjecaoViewModel.INTERVALO_QR} s · ${host(qr.url)}", color = TextoSecundario, fontSize = 16.sp)
+                        Spacer(Modifier.width(8.dp))
+                        // Para ensaiar sem celular (scripts/simular-aluno.ts); o link vale ~40 s.
+                        TextButton(onClick = {
+                            area.setText(AnnotatedString(qr.url))
+                            avisar("Link do QR copiado (vale ~40 s)")
+                        }, modifier = Modifier.maoAoPassar()) { Text("Copiar link", color = TextoSecundario, fontSize = 14.sp) }
                     }
                 }
             }

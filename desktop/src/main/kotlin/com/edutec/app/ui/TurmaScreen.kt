@@ -401,7 +401,7 @@ private fun ListaAlunos(alunos: List<Aluno>, rolavel: Boolean, modifier: Modifie
                 Text("Alunos (${alunos.size})", color = TextoPrincipal, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
             Text(
-                "Pseudônimos, com o pior estado de cada aluno.",
+                "Pior estado de cada aluno (simulação: pseudônimos).",
                 color = TextoSecundario, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp),
             )
             Spacer(Modifier.height(4.dp))
@@ -426,10 +426,16 @@ private fun ListaAlunos(alunos: List<Aluno>, rolavel: Boolean, modifier: Modifie
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Box(
-                        Modifier.size(32.dp).clip(CircleShape).background(Pilula),
-                        contentAlignment = Alignment.Center,
-                    ) { Text(aluno.nome.takeLast(2), color = TextoCorpo, fontSize = 12.sp) }
+                    // Pseudônimo da simulação ("Aluno 07") → número; aluno real → foto/iniciais.
+                    val numero = Regex("""^Aluno (\d+)$""").find(aluno.nome)?.groupValues?.get(1)
+                    if (numero != null) {
+                        Box(
+                            Modifier.size(32.dp).clip(CircleShape).background(Pilula),
+                            contentAlignment = Alignment.Center,
+                        ) { Text(numero, color = TextoCorpo, fontSize = 12.sp) }
+                    } else {
+                        FotoUsuario(aluno.nome, null, tamanho = 32.dp)
+                    }
                     Spacer(Modifier.width(14.dp))
                     Text(aluno.nome, color = TextoPrincipal, fontSize = 15.sp, modifier = Modifier.weight(1f))
                     SeloEstado(aluno.estado)

@@ -56,5 +56,5 @@ fun FotoUsuario(nome: String, fotoUrl: String?, tamanho: Dp = 44.dp) {
 private val fotosBaixadas = mutableMapOf<String?, ImageBitmap>()
 
 private fun iniciais(nome: String): String =
-    nome.split(' ').filter { it.isNotBlank() }.let { p -> (p.firstOrNull()?.take(1).orEmpty() + if (p.size > 1) p.last().take(1) else "") }
+    nome.split(' ').filter { it.firstOrNull()?.isLetter() == true }.let { p -> (p.firstOrNull()?.take(1).orEmpty() + if (p.size > 1) p.last().take(1) else "") }
         .uppercase().ifEmpty { "?" }

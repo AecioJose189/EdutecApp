@@ -27,10 +27,11 @@ fun CodigoQr(texto: String, modifier: Modifier = Modifier) {
     val matriz = remember(texto) { matrizQr(texto) }
     Canvas(modifier) {
         val n = matriz.width
-        // Módulo com tamanho inteiro em pixels, para não borrar as bordas.
+        // Módulo e origem em pixels inteiros: sem isso as bordas saem antisserrilhadas e aparecem
+        // linhas cinza entre os módulos, que atrapalham a leitura (testado com o leitor do ZXing).
         val modulo = floor(min(size.width, size.height) / n).coerceAtLeast(1f)
         val lado = modulo * n
-        val origem = Offset((size.width - lado) / 2, (size.height - lado) / 2)
+        val origem = Offset(floor((size.width - lado) / 2), floor((size.height - lado) / 2))
         drawRect(Color.White, origem, Size(lado, lado))
         for (y in 0 until n) for (x in 0 until n) {
             if (matriz[x, y]) drawRect(Color.Black, Offset(origem.x + x * modulo, origem.y + y * modulo), Size(modulo, modulo))
