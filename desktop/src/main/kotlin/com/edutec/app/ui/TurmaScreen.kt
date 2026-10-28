@@ -374,8 +374,11 @@ private fun SeletorAbas(selecionada: String, onAba: (String) -> Unit) {
 }
 
 // ---------------------------------------------------------------------------
-// Lista de alunos (só pseudônimos, RN13)
+// Lista de alunos (alunos reais pelo nome; simulação por pseudônimo, RN13)
 // ---------------------------------------------------------------------------
+
+/** Pseudônimo de aluno simulado ("Aluno 07"); o grupo 1 é o número. */
+private val PseudonimoSimulacao = Regex("""^Aluno (\d+)$""")
 
 @Composable
 private fun ListaAlunos(alunos: List<Aluno>, rolavel: Boolean, modifier: Modifier = Modifier) {
@@ -400,8 +403,9 @@ private fun ListaAlunos(alunos: List<Aluno>, rolavel: Boolean, modifier: Modifie
             Row(Modifier.padding(start = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Alunos (${alunos.size})", color = TextoPrincipal, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
+            val temSimulados = alunos.any { PseudonimoSimulacao.matches(it.nome) }
             Text(
-                "Pior estado de cada aluno (simulação: pseudônimos).",
+                if (temSimulados) "Pior estado de cada aluno (simulação: pseudônimos)." else "Pior estado de cada aluno.",
                 color = TextoSecundario, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp),
             )
             Spacer(Modifier.height(4.dp))
@@ -427,7 +431,7 @@ private fun ListaAlunos(alunos: List<Aluno>, rolavel: Boolean, modifier: Modifie
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     // Pseudônimo da simulação ("Aluno 07") → número; aluno real → foto/iniciais.
-                    val numero = Regex("""^Aluno (\d+)$""").find(aluno.nome)?.groupValues?.get(1)
+                    val numero = PseudonimoSimulacao.find(aluno.nome)?.groupValues?.get(1)
                     if (numero != null) {
                         Box(
                             Modifier.size(32.dp).clip(CircleShape).background(Pilula),
