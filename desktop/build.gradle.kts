@@ -45,19 +45,24 @@ compose.desktop {
         javaHome = javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) }
             .get().metadata.installationPath.asFile.absolutePath
 
+        // Versão dos instaladores: -PluminiVersao=1.0.1 (o workflow passa a da tag v*); MAJOR.MINOR.BUILD.
+        val versao = providers.gradleProperty("luminiVersao").getOrElse("1.0.0")
+
         nativeDistributions {
             targetFormats(TargetFormat.Deb, TargetFormat.Msi, TargetFormat.Dmg)
             packageName = "Lumini"
-            packageVersion = "1.0.0"
+            packageVersion = versao
             description = "Lumini: Knowledge Tracing e Learning Analytics para o professor"
             vendor = "Lumini"
             // Saída de ./gradlew :desktop:suggestRuntimeModules (refaça ao trocar dependências)
             // + jdk.httpserver, do retorno do login Google (data/Login.kt).
             modules("java.instrument", "java.management", "java.prefs", "jdk.unsupported", "jdk.httpserver")
-            linux { debPackageVersion = "1.0.0" }
+            linux { debPackageVersion = versao }
             windows {
                 menu = true
                 shortcut = true
+                // Instala na pasta do usuário, sem pedir senha de administrador (computadores de laboratório).
+                perUserInstall = true
                 // Fixo: o Windows usa este código para reconhecer atualizações do mesmo app.
                 upgradeUuid = "6f1d3c52-8a4e-4b1f-9d77-2b6a0e4f5c31"
             }
