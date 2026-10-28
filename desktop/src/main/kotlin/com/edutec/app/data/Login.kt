@@ -11,6 +11,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonPrimitive
 import java.awt.Desktop
 import java.net.BindException
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.URI
 import java.net.URLDecoder
@@ -42,7 +43,8 @@ object Login {
         val auth = Supabase.cliente.auth
         val retorno = CompletableDeferred<Result<String>>()
         val servidor = try {
-            HttpServer.create(InetSocketAddress(PORTA), 0)
+            // Só no loopback: escutar em todas as interfaces faz o Windows/macOS perguntar sobre o firewall.
+            HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), PORTA), 0)
         } catch (e: BindException) {
             throw ErroLogin("A porta $PORTA está ocupada (outro Lumini aberto?). Feche o outro programa e tente de novo.")
         }
