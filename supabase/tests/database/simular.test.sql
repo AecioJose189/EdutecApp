@@ -6,7 +6,9 @@ set local search_path = public, extensions;
 
 select plan(5);
 
-insert into turmas (id, nome, codigo) values ('00000000-0000-4000-8000-0000000000c3', 'Teste', 'Sim');
+-- Turmas agora têm professor (perfil criado pelo gatilho do cadastro).
+insert into auth.users (id, email) values ('00000000-0000-4000-8000-00000000f001', 'prof-teste@exemplo.com');
+insert into turmas (id, nome, codigo, professor_id) values ('00000000-0000-4000-8000-0000000000c3', 'Teste', 'Sim', '00000000-0000-4000-8000-00000000f001');
 insert into geracoes (id, hash_pdf, quantidade, formato, dificuldade, resultado)
 overriding system value values (-10, repeat('d', 64), 2, 'mista', 'media', '{"conceitos": [
     {"nome": "Base", "prerequisitos": []},
