@@ -16,11 +16,11 @@
 // parâmetros, ele volta na hora, sem chamar o Gemini, com reaproveitado = true.
 // Erro:      { erro: "..." } com status 4xx/5xx.
 //
-// Autenticação: verify_jwt = false (config.toml), porque a chave publishable (sb_publishable_...)
-// não é JWT. A função confere aqui mesmo se o cabeçalho `apikey` é uma chave pública do projeto.
+// Autenticação: verify_jwt = true e só usuários logados (o professor no desktop). As tabelas e o
+// Storage continuam acessados com a service_role: geracoes é um cache por PDF, sem dono (RN12).
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { chavePublicaValida } from "../_shared/chave_publica.ts";
+import { usuarioDoPedido } from "../_shared/auth.ts";
 import { ErroGemini, gerarJsonComPdf } from "../_shared/gemini.ts";
 
 const TAMANHO_MAXIMO = 20 * 1024 * 1024;
@@ -75,8 +75,8 @@ Deno.serve(async (req) => {
 
   const inicio = Date.now();
   try {
-    if (!chavePublicaValida(req)) {
-      return erro("Chave de API ausente ou inválida (envie a chave pública do Supabase em `apikey`).", 401);
+    if (!(await usuarioDoPedido(req))) {
+      return erro("Entre com sua conta Google para gerar atividades.", 401);
     }
 
     const { pdf, quantidade, formato, dificuldade, forcarNova } = await lerFormulario(req);
