@@ -163,6 +163,8 @@ fun NovaAtividadeScreen(
     estado: EstadoGeracao = EstadoGeracao.Ocioso,
     onGerar: (PedidoGeracao) -> Unit = {},
     onTentarDeNovo: () -> Unit = {},
+    /** IA sobrecarregada: gera de novo com menos questões. */
+    onGerarMenos: () -> Unit = {},
     onVoltar: () -> Unit = {},
     /** Etapa 5: publica o resultado revisado na turma. */
     onPublicar: () -> Unit = {},
@@ -304,7 +306,7 @@ fun NovaAtividadeScreen(
             // O estado do formulário fica acima deste "when": Voltar/Tentar de novo não perdem as escolhas.
             when (estado) {
                 is EstadoGeracao.Gerando -> GerandoConteudo(estado, onCancelar = onVoltar, modifier = Modifier.weight(1f))
-                is EstadoGeracao.Erro -> ErroGeracaoConteudo(estado, onTentarDeNovo, onVoltar, Modifier.weight(1f))
+                is EstadoGeracao.Erro -> ErroGeracaoConteudo(estado, onTentarDeNovo, onVoltar, Modifier.weight(1f), onGerarMenos)
                 is EstadoGeracao.Concluido -> RevisaoConteudo(
                     estado, expandido,
                     onGerarNovas = { onGerar(estado.pedido.copy(forcarNova = true)) },

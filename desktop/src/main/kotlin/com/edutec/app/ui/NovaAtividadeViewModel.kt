@@ -37,6 +37,9 @@ sealed interface EstadoGeracao {
 
 enum class TipoErro { Cota, Indisponivel, TempoEsgotado, SemConexao, Outro }
 
+/** Quantidade oferecida em "Gerar menos questões" quando a IA está sobrecarregada. */
+const val QUESTOES_SE_SOBRECARREGADA = 3
+
 class NovaAtividadeViewModel(
     private val gerarAtividade: suspend (PedidoGeracao) -> AtividadeGerada = GeracaoRepositorio::gerar,
     private val publicarAtividade: suspend (String, Long, Boolean, Int?, String?) -> String = TurmaRepositorio::publicar,
@@ -104,6 +107,13 @@ class NovaAtividadeViewModel(
 
     fun tentarDeNovo() {
         (_estado.value as? EstadoGeracao.Erro)?.let { gerar(it.pedido) }
+    }
+
+    /** IA sobrecarregada: mesmo pedido com menos questões (resposta mais curta e mais rápida). */
+    fun gerarMenos() {
+        (_estado.value as? EstadoGeracao.Erro)?.let {
+            gerar(it.pedido.copy(quantidade = minOf(it.pedido.quantidade, QUESTOES_SE_SOBRECARREGADA)))
+        }
     }
 
     /**

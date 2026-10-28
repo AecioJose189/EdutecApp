@@ -88,14 +88,17 @@ fun ErroGeracaoConteudo(
     onTentarDeNovo: () -> Unit,
     onVoltar: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Gera de novo com [QUESTOES_SE_SOBRECARREGADA] questões; null esconde o botão. */
+    onGerarMenos: (() -> Unit)? = null,
 ) {
     val (titulo, explicacao) = when (estado.tipo) {
         TipoErro.Cota -> "A IA atingiu o limite de uso por agora" to
-            "O plano gratuito do Gemini aceita poucos pedidos por minuto. Espere cerca de 1 minuto e tente de novo."
-        TipoErro.Indisponivel -> "A IA está sobrecarregada agora" to
-            "O serviço do Gemini está com muita demanda. Isso costuma passar em instantes: tente de novo."
-        TipoErro.TempoEsgotado -> "A IA demorou demais para responder" to
-            "Às vezes o serviço fica lento. Tente de novo; se continuar, peça menos questões ou use um PDF menor."
+            "O plano gratuito da IA aceita poucos pedidos por minuto. Espere cerca de 1 minuto e tente de novo, " +
+            "ou gere menos questões."
+        // O servidor já tentou de novo e com um modelo reserva antes de desistir.
+        TipoErro.Indisponivel, TipoErro.TempoEsgotado -> "A IA está sobrecarregada agora" to
+            "Muita gente está usando a IA ao mesmo tempo e ela não conseguiu responder, nem com o modelo reserva. " +
+            "Espere alguns segundos e tente de novo, ou gere menos questões, que é mais rápido."
         TipoErro.SemConexao -> "Sem conexão com o servidor" to
             "Confira a internet do aparelho e tente de novo."
         TipoErro.Outro -> "Não foi possível gerar a atividade" to
@@ -134,6 +137,10 @@ fun ErroGeracaoConteudo(
             Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
             Text("Tentar de novo", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        }
+        val sobrecarga = estado.tipo in setOf(TipoErro.Cota, TipoErro.Indisponivel, TipoErro.TempoEsgotado)
+        if (onGerarMenos != null && sobrecarga && estado.pedido.quantidade > QUESTOES_SE_SOBRECARREGADA) {
+            BotaoSecundario("Gerar menos questões ($QUESTOES_SE_SOBRECARREGADA)", onGerarMenos)
         }
         BotaoSecundario("Voltar", onVoltar)
     }
@@ -210,7 +217,7 @@ private fun PreviewErroCelular() {
     EdutecTheme {
         NovaAtividadeScreen(
             DadosExemplo.turmas.first(), onFechar = {},
-            estado = EstadoGeracao.Erro(PedidoExemplo, TipoErro.Cota),
+            estado = EstadoGeracao.Erro(PedidoExemplo, TipoErro.Indisponivel),
         )
     }
 }

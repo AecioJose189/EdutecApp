@@ -147,6 +147,7 @@ private fun AppDoProfessor(usuario: Usuario, onSair: () -> Unit) {
                 estado = estado,
                 onGerar = geracao::gerar,
                 onTentarDeNovo = geracao::tentarDeNovo,
+                onGerarMenos = geracao::gerarMenos,
                 onVoltar = geracao::voltar,
                 onPublicar = { geracao.publicar(turma.id) },
             )
