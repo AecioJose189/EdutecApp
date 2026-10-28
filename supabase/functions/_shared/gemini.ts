@@ -18,12 +18,35 @@ const URL_BASE = "https://generativelanguage.googleapis.com/v1beta";
 // Docs: https://ai.google.dev/gemini-api/docs/thinking
 const NIVEL_RACIOCINIO_PADRAO = "low";
 const NIVEIS_RACIOCINIO = ["minimal", "low", "medium", "high"];
-// A Edge Function tem 150 s de duração; deixa folga para o resto do pedido.
+// Tempo de uma chamada quando ninguém define outro (gerarJsonComPdf avulsa).
 const TEMPO_LIMITE_MS = 120_000;
+
+// Modelo RESERVA, usado quando o principal está sobrecarregado (503), sem cota (429) ou lento demais.
+// Flash-Lite estável, mais leve, com plano gratuito e entrada de PDF (docs consultadas em 27/10/2026:
+// ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite e /pricing). A cota do plano gratuito é
+// por modelo, então o reserva costuma ter folga quando o principal esgota.
+// Configurável: `supabase secrets set GEMINI_MODELO_RESERVA=...` (e GEMINI_THINKING_LEVEL_RESERVA).
+const MODELO_RESERVA_PADRAO = "gemini-3.5-flash-lite";
+const NIVEL_RACIOCINIO_RESERVA_PADRAO = "low";
+
+// Orçamento de tempo de gerarComReserva (a Edge Function morre em 150 s).
+/** Tempo garantido ao reserva: o principal não pode avançar sobre ele. */
+const TEMPO_RESERVA_MS = 50_000;
+/** Menos que isso não vale começar uma tentativa (a geração típica leva dezenas de segundos). */
+const TEMPO_MINIMO_TENTATIVA_MS = 20_000;
+/** Folga depois da IA para validar, salvar e responder. */
+const FOLGA_FINAL_MS = 3_000;
+/** Espera curta antes de repetir o principal depois de 503/429/falha de rede. */
+const ESPERA_REPETICAO_MS = 2_000;
 
 /** Erro com status HTTP sugerido para devolver ao cliente. */
 export class ErroGemini extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(
+    message: string,
+    readonly status: number,
+    /** Sobrecarga, cota ou tempo: vale tentar de novo ou trocar de modelo. */
+    readonly transitorio = false,
+  ) {
     super(message);
     this.name = "ErroGemini";
   }
@@ -49,25 +72,34 @@ export function modeloAtual(): string {
   return Deno.env.get("GEMINI_MODEL")?.trim() || MODELO_PADRAO;
 }
 
-export function nivelRaciocinioAtual(): string {
-  const nivel = Deno.env.get("GEMINI_THINKING_LEVEL")?.trim().toLowerCase() || NIVEL_RACIOCINIO_PADRAO;
+export function modeloReserva(): string {
+  return Deno.env.get("GEMINI_MODELO_RESERVA")?.trim() || MODELO_RESERVA_PADRAO;
+}
+
+export function nivelRaciocinioAtual(variavel = "GEMINI_THINKING_LEVEL", padrao = NIVEL_RACIOCINIO_PADRAO): string {
+  const nivel = Deno.env.get(variavel)?.trim().toLowerCase() || padrao;
   if (!NIVEIS_RACIOCINIO.includes(nivel)) {
-    throw new ErroGemini(
-      `GEMINI_THINKING_LEVEL inválido: "${nivel}" (use ${NIVEIS_RACIOCINIO.join(", ")}).`,
-      500,
-    );
+    throw new ErroGemini(`${variavel} inválido: "${nivel}" (use ${NIVEIS_RACIOCINIO.join(", ")}).`, 500);
   }
   return nivel;
 }
 
+/** Como chamar: modelo, nível de raciocínio e tempo máximo (padrão: principal e 120 s). */
+export interface OpcoesChamada {
+  modelo?: string;
+  nivelRaciocinio?: string;
+  tempoLimiteMs?: number;
+}
+
 /** Envia um PDF (inline, base64) e devolve a resposta já interpretada como JSON. */
-export async function gerarJsonComPdf<T>(pedido: PedidoJsonComPdf): Promise<RespostaJson<T>> {
+export async function gerarJsonComPdf<T>(pedido: PedidoJsonComPdf, opcoes: OpcoesChamada = {}): Promise<RespostaJson<T>> {
   const chave = Deno.env.get("GEMINI_API_KEY");
   if (!chave) {
     throw new ErroGemini("GEMINI_API_KEY não está configurada nos secrets da função.", 500);
   }
-  const modelo = modeloAtual();
-  const nivelRaciocinio = nivelRaciocinioAtual();
+  const modelo = opcoes.modelo ?? modeloAtual();
+  const nivelRaciocinio = opcoes.nivelRaciocinio ?? nivelRaciocinioAtual();
+  const tempoLimite = opcoes.tempoLimiteMs ?? TEMPO_LIMITE_MS;
 
   const corpo = {
     systemInstruction: { parts: [{ text: pedido.instrucaoSistema }] },
@@ -92,13 +124,13 @@ export async function gerarJsonComPdf<T>(pedido: PedidoJsonComPdf): Promise<Resp
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": chave },
       body: JSON.stringify(corpo),
-      signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
+      signal: AbortSignal.timeout(tempoLimite),
     });
   } catch (e) {
     if (e instanceof DOMException && e.name === "TimeoutError") {
-      throw new ErroGemini(`O Gemini não respondeu em ${TEMPO_LIMITE_MS / 1000} s.`, 504);
+      throw new ErroGemini(`O Gemini (${modelo}) não respondeu em ${Math.round(tempoLimite / 1000)} s.`, 504, true);
     }
-    throw new ErroGemini(`Falha de rede ao chamar o Gemini: ${(e as Error).message}`, 502);
+    throw new ErroGemini(`Falha de rede ao chamar o Gemini: ${(e as Error).message}`, 502, true);
   }
 
   if (!resposta.ok) {
@@ -163,15 +195,17 @@ async function erroDeStatus(resposta: Response, modelo: string): Promise<ErroGem
   if (resposta.status === 429) {
     const espera = resposta.headers.get("retry-after");
     return new ErroGemini(
-      "Cota do Gemini esgotada (plano gratuito: poucos pedidos por minuto e por dia). " +
+      `Cota do Gemini (${modelo}) esgotada (plano gratuito: poucos pedidos por minuto e por dia). ` +
         `Aguarde ${espera ? `${espera} s` : "cerca de 1 minuto"} e tente de novo.${sufixo}`,
       429,
+      true,
     );
   }
   if (resposta.status >= 500) {
     return new ErroGemini(
-      `O Gemini está indisponível no momento (HTTP ${resposta.status}). Tente de novo em instantes.${sufixo}`,
+      `O Gemini (${modelo}) está indisponível no momento (HTTP ${resposta.status}). Tente de novo em instantes.${sufixo}`,
       503,
+      true,
     );
   }
   if (resposta.status === 404) {
@@ -181,6 +215,94 @@ async function erroDeStatus(resposta: Response, modelo: string): Promise<ErroGem
     return new ErroGemini(`O Gemini recusou a chave de API (HTTP ${resposta.status}).${sufixo}`, 500);
   }
   return new ErroGemini(`Erro do Gemini (HTTP ${resposta.status}).${sufixo}`, 502);
+}
+
+// ---------------------------------------------------------------------------
+// Principal com uma nova tentativa e modelo reserva, dentro de um prazo
+// ---------------------------------------------------------------------------
+
+/** Uma chamada ao Gemini dentro de gerarComReserva (vai para o log e para a resposta). */
+export interface Tentativa {
+  modelo: string;
+  ms: number;
+  /** "ok", "503", "429", "504" (tempo), "502" (rede) ou "pulada" (sem tempo para tentar). */
+  resultado: string;
+}
+
+export interface RespostaComReserva<T> extends RespostaJson<T> {
+  /** true quando quem gerou foi o modelo reserva. */
+  reserva: boolean;
+  tentativas: Tentativa[];
+}
+
+/**
+ * Gera com o modelo principal; em sobrecarga (503), cota (429), falha de rede ou tempo esgotado,
+ * repete o principal uma vez depois de uma espera curta e, se falhar de novo, usa o modelo reserva.
+ * Tudo termina antes de [prazo] (epoch ms): o principal nunca avança sobre os [TEMPO_RESERVA_MS] do
+ * reserva, e uma tentativa sem pelo menos [TEMPO_MINIMO_TENTATIVA_MS] nem começa. Sem tempo ou sem
+ * sucesso, lança um ErroGemini claro (503, ou 429 se todas foram por cota) em vez de estourar a função.
+ * Erros que não são transitórios (chave, modelo inexistente, bloqueio, JSON inválido) saem na hora.
+ * GEMINI_FORCAR_RESERVA=true pula o principal (para testar o reserva).
+ */
+export async function gerarComReserva<T>(pedido: PedidoJsonComPdf, prazo: number): Promise<RespostaComReserva<T>> {
+  const principal = modeloAtual();
+  const reserva = modeloReserva();
+  const forcarReserva = Deno.env.get("GEMINI_FORCAR_RESERVA")?.trim().toLowerCase() === "true";
+  const plano: { modelo: string; ehReserva: boolean }[] = forcarReserva
+    ? [{ modelo: reserva, ehReserva: true }]
+    : [
+      { modelo: principal, ehReserva: false },
+      { modelo: principal, ehReserva: false },
+      ...(reserva !== principal ? [{ modelo: reserva, ehReserva: true }] : []),
+    ];
+  const nivelPrincipal = nivelRaciocinioAtual();
+  const nivelReserva = nivelRaciocinioAtual("GEMINI_THINKING_LEVEL_RESERVA", NIVEL_RACIOCINIO_RESERVA_PADRAO);
+
+  const tentativas: Tentativa[] = [];
+  const erros: ErroGemini[] = [];
+  for (const [i, passo] of plano.entries()) {
+    const repeticao = i > 0 && plano[i - 1].modelo === passo.modelo;
+    if (repeticao) {
+      const ultimo = tentativas[tentativas.length - 1];
+      // Depois de esgotar o tempo, repetir o mesmo modelo não cabe: vai direto para o reserva.
+      if (ultimo?.resultado === "504" || ultimo?.resultado === "pulada") continue;
+    }
+    const guardarParaReserva = !passo.ehReserva && plano.some((p) => p.ehReserva) ? TEMPO_RESERVA_MS : 0;
+    const espera = repeticao ? ESPERA_REPETICAO_MS : 0;
+    const tempo = prazo - Date.now() - espera - guardarParaReserva - FOLGA_FINAL_MS;
+    if (tempo < TEMPO_MINIMO_TENTATIVA_MS) {
+      tentativas.push({ modelo: passo.modelo, ms: 0, resultado: "pulada" });
+      continue;
+    }
+    if (espera) await new Promise((r) => setTimeout(r, espera));
+
+    const inicio = Date.now();
+    try {
+      const resposta = await gerarJsonComPdf<T>(pedido, {
+        modelo: passo.modelo,
+        nivelRaciocinio: passo.ehReserva ? nivelReserva : nivelPrincipal,
+        tempoLimiteMs: tempo,
+      });
+      tentativas.push({ modelo: passo.modelo, ms: Date.now() - inicio, resultado: "ok" });
+      return { ...resposta, reserva: passo.ehReserva, tentativas };
+    } catch (e) {
+      if (!(e instanceof ErroGemini) || !e.transitorio) throw e;
+      tentativas.push({ modelo: passo.modelo, ms: Date.now() - inicio, resultado: String(e.status) });
+      erros.push(e);
+      console.error(`Gemini falhou (${passo.modelo}, tentativa ${i + 1}): ${e.message}`);
+    }
+  }
+
+  const resumo = tentativas.map((t) => `${t.modelo}: ${t.resultado}`).join("; ");
+  const soCota = erros.length > 0 && erros.every((e) => e.status === 429);
+  throw new ErroGemini(
+    soCota
+      ? `A cota gratuita da IA acabou por agora (${resumo}). Aguarde cerca de 1 minuto e tente de novo.`
+      : `A IA está sobrecarregada agora e não respondeu a tempo (${resumo}). ` +
+        "Tente de novo em instantes ou gere menos questões.",
+    soCota ? 429 : 503,
+    true,
+  );
 }
 
 function paraBase64(bytes: Uint8Array): string {
