@@ -5,7 +5,13 @@
 .DS_Store
 /build/
 /app/build/
+/desktop/build/
+# Configuração do Lumini desktop (URL e chave pública do Supabase)
+lumini.properties
 /captures/
 .externalNativeBuild/
 .cxx/
 .kotlin/
+
+# PDFs de teste e resultados (não versionar)
+/amostras/

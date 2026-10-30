@@ -1,8 +1,17 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
+
+// URL e chave pública (publishable/anon) do Supabase vêm do local.properties, que não vai para o git.
+val propriedadesLocais = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+fun propriedadeLocal(nome: String): String = propriedadesLocais.getProperty(nome, "").trim()
 
 android {
     namespace = "com.edutec.app"
@@ -14,6 +23,10 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "SUPABASE_URL", "\"${propriedadeLocal("SUPABASE_URL")}\"")
+        buildConfigField("String", "SUPABASE_CHAVE_PUBLICA", "\"${propriedadeLocal("SUPABASE_CHAVE_PUBLICA")}\"")
     }
 
     buildTypes {
@@ -33,6 +46,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -50,5 +64,21 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-core")
 
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+
+    // supabase-kt 3.1.x é a última linha compilada com Kotlin 2.1 (as mais novas exigem Kotlin 2.2+).
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.1.4"))
+    implementation("io.github.jan-tennert.supabase:functions-kt")
+    implementation("io.ktor:ktor-client-okhttp:3.1.2")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    testImplementation("junit:junit:4.13.2")
+
+    // Testes de interface no emulador/aparelho (./gradlew connectedDebugAndroidTest).
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
