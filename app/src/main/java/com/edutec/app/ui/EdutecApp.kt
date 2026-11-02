@@ -1,48 +1,99 @@
 package com.edutec.app.ui
 
 import androidx.activity.compose.BackHandler
+import android.widget.Toast
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import com.edutec.app.data.DadosExemplo
-import com.edutec.app.data.Turma
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 /**
- * Navegação simples por estado: Minhas turmas → Turma → Nova atividade.
- * O botão "voltar" do Android volta uma tela.
+ * Navegação simples por estado: Minhas turmas → Turma → Nova atividade (Origem/Formato → Gerando → Revisão).
+ * O botão "voltar" do Android volta uma tela ou uma etapa. Navegação e geração ficam em ViewModels
+ * (escopo da Activity), então girar a tela não perde a tela atual, a geração em andamento nem o resultado.
  */
 @Composable
 fun EdutecApp() {
-    val turmas = remember { mutableStateListOf<Turma>().apply { addAll(DadosExemplo.turmas) } }
-    var turmaAberta by remember { mutableStateOf<Turma?>(null) }
-    // null = tela de nova atividade fechada; caso contrário, os conceitos já marcados ao abrir.
-    var novaAtividade by remember { mutableStateOf<Set<String>?>(null) }
+    val context = LocalContext.current
+    val navegacao: NavegacaoViewModel = viewModel()
+    val geracao: NovaAtividadeViewModel = viewModel()
+    val dadosTurma: TurmaViewModel = viewModel()
 
-    val turma = turmaAberta
-    val conceitosIniciais = novaAtividade
+    val turma = navegacao.turmaAberta
+    val conceitosIniciais = navegacao.novaAtividade
 
     when {
-        turma == null -> MinhasTurmasScreen(turmas = turmas, onTurma = { turmaAberta = it })
+        turma == null -> {
+            val estadoTurmas = navegacao.turmas
+            MinhasTurmasScreen(
+                turmas = (estadoTurmas as? EstadoTurmas.Pronto)?.turmas.orEmpty(),
+                onTurma = navegacao::abrirTurma,
+                onCriarTurma = navegacao::criarTurma,
+                carregando = estadoTurmas == EstadoTurmas.Carregando,
+                erro = (estadoTurmas as? EstadoTurmas.Erro)?.mensagem,
+                onTentarDeNovo = { navegacao.recarregarTurmas() },
+            )
+        }
 
         conceitosIniciais == null -> {
-            BackHandler { turmaAberta = null }
+            BackHandler { navegacao.fecharTurma() }
+            LaunchedEffect(turma.id) { dadosTurma.abrir(turma.id) }
+            // Lê o estado sempre (fora do if), para a tela recompor quando o grafo chegar.
+            val grafo by dadosTurma.grafo.collectAsState()
+            val grafoAtual = grafo
             TurmaScreen(
                 turma = turma,
-                onVoltar = { turmaAberta = null },
-                onNovaAtividade = { novaAtividade = it },
+                // Enquanto o ViewModel ainda guarda o grafo de outra turma, mostra "carregando".
+                grafo = if (dadosTurma.turmaId == turma.id) grafoAtual else EstadoGrafo.Carregando,
+                onTentarDeNovo = dadosTurma::recarregar,
+                onSimular = {
+                    dadosTurma.simular(turma.id) { erro ->
+                        Toast.makeText(context, erro ?: "Simulação concluída: 25 alunos responderam", Toast.LENGTH_SHORT).show()
+                        // Número de alunos e resumo do cartão em Minhas turmas.
+                        if (erro == null) navegacao.recarregarTurmas(silencioso = true)
+                    }
+                },
+                simulando = dadosTurma.simulando,
+                onVoltar = navegacao::fecharTurma,
+                onNovaAtividade = {
+                    geracao.voltar() // não mostrar o resultado de uma sessão anterior
+                    navegacao.abrirNovaAtividade(it)
+                },
             )
         }
 
         else -> {
-            BackHandler { novaAtividade = null }
+            val estado by geracao.estado.collectAsState()
+            val fechar = {
+                geracao.voltar() // cancela uma geração em andamento
+                navegacao.fecharNovaAtividade()
+            }
+            BackHandler { if (estado == EstadoGeracao.Ocioso) fechar() else geracao.voltar() }
             NovaAtividadeScreen(
                 turma = turma,
                 conceitosIniciais = conceitosIniciais,
-                onFechar = { novaAtividade = null },
+                // Ainda não há banco com o grafo da turma: só dá para gerar a partir de PDF.
+                conceitos = emptyList(),
+                onFechar = fechar,
+                estado = estado,
+                onGerar = geracao::gerar,
+                onTentarDeNovo = geracao::tentarDeNovo,
+                onVoltar = geracao::voltar,
+                onPublicar = { geracao.publicar(turma.id) },
             )
+            // Publicada: volta para a Turma com os dados atualizados.
+            LaunchedEffect(estado) {
+                val publicado = estado
+                if (publicado is EstadoGeracao.Publicado) {
+                    Toast.makeText(context, "Atividade publicada para a turma", Toast.LENGTH_SHORT).show()
+                    geracao.voltar()
+                    navegacao.fecharNovaAtividade()
+                    navegacao.recarregarTurmas(silencioso = true)
+                    dadosTurma.abrir(publicado.turmaId, forcar = true)
+                }
+            }
         }
     }
 }

@@ -59,7 +59,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -87,6 +91,7 @@ import com.edutec.app.data.Conceito
 import com.edutec.app.data.DadosExemplo
 import com.edutec.app.data.DadosTurmaExemplo
 import com.edutec.app.data.EstadoConceito
+import com.edutec.app.data.PedidoGeracao
 import com.edutec.app.data.Turma
 import com.edutec.app.ui.theme.AzulFundo
 import com.edutec.app.ui.theme.BordaTracejada
@@ -116,16 +121,21 @@ import java.io.File
 private val CantoCartao = RoundedCornerShape(24.dp)
 private val Espaco = 14.dp
 private const val LimitePdfBytes = 20L * 1024 * 1024
+// A Edge Function gera tudo numa chamada só (limite de 150 s): 5 por padrão, no máximo 10.
+private const val QuantidadePadrao = 5
+private const val QuantidadeMaxima = 10
 
 private enum class Origem { Grafo, Pdf }
 
-private enum class Formato(val titulo: String, val descricao: String, val adjetivo: String) {
-    MultiplaEscolha("Múltipla escolha", "Correção e feedback imediatos", "de múltipla escolha"),
-    Aberta("Aberta", "Corrigida pela IA com rubrica", "abertas"),
-    Mista("Mista", "Metade de cada tipo", "mistas"),
+/** [valor] é o que a Edge Function gerar-atividade espera. */
+private enum class Formato(val titulo: String, val descricao: String, val adjetivo: String, val valor: String) {
+    MultiplaEscolha("Múltipla escolha", "Correção e feedback imediatos", "de múltipla escolha", "multipla_escolha"),
+    Aberta("Aberta", "Corrigida pela IA com rubrica", "abertas", "aberta"),
+    Mista("Mista", "Metade de cada tipo", "mistas", "mista"),
 }
 
 private val Dificuldades = listOf("Fácil", "Média", "Difícil")
+private val ValorDificuldade = mapOf("Fácil" to "facil", "Média" to "media", "Difícil" to "dificil")
 private val Tempos = listOf("Sem limite", "15 min", "30 min", "45 min", "60 min")
 
 /** PDF escolhido pelo professor e o estado do envio (cópia para o armazenamento do app). */
@@ -138,26 +148,47 @@ private data class MaterialPdf(
     val enviado get() = arquivoLocal != null
 }
 
+/** Guarda o PDF escolhido no estado salvo da tela (sobrevive a girar a tela). */
+private val SaverPdf = Saver<MaterialPdf?, List<String>>(
+    save = { pdf -> pdf?.let { listOf(it.uri.toString(), it.nome, it.tamanho.toString(), it.arquivoLocal?.path.orEmpty()) } },
+    restore = { (uri, nome, tamanho, caminho) ->
+        MaterialPdf(Uri.parse(uri), nome, tamanho.toLong(), caminho.takeIf { it.isNotEmpty() }?.let(::File))
+    },
+)
+
+private val SaverSelecionados = listSaver<SnapshotStateList<String>, String>(
+    save = { it.toList() },
+    restore = { it.toMutableStateList() },
+)
+
 @Composable
 fun NovaAtividadeScreen(
     turma: Turma,
     onFechar: () -> Unit,
     modifier: Modifier = Modifier,
     conceitosIniciais: Set<String> = emptySet(),
-    conceitos: List<Conceito> = DadosTurmaExemplo.conceitos,
+    conceitos: List<Conceito> = emptyList(),
+    estado: EstadoGeracao = EstadoGeracao.Ocioso,
+    onGerar: (PedidoGeracao) -> Unit = {},
+    onTentarDeNovo: () -> Unit = {},
+    onVoltar: () -> Unit = {},
+    /** Etapa 5: publica o resultado revisado na turma. */
+    onPublicar: () -> Unit = {},
 ) {
     val context = LocalContext.current
     fun avisar(mensagem: String) = Toast.makeText(context, mensagem, Toast.LENGTH_SHORT).show()
 
-    var origem by remember { mutableStateOf(Origem.Grafo) }
-    val selecionados = remember { mutableStateListOf<String>().apply { addAll(conceitosIniciais) } }
-    var pdf by remember { mutableStateOf<MaterialPdf?>(null) }
+    // rememberSaveable: as escolhas sobrevivem a girar a tela (e à ida e volta de Gerando/Revisão).
+    // Turma sem grafo ainda começa direto em "Material em PDF".
+    var origem by rememberSaveable { mutableStateOf(if (conceitos.isEmpty()) Origem.Pdf else Origem.Grafo) }
+    val selecionados = rememberSaveable(saver = SaverSelecionados) { conceitosIniciais.toMutableStateList() }
+    var pdf by rememberSaveable(stateSaver = SaverPdf) { mutableStateOf<MaterialPdf?>(null) }
     var progressoEnvio by remember { mutableFloatStateOf(0f) }
-    var formato by remember { mutableStateOf(Formato.Mista) }
-    var quantidade by remember { mutableIntStateOf(8) }
-    var dificuldade by remember { mutableStateOf("Média") }
-    var permitirRefazer by remember { mutableStateOf(true) }
-    var tempo by remember { mutableStateOf("30 min") }
+    var formato by rememberSaveable { mutableStateOf(Formato.Mista) }
+    var quantidade by rememberSaveable { mutableIntStateOf(QuantidadePadrao) }
+    var dificuldade by rememberSaveable { mutableStateOf("Média") }
+    var permitirRefazer by rememberSaveable { mutableStateOf(true) }
+    var tempo by rememberSaveable { mutableStateOf("30 min") }
 
     val seletorPdf = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -188,16 +219,19 @@ fun NovaAtividadeScreen(
     }
 
     val conceitosOrdenados = conceitos.filter { it.nome in selecionados }.map { it.nome }
-    val origemPronta = when (origem) {
-        Origem.Grafo -> conceitosOrdenados.isNotEmpty()
-        Origem.Pdf -> pdf?.enviado == true
+    // Nesta versão só há material no servidor quando a origem é um PDF.
+    val motivoDesabilitado = when {
+        origem == Origem.Grafo -> "Para a demonstração, gere a partir de um PDF"
+        pdf == null -> "Envie um PDF para gerar a atividade"
+        pdf?.enviado != true -> "Aguarde o envio do PDF terminar"
+        else -> null
     }
     val resumo = buildString {
         append("$quantidade questões ${formato.adjetivo} sobre ")
         append(
             when (origem) {
-                Origem.Grafo -> conceitosOrdenados.joinToString(", ").ifEmpty { "[escolha os conceitos]" }
-                Origem.Pdf -> pdf?.let { "o material \"${it.nome}\"" } ?: "[envie um PDF]"
+                Origem.Grafo -> conceitosOrdenados.joinToString(", ").ifEmpty { "os conceitos que você escolher" }
+                Origem.Pdf -> pdf?.let { "o material \"${it.nome}\"" } ?: "o PDF que você enviar"
             }
         )
         append(" · ${if (permitirRefazer) "refazer livre" else "tentativa única"}")
@@ -238,7 +272,7 @@ fun NovaAtividadeScreen(
                 formato = formato,
                 onFormato = { formato = it },
                 quantidade = quantidade,
-                onQuantidade = { quantidade = it.coerceIn(1, 30) },
+                onQuantidade = { quantidade = it.coerceIn(1, QuantidadeMaxima) },
                 dificuldade = dificuldade,
                 onDificuldade = { dificuldade = it },
                 compacto = !expandido,
@@ -251,8 +285,24 @@ fun NovaAtividadeScreen(
                 tempo = tempo,
                 onTempo = { tempo = it },
                 resumo = resumo,
-                podeGerar = origemPronta,
-                onGerar = { avisar("Gerando atividade… (próxima etapa)") },
+                motivoDesabilitado = motivoDesabilitado,
+                onGerar = {
+                    val material = pdf
+                    val arquivo = material?.arquivoLocal
+                    if (origem == Origem.Pdf && material != null && arquivo != null) {
+                        onGerar(
+                            PedidoGeracao(
+                                arquivo = arquivo,
+                                nomeArquivo = material.nome,
+                                quantidade = quantidade,
+                                formato = formato.valor,
+                                dificuldade = ValorDificuldade.getValue(dificuldade),
+                                permitirRefazer = permitirRefazer,
+                                tempoMinutos = tempo.removeSuffix(" min").toIntOrNull(),
+                            )
+                        )
+                    }
+                },
                 onManual = { avisar("Criar questões manualmente (próxima etapa)") },
                 preencherAltura = expandido,
                 modifier = mod,
@@ -266,33 +316,52 @@ fun NovaAtividadeScreen(
                 .padding(horizontal = margem, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(Espaco),
         ) {
-            Cabecalho(turma = turma, expandido = expandido, onFechar = onFechar)
+            val etapa = when (estado) {
+                EstadoGeracao.Ocioso -> 2
+                is EstadoGeracao.Gerando, is EstadoGeracao.Erro -> 3
+                is EstadoGeracao.Concluido -> if (estado.publicando) 5 else 4
+                is EstadoGeracao.Publicado -> 5
+            }
+            Cabecalho(turma = turma, expandido = expandido, etapa = etapa, onFechar = onFechar)
 
-            if (expandido) {
-                Row(
+            // O estado do formulário fica acima deste "when": Voltar/Tentar de novo não perdem as escolhas.
+            when (estado) {
+                is EstadoGeracao.Gerando -> GerandoConteudo(estado, onCancelar = onVoltar, modifier = Modifier.weight(1f))
+                is EstadoGeracao.Erro -> ErroGeracaoConteudo(estado, onTentarDeNovo, onVoltar, Modifier.weight(1f))
+                is EstadoGeracao.Concluido -> RevisaoConteudo(
+                    estado, expandido,
+                    onGerarNovas = { onGerar(estado.pedido.copy(forcarNova = true)) },
+                    onPublicar = onPublicar,
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(Espaco),
-                ) {
+                )
+                // Instante entre publicar e voltar para a Turma.
+                is EstadoGeracao.Publicado -> Box(Modifier.fillMaxWidth().weight(1f))
+                EstadoGeracao.Ocioso -> if (expandido) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(Espaco),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(Espaco),
+                        ) {
+                            cartaoOrigem()
+                            cartaoFormato()
+                        }
+                        painelLateral(Modifier.width(370.dp).fillMaxHeight())
+                    }
+                } else {
                     Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .verticalScroll(rememberScrollState()),
+                        modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(Espaco),
                     ) {
                         cartaoOrigem()
                         cartaoFormato()
+                        painelLateral(Modifier.fillMaxWidth())
                     }
-                    painelLateral(Modifier.width(370.dp).fillMaxHeight())
-                }
-            } else {
-                Column(
-                    modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(Espaco),
-                ) {
-                    cartaoOrigem()
-                    cartaoFormato()
-                    painelLateral(Modifier.fillMaxWidth())
                 }
             }
         }
@@ -304,19 +373,19 @@ fun NovaAtividadeScreen(
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun Cabecalho(turma: Turma, expandido: Boolean, onFechar: () -> Unit) {
+private fun Cabecalho(turma: Turma, expandido: Boolean, etapa: Int, onFechar: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             BotaoTopo(Icons.Filled.Close, "Fechar", onFechar)
             Spacer(Modifier.width(16.dp))
             Column {
                 Text("Nova atividade", color = TextoPrincipal, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("${turma.nome} · [${turma.codigo}]", color = TextoSecundario, fontSize = 14.sp)
+                Text("${turma.nome} · ${turma.codigo}", color = TextoSecundario, fontSize = 14.sp)
             }
             Spacer(Modifier.weight(1f))
-            if (expandido) Etapas()
+            if (expandido) Etapas(etapa)
         }
-        if (!expandido) Box(Modifier.horizontalScroll(rememberScrollState())) { Etapas() }
+        if (!expandido) Box(Modifier.horizontalScroll(rememberScrollState())) { Etapas(etapa) }
     }
 }
 
@@ -456,6 +525,14 @@ private fun ConteudoGrafo(
     onSelecionarRevisar: () -> Unit,
 ) {
     val aRevisar = conceitos.count { it.estado == EstadoConceito.Revisar }
+
+    if (conceitos.isEmpty()) {
+        Text(
+            "Esta turma ainda não tem conceitos no grafo. Gere a primeira atividade a partir de um PDF.",
+            color = TextoCorpo, fontSize = 14.sp,
+        )
+        return
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (aRevisar > 0) {
@@ -683,7 +760,7 @@ private fun CartaoFormato(
                         modifier = Modifier.width(52.dp),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     )
-                    BotaoContador("+", "Aumentar", enabled = quantidade < 30) { onQuantidade(quantidade + 1) }
+                    BotaoContador("+", "Aumentar", enabled = quantidade < QuantidadeMaxima) { onQuantidade(quantidade + 1) }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Dificuldade", color = TextoCorpo, fontSize = 14.sp)
@@ -764,7 +841,8 @@ private fun PainelTentativas(
     tempo: String,
     onTempo: (String) -> Unit,
     resumo: String,
-    podeGerar: Boolean,
+    /** null = pode gerar; caso contrário, o botão fica desabilitado e o motivo aparece embaixo. */
+    motivoDesabilitado: String?,
     onGerar: () -> Unit,
     onManual: () -> Unit,
     preencherAltura: Boolean,
@@ -842,7 +920,7 @@ private fun PainelTentativas(
 
             Button(
                 onClick = onGerar,
-                enabled = podeGerar,
+                enabled = motivoDesabilitado == null,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Consolidado),
@@ -851,6 +929,13 @@ private fun PainelTentativas(
                 Icon(Icons.Filled.Star, null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(10.dp))
                 Text("Gerar atividade", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            }
+            motivoDesabilitado?.let { motivo ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Info, null, tint = TextoSecundario, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(motivo, color = TextoSecundario, fontSize = 13.sp)
+                }
             }
             Button(
                 onClick = onManual,
@@ -919,6 +1004,7 @@ private fun PreviewNovaAtividadeTablet() {
         NovaAtividadeScreen(
             DadosExemplo.turmas.first(), onFechar = {},
             conceitosIniciais = setOf("Regra da cadeia", "Derivada"),
+            conceitos = DadosTurmaExemplo.conceitos,
         )
     }
 }
@@ -926,5 +1012,7 @@ private fun PreviewNovaAtividadeTablet() {
 @Preview(name = "Nova atividade · Celular", widthDp = 400, heightDp = 1800, showBackground = true)
 @Composable
 private fun PreviewNovaAtividadeCelular() {
-    EdutecTheme { NovaAtividadeScreen(DadosExemplo.turmas.first(), onFechar = {}) }
+    EdutecTheme {
+        NovaAtividadeScreen(DadosExemplo.turmas.first(), onFechar = {}, conceitos = DadosTurmaExemplo.conceitos)
+    }
 }

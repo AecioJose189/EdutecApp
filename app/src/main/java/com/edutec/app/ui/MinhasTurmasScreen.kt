@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -30,6 +32,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -42,7 +47,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,11 +62,16 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.edutec.app.data.AtividadePendente
 import com.edutec.app.data.DadosExemplo
 import com.edutec.app.data.Turma
+import com.edutec.app.data.rotuloAlunos
+import com.edutec.app.data.semDados
+import com.edutec.app.data.semestresRecentes
 import com.edutec.app.ui.theme.AmareloFundo
 import com.edutec.app.ui.theme.AmareloIcone
 import com.edutec.app.ui.theme.AmareloTexto
@@ -92,13 +104,23 @@ private val EspacoGrade = 14.dp
 @Composable
 fun MinhasTurmasScreen(
     modifier: Modifier = Modifier,
-    turmas: MutableList<Turma> = remember { mutableStateListOf<Turma>().apply { addAll(DadosExemplo.turmas) } },
+    /** Turmas do professor vindas do servidor (os exemplos ficam só nos @Preview). */
+    turmas: List<Turma>,
     onTurma: (Turma) -> Unit = {},
+    /** Cria a turma; o terceiro parâmetro recebe null quando deu certo ou a mensagem de erro. */
+    onCriarTurma: (nome: String, codigo: String, aoTerminar: (String?) -> Unit) -> Unit = { _, _, fim -> fim(null) },
+    /** Carregando a lista do servidor (primeira vez ou "Tentar de novo"). */
+    carregando: Boolean = false,
+    /** Falha ao carregar a lista; mostra a mensagem e o botão "Tentar de novo". */
+    erro: String? = null,
+    onTentarDeNovo: () -> Unit = {},
+    /** Atividades geradas aguardando revisão; ainda não há banco, então o app passa vazia. */
+    pendentes: List<AtividadePendente> = emptyList(),
 ) {
     val context = LocalContext.current
-    var semestre by remember { mutableStateOf(DadosExemplo.semestres.first()) }
-    var mostrarNovaTurma by remember { mutableStateOf(false) }
-    val pendentes = DadosExemplo.atividadesPendentes
+    val semestres = remember { semestresRecentes() }
+    var semestre by rememberSaveable { mutableStateOf(semestres.first()) }
+    var mostrarNovaTurma by rememberSaveable { mutableStateOf(false) }
 
     fun avisar(mensagem: String) = Toast.makeText(context, mensagem, Toast.LENGTH_SHORT).show()
 
@@ -129,48 +151,55 @@ fun MinhasTurmasScreen(
             verticalArrangement = Arrangement.spacedBy(EspacoGrade),
         ) {
             BarraSuperior(
+                semestres = semestres,
                 semestre = semestre,
                 onSemestreSelecionado = { semestre = it; avisar("Semestre $it selecionado") },
                 onPerfil = { avisar("Perfil do professor") },
             )
             Spacer(Modifier.height(8.dp))
-            Cabecalho(expandido = expandido)
+            Cabecalho(expandido = expandido, mostrarLegenda = turmas.isNotEmpty() && !carregando && erro == null)
 
-            Resumo(
-                expandido = expandido,
-                pendentes = pendentes.size,
-                descricaoPendente = pendentes.firstOrNull()
-                    ?.let { "${it.disciplina} · ${it.turma}" }.orEmpty(),
-                conceitosARevisar = conceitosARevisar,
-                turmasComRevisao = turmasComRevisao,
-                totalAlunos = totalAlunos,
-                onRevisar = { avisar("Abrindo revisão da atividade") },
-            )
-
-            GradeTurmas(
-                turmas = turmas,
-                colunas = colunas,
-                onTurma = onTurma,
-                onNovaTurma = { mostrarNovaTurma = true },
-            )
+            if (carregando) {
+                CarregandoTurmas()
+            } else if (erro != null) {
+                ErroTurmas(erro, onTentarDeNovo)
+            } else if (turmas.isEmpty()) {
+                EstadoVazioTurmas(onNovaTurma = { mostrarNovaTurma = true })
+            } else {
+                // Os números do resumo só aparecem quando há algo real para contar (nada inventado).
+                if (pendentes.isNotEmpty() || totalAlunos > 0) {
+                    Resumo(
+                        expandido = expandido,
+                        pendentes = pendentes.size,
+                        descricaoPendente = pendentes.firstOrNull()
+                            ?.let { "${it.disciplina} · ${it.turma}" }.orEmpty(),
+                        conceitosARevisar = conceitosARevisar,
+                        turmasComRevisao = turmasComRevisao,
+                        totalAlunos = totalAlunos,
+                        onRevisar = { avisar("Abrindo revisão da atividade") },
+                    )
+                }
+                GradeTurmas(
+                    turmas = turmas,
+                    colunas = colunas,
+                    onTurma = onTurma,
+                    onNovaTurma = { mostrarNovaTurma = true },
+                )
+            }
         }
     }
 
     if (mostrarNovaTurma) {
         DialogoNovaTurma(
             onCancelar = { mostrarNovaTurma = false },
-            onCriar = { nome, codigo ->
-                turmas.add(
-                    Turma(
-                        nome = nome,
-                        codigo = codigo.ifBlank { "TURMA" }.uppercase(),
-                        alunos = 0,
-                        consolidado = 0, desenvolvimento = 0, revisar = 0,
-                        rodape = "Nenhuma atividade ainda",
-                    )
-                )
-                mostrarNovaTurma = false
-                avisar("Turma \"$nome\" criada")
+            onCriar = { nome, codigo, aoTerminar ->
+                onCriarTurma(nome, codigo.ifBlank { "Turma única" }) { falha ->
+                    aoTerminar(falha)
+                    if (falha == null) {
+                        mostrarNovaTurma = false
+                        avisar("Turma \"$nome\" criada")
+                    }
+                }
             },
         )
     }
@@ -182,6 +211,7 @@ fun MinhasTurmasScreen(
 
 @Composable
 private fun BarraSuperior(
+    semestres: List<String>,
     semestre: String,
     onSemestreSelecionado: (String) -> Unit,
     onPerfil: () -> Unit,
@@ -212,7 +242,7 @@ private fun BarraSuperior(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Semestre [$semestre]",
+                        text = "Semestre $semestre",
                         color = TextoPrincipal,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
@@ -227,9 +257,9 @@ private fun BarraSuperior(
                 }
             }
             DropdownMenu(expanded = menuAberto, onDismissRequest = { menuAberto = false }) {
-                DadosExemplo.semestres.forEach { opcao ->
+                semestres.forEach { opcao ->
                     DropdownMenuItem(
-                        text = { Text("Semestre [$opcao]") },
+                        text = { Text("Semestre $opcao") },
                         onClick = {
                             menuAberto = false
                             onSemestreSelecionado(opcao)
@@ -259,7 +289,7 @@ private fun BarraSuperior(
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun Cabecalho(expandido: Boolean) {
+private fun Cabecalho(expandido: Boolean, mostrarLegenda: Boolean) {
     val titulo: @Composable () -> Unit = {
         Text(
             text = "Minhas turmas",
@@ -276,12 +306,12 @@ private fun Cabecalho(expandido: Boolean) {
         ) {
             titulo()
             Spacer(Modifier.weight(1f))
-            Legenda()
+            if (mostrarLegenda) Legenda()
         }
     } else {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             titulo()
-            Legenda()
+            if (mostrarLegenda) Legenda()
         }
     }
 }
@@ -488,7 +518,7 @@ private fun CartaoTurma(turma: Turma, onClick: () -> Unit, modifier: Modifier = 
                 Column(Modifier.weight(1f)) {
                     Text(turma.nome, color = TextoPrincipal, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "[${turma.codigo}] · ${turma.alunos} alunos",
+                        "${turma.codigo} · ${turma.rotuloAlunos}",
                         color = TextoSecundario,
                         fontSize = 14.sp,
                     )
@@ -520,6 +550,7 @@ private fun CartaoTurma(turma: Turma, onClick: () -> Unit, modifier: Modifier = 
 @Composable
 private fun EtiquetaTurma(turma: Turma) {
     val (texto, fundo, cor) = when {
+        turma.semDados -> Triple("Nova turma", EtiquetaAzulFundo, EtiquetaAzulTexto)
         turma.conceitosARevisar > 0 -> Triple(
             if (turma.conceitosARevisar == 1) "1 conceito a revisar"
             else "${turma.conceitosARevisar} conceitos a revisar",
@@ -613,13 +644,107 @@ private fun CartaoNovaTurma(onClick: () -> Unit, modifier: Modifier = Modifier) 
 }
 
 // ---------------------------------------------------------------------------
+// Estado vazio (nenhuma turma)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun EstadoVazioTurmas(onNovaTurma: () -> Unit) {
+    Surface(shape = CantoCartao, color = Cartao, modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Box(
+                Modifier.size(64.dp).clip(RoundedCornerShape(18.dp)).background(AzulFundo),
+                contentAlignment = Alignment.Center,
+            ) { Icon(Icons.Filled.Add, null, tint = Consolidado, modifier = Modifier.size(30.dp)) }
+            Text(
+                "Nenhuma turma ainda",
+                color = TextoPrincipal, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+            )
+            Text(
+                "Crie a primeira turma para enviar materiais em PDF, gerar atividades com a IA e, quando os " +
+                    "alunos responderem, acompanhar o domínio estimado de cada conceito.",
+                color = TextoCorpo, fontSize = 15.sp, textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 560.dp),
+            )
+            Spacer(Modifier.height(4.dp))
+            Button(
+                onClick = onNovaTurma,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Consolidado),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Nova turma", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Carregando / erro ao buscar as turmas no servidor
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun CarregandoTurmas() {
+    Surface(shape = CantoCartao, color = Cartao, modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            CircularProgressIndicator(color = Consolidado)
+            Text("Carregando suas turmas…", color = TextoCorpo, fontSize = 15.sp)
+        }
+    }
+}
+
+@Composable
+private fun ErroTurmas(mensagem: String, onTentarDeNovo: () -> Unit) {
+    Surface(shape = CantoCartao, color = Cartao, modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 48.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Box(
+                Modifier.size(64.dp).clip(CircleShape).background(EtiquetaVermelhaFundo),
+                contentAlignment = Alignment.Center,
+            ) { Text("!", color = EtiquetaVermelhaTexto, fontSize = 26.sp, fontWeight = FontWeight.Bold) }
+            Text(
+                "Não foi possível carregar as turmas",
+                color = TextoPrincipal, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+            )
+            Text(
+                mensagem, color = TextoCorpo, fontSize = 15.sp, textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 560.dp),
+            )
+            Button(
+                onClick = onTentarDeNovo,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Consolidado),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
+            ) { Text("Tentar de novo", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Diálogo de nova turma
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun DialogoNovaTurma(onCancelar: () -> Unit, onCriar: (nome: String, codigo: String) -> Unit) {
+private fun DialogoNovaTurma(
+    onCancelar: () -> Unit,
+    onCriar: (nome: String, codigo: String, aoTerminar: (String?) -> Unit) -> Unit,
+) {
     var nome by remember { mutableStateOf("") }
     var codigo by remember { mutableStateOf("") }
+    var criando by remember { mutableStateOf(false) }
+    var falha by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = onCancelar,
@@ -639,11 +764,29 @@ private fun DialogoNovaTurma(onCancelar: () -> Unit, onCriar: (nome: String, cod
                     label = { Text("Turma (ex.: Turma C)") },
                     singleLine = true,
                 )
+                if (criando) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Consolidado)
+                        Spacer(Modifier.width(10.dp))
+                        Text("Criando a turma…", color = TextoCorpo, fontSize = 14.sp)
+                    }
+                }
+                falha?.let { Text(it, color = EtiquetaVermelhaTexto, fontSize = 14.sp) }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onCriar(nome.trim(), codigo.trim()) }, enabled = nome.isNotBlank()) {
-                Text("Criar")
+            TextButton(
+                onClick = {
+                    criando = true
+                    falha = null
+                    onCriar(nome.trim(), codigo.trim()) { erro ->
+                        criando = false
+                        falha = erro
+                    }
+                },
+                enabled = nome.isNotBlank() && !criando,
+            ) {
+                Text(if (falha != null) "Tentar de novo" else "Criar")
             }
         },
         dismissButton = {
@@ -656,14 +799,43 @@ private fun DialogoNovaTurma(onCancelar: () -> Unit, onCriar: (nome: String, cod
 // Previews (aparecem no painel "Split/Design" do Android Studio)
 // ---------------------------------------------------------------------------
 
+@Composable
+private fun turmasExemplo() = remember { DadosExemplo.turmas.toMutableStateList() }
+
 @Preview(name = "Tablet", widthDp = 1280, heightDp = 800, showBackground = true)
 @Composable
 private fun PreviewTablet() {
-    EdutecTheme { MinhasTurmasScreen() }
+    EdutecTheme { MinhasTurmasScreen(turmas = turmasExemplo(), pendentes = DadosExemplo.atividadesPendentes) }
 }
 
 @Preview(name = "Celular", widthDp = 400, heightDp = 1400, showBackground = true)
 @Composable
 private fun PreviewCelular() {
-    EdutecTheme { MinhasTurmasScreen() }
+    EdutecTheme { MinhasTurmasScreen(turmas = turmasExemplo(), pendentes = DadosExemplo.atividadesPendentes) }
+}
+
+@Preview(name = "Sem turmas · Tablet", widthDp = 1280, heightDp = 800, showBackground = true)
+@Composable
+private fun PreviewVazioTablet() {
+    EdutecTheme { MinhasTurmasScreen(turmas = remember { mutableStateListOf() }) }
+}
+
+@Preview(name = "Sem turmas · Celular", widthDp = 400, heightDp = 860, showBackground = true)
+@Composable
+private fun PreviewVazioCelular() {
+    EdutecTheme { MinhasTurmasScreen(turmas = remember { mutableStateListOf() }) }
+}
+
+@Preview(name = "Carregando · Tablet", widthDp = 1280, heightDp = 800, showBackground = true)
+@Composable
+private fun PreviewCarregandoTablet() {
+    EdutecTheme { MinhasTurmasScreen(turmas = emptyList(), carregando = true) }
+}
+
+@Preview(name = "Erro · Celular", widthDp = 400, heightDp = 860, showBackground = true)
+@Composable
+private fun PreviewErroCelular() {
+    EdutecTheme {
+        MinhasTurmasScreen(turmas = emptyList(), erro = "Sem conexão com o servidor. Verifique a internet e tente de novo.")
+    }
 }
