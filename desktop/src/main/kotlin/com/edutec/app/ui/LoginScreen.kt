@@ -29,14 +29,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.edutec.app.ui.theme.Cartao
-import com.edutec.app.ui.theme.Consolidado
 import com.edutec.app.ui.theme.EdutecTheme
-import com.edutec.app.ui.theme.EtiquetaVermelhaTexto
+import com.edutec.app.ui.theme.Erro
 import com.edutec.app.ui.theme.Fundo
-import com.edutec.app.ui.theme.TextoCorpo
-import com.edutec.app.ui.theme.TextoPrincipal
-import com.edutec.app.ui.theme.TextoSecundario
+import com.edutec.app.ui.theme.Primaria
+import com.edutec.app.ui.theme.Superficie
+import com.edutec.app.ui.theme.Tinta
+import com.edutec.app.ui.theme.TintaSuave
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /** Tela de entrada: "Entrar com Google" abre o navegador do sistema e espera o retorno. */
@@ -53,24 +52,24 @@ fun LoginScreen(
     val avisar = LocalAvisar.current
     val area = LocalClipboardManager.current
     Box(modifier.fillMaxSize().background(Fundo), contentAlignment = Alignment.Center) {
-        Surface(shape = RoundedCornerShape(28.dp), color = Cartao, modifier = Modifier.widthIn(max = 460.dp).padding(24.dp)) {
+        Surface(shape = RoundedCornerShape(28.dp), color = Superficie, modifier = Modifier.widthIn(max = 460.dp).padding(24.dp)) {
             Column(
                 Modifier.padding(horizontal = 40.dp, vertical = 36.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Text("LUMINI", color = TextoPrincipal, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text("LUMINI", color = Tinta, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                 Text(
                     "Grafo de conhecimento da turma e domínio estimado de cada conceito.",
-                    color = TextoSecundario, fontSize = 15.sp, textAlign = TextAlign.Center,
+                    color = TintaSuave, fontSize = 15.sp, textAlign = TextAlign.Center,
                 )
-                aviso?.let { Text(it, color = TextoCorpo, fontSize = 14.sp, textAlign = TextAlign.Center) }
+                aviso?.let { Text(it, color = TintaSuave, fontSize = 14.sp, textAlign = TextAlign.Center) }
                 Spacer(Modifier.height(4.dp))
                 if (entrando) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Consolidado)
+                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Primaria)
                         Spacer(Modifier.width(12.dp))
-                        Text("Continue no navegador…", color = TextoCorpo, fontSize = 15.sp)
+                        Text("Continue no navegador…", color = TintaSuave, fontSize = 15.sp)
                     }
                     if (urlLogin != null) {
                         TextButton(onClick = {
@@ -78,16 +77,16 @@ fun LoginScreen(
                             avisar("Link copiado: cole no navegador")
                         }, modifier = Modifier.maoAoPassar()) { Text("O navegador não abriu? Copiar o link") }
                     }
-                    TextButton(onClick = onCancelar, modifier = Modifier.maoAoPassar()) { Text("Cancelar", color = TextoSecundario) }
+                    TextButton(onClick = onCancelar, modifier = Modifier.maoAoPassar()) { Text("Cancelar", color = TintaSuave) }
                 } else {
                     Button(
                         onClick = onEntrar,
                         shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Consolidado),
+                        colors = ButtonDefaults.buttonColors(containerColor = Primaria),
                         modifier = Modifier.fillMaxWidth().height(52.dp).maoAoPassar(),
                     ) { Text("Entrar com Google", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
                 }
-                erro?.let { Text(it, color = EtiquetaVermelhaTexto, fontSize = 14.sp, textAlign = TextAlign.Center) }
+                erro?.let { Text(it, color = Erro, fontSize = 14.sp, textAlign = TextAlign.Center) }
             }
         }
     }
@@ -97,7 +96,7 @@ fun LoginScreen(
 @Composable
 fun CarregandoSessao() {
     Box(Modifier.fillMaxSize().background(Fundo), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = Consolidado)
+        CircularProgressIndicator(color = Primaria)
     }
 }
 

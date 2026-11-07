@@ -2,6 +2,7 @@ package com.edutec.app.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -32,22 +33,21 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.foundation.focusable
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -57,21 +57,18 @@ import com.edutec.app.data.AtividadePublicada
 import com.edutec.app.data.Participante
 import com.edutec.app.data.SessaoSala
 import com.edutec.app.data.TokenQr
-import com.edutec.app.ui.theme.AzulFundo
-import com.edutec.app.ui.theme.Cartao
-import com.edutec.app.ui.theme.Consolidado
+import com.edutec.app.ui.theme.Borda
 import com.edutec.app.ui.theme.EdutecTheme
-import com.edutec.app.ui.theme.EtiquetaAzulTexto
-import com.edutec.app.ui.theme.EtiquetaVermelhaTexto
+import com.edutec.app.ui.theme.Erro
 import com.edutec.app.ui.theme.Fundo
-import com.edutec.app.ui.theme.Pilula
-import com.edutec.app.ui.theme.Revisar
-import com.edutec.app.ui.theme.TextoCorpo
-import com.edutec.app.ui.theme.TextoPrincipal
-import com.edutec.app.ui.theme.TextoSecundario
-import com.edutec.app.ui.theme.Trilho
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import com.edutec.app.ui.theme.Menta
+import com.edutec.app.ui.theme.MentaSuave
+import com.edutec.app.ui.theme.Primaria
+import com.edutec.app.ui.theme.Superficie
+import com.edutec.app.ui.theme.Tinta
+import com.edutec.app.ui.theme.TintaSuave
 import java.net.URI
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
  * Projeção da sessão em sala (tela cheia): QR que muda a cada 15 s, contagem de quem entrou e de quem
@@ -114,8 +111,8 @@ fun ProjecaoScreen(
             // Topo: atividade, ao vivo, botões
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(atividade.titulo, color = TextoPrincipal, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                    Text(nomeTurma, color = TextoSecundario, fontSize = 17.sp)
+                    Text(atividade.titulo, color = Tinta, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text(nomeTurma, color = TintaSuave, fontSize = 17.sp)
                 }
                 if (!encerrada) {
                     IndicadorAoVivo(aoVivo)
@@ -123,19 +120,19 @@ fun ProjecaoScreen(
                 }
                 if (!encerrada) {
                     if (!entradaFechada) {
-                        OutlinedButton(onClick = onEncerrarEntrada, border = BorderStroke(1.dp, Consolidado),
-                            modifier = Modifier.maoAoPassar()) { Text("Encerrar entrada", color = Consolidado) }
+                        OutlinedButton(onClick = onEncerrarEntrada, border = BorderStroke(1.dp, Primaria),
+                            modifier = Modifier.maoAoPassar()) { Text("Encerrar entrada", color = Primaria) }
                         Spacer(Modifier.width(10.dp))
                     }
-                    Button(onClick = { confirmarEncerrar = true }, colors = ButtonDefaults.buttonColors(containerColor = Revisar),
+                    Button(onClick = { confirmarEncerrar = true }, colors = ButtonDefaults.buttonColors(containerColor = Erro),
                         modifier = Modifier.maoAoPassar()) { Text("Encerrar sessão") }
                     Spacer(Modifier.width(10.dp))
                 }
                 TextButton(onClick = onSair, modifier = Modifier.maoAoPassar()) {
-                    Text(if (encerrada) "Ver a turma" else "Sair da projeção", color = TextoSecundario)
+                    Text(if (encerrada) "Ver a turma" else "Sair da projeção", color = TintaSuave)
                 }
             }
-            erro?.let { Text(it, color = EtiquetaVermelhaTexto, fontSize = 15.sp) }
+            erro?.let { Text(it, color = Erro, fontSize = 15.sp) }
 
             val painelQr: @Composable (Modifier) -> Unit = { mod ->
                 PainelQr(qr, segundosParaTrocar, sessao, enviaram, mod)
@@ -160,7 +157,7 @@ fun ProjecaoScreen(
     if (confirmarEncerrar) {
         AlertDialog(
             onDismissRequest = { confirmarEncerrar = false },
-            containerColor = Cartao,
+            containerColor = Superficie,
             title = { Text("Encerrar a sessão?") },
             text = {
                 // O foco fica aqui para o Enter confirmar (Esc fecha o diálogo).
@@ -177,7 +174,7 @@ fun ProjecaoScreen(
             },
             confirmButton = {
                 Button(onClick = { confirmarEncerrar = false; onEncerrarSessao() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Revisar), modifier = Modifier.maoAoPassar()) { Text("Encerrar") }
+                    colors = ButtonDefaults.buttonColors(containerColor = Erro), modifier = Modifier.maoAoPassar()) { Text("Encerrar") }
             },
             dismissButton = { TextButton(onClick = { confirmarEncerrar = false }, modifier = Modifier.maoAoPassar()) { Text("Continuar") } },
         )
@@ -188,36 +185,36 @@ fun ProjecaoScreen(
 private fun PainelQr(qr: TokenQr?, segundosParaTrocar: Int, sessao: SessaoSala?, enviaram: Int, modifier: Modifier) {
     val avisar = LocalAvisar.current
     val area = LocalClipboardManager.current
-    Surface(shape = RoundedCornerShape(28.dp), color = Cartao, modifier = modifier) {
+    Surface(shape = RoundedCornerShape(28.dp), color = Superficie, modifier = modifier) {
         Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)) {
             when {
-                sessao == null -> CircularProgressIndicator(color = Consolidado)
+                sessao == null -> CircularProgressIndicator(color = Primaria)
                 !sessao.aberta -> MensagemGrande(
                     "Sessão encerrada",
                     if (enviaram > 0) "Obrigado! O grafo da turma já tem as respostas." else "Ninguém enviou respostas nesta sessão.",
                 )
                 !sessao.entradaAberta -> MensagemGrande("Entrada encerrada", "Quem já entrou ainda pode enviar as respostas.")
-                qr == null -> CircularProgressIndicator(color = Consolidado)
+                qr == null -> CircularProgressIndicator(color = Primaria)
                 else -> {
-                    Text("Aponte a câmera do celular para o código", color = TextoPrincipal, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Aponte a câmera do celular para o código", color = Tinta, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
                     CodigoQr(qr.url, Modifier.weight(1f).aspectRatio(1f))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(
                                 progress = { segundosParaTrocar / ProjecaoViewModel.INTERVALO_QR.toFloat() },
-                                modifier = Modifier.size(40.dp), color = Consolidado, trackColor = Trilho, strokeWidth = 4.dp,
+                                modifier = Modifier.size(40.dp), color = Primaria, trackColor = Borda, strokeWidth = 4.dp,
                             )
-                            Text("$segundosParaTrocar", color = TextoPrincipal, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("$segundosParaTrocar", color = Tinta, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         }
                         Spacer(Modifier.width(12.dp))
-                        Text("O código muda a cada ${ProjecaoViewModel.INTERVALO_QR} s · ${host(qr.url)}", color = TextoSecundario, fontSize = 16.sp)
+                        Text("O código muda a cada ${ProjecaoViewModel.INTERVALO_QR} s · ${host(qr.url)}", color = TintaSuave, fontSize = 16.sp)
                         Spacer(Modifier.width(8.dp))
                         // Para ensaiar sem celular (scripts/simular-aluno.ts); o link vale ~40 s.
                         TextButton(onClick = {
                             area.setText(AnnotatedString(qr.url))
                             avisar("Link do QR copiado (vale ~40 s)")
-                        }, modifier = Modifier.maoAoPassar()) { Text("Copiar link", color = TextoSecundario, fontSize = 14.sp) }
+                        }, modifier = Modifier.maoAoPassar()) { Text("Copiar link", color = TintaSuave, fontSize = 14.sp) }
                     }
                 }
             }
@@ -227,25 +224,25 @@ private fun PainelQr(qr: TokenQr?, segundosParaTrocar: Int, sessao: SessaoSala?,
 
 @Composable
 private fun PainelParticipantes(participantes: List<Participante>, enviaram: Int, modifier: Modifier) {
-    Surface(shape = RoundedCornerShape(28.dp), color = Cartao, modifier = modifier) {
+    Surface(shape = RoundedCornerShape(28.dp), color = Superficie, modifier = modifier) {
         Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Contador(participantes.size, "entraram", Modifier.weight(1f))
                 Contador(enviaram, "enviaram", Modifier.weight(1f))
             }
             if (participantes.isEmpty()) {
-                Text("Ninguém entrou ainda.", color = TextoSecundario, fontSize = 18.sp)
+                Text("Ninguém entrou ainda.", color = TintaSuave, fontSize = 18.sp)
             } else {
                 // Quem ainda responde primeiro; depois quem enviou, pela ordem de envio.
                 val ordem = participantes.sortedWith(compareBy<Participante>({ it.enviou }, { it.enviadaEm ?: it.iniciadaEm }))
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(ordem, key = { it.tentativaId }) { p ->
-                        Row(Modifier.fillMaxWidth().background(if (p.enviou) AzulFundo else Pilula, RoundedCornerShape(14.dp))
+                        Row(Modifier.fillMaxWidth().background(if (p.enviou) Menta else MentaSuave, RoundedCornerShape(14.dp))
                             .padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(p.nome, color = TextoPrincipal, fontSize = 18.sp, modifier = Modifier.weight(1f), maxLines = 1)
+                            Text(p.nome, color = Tinta, fontSize = 18.sp, modifier = Modifier.weight(1f), maxLines = 1)
                             Text(
                                 if (p.enviou) "✓ enviou" else "… respondendo",
-                                color = if (p.enviou) EtiquetaAzulTexto else TextoCorpo, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                                color = if (p.enviou) Tinta else TintaSuave, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
                             )
                         }
                     }
@@ -258,24 +255,24 @@ private fun PainelParticipantes(participantes: List<Participante>, enviaram: Int
 @Composable
 private fun Contador(numero: Int, legenda: String, modifier: Modifier) {
     Column(modifier.background(Fundo, RoundedCornerShape(20.dp)).padding(horizontal = 20.dp, vertical = 14.dp)) {
-        Text("$numero", color = TextoPrincipal, fontSize = 48.sp, fontWeight = FontWeight.Bold)
-        Text(legenda, color = TextoSecundario, fontSize = 17.sp)
+        Text("$numero", color = Tinta, fontSize = 48.sp, fontWeight = FontWeight.Bold)
+        Text(legenda, color = TintaSuave, fontSize = 17.sp)
     }
 }
 
 @Composable
 private fun IndicadorAoVivo(ligado: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(10.dp).background(if (ligado) Consolidado else Trilho, CircleShape))
+        Box(Modifier.size(10.dp).background(if (ligado) Primaria else Borda, CircleShape))
         Spacer(Modifier.width(6.dp))
-        Text(if (ligado) "ao vivo" else "atualiza a cada 10 s", color = TextoSecundario, fontSize = 14.sp)
+        Text(if (ligado) "ao vivo" else "atualiza a cada 10 s", color = TintaSuave, fontSize = 14.sp)
     }
 }
 
 @Composable
 private fun MensagemGrande(titulo: String, texto: String) {
-    Text(titulo, color = TextoPrincipal, fontSize = 40.sp, fontWeight = FontWeight.Bold)
-    Text(texto, color = TextoCorpo, fontSize = 20.sp, textAlign = TextAlign.Center)
+    Text(titulo, color = Tinta, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+    Text(texto, color = TintaSuave, fontSize = 20.sp, textAlign = TextAlign.Center)
     Spacer(Modifier.height(8.dp))
 }
 

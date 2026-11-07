@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,22 +35,20 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import org.jetbrains.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.edutec.app.data.DadosExemplo
 import com.edutec.app.data.PedidoGeracao
-import com.edutec.app.ui.theme.Cartao
-import com.edutec.app.ui.theme.Consolidado
+import com.edutec.app.ui.theme.Borda
 import com.edutec.app.ui.theme.EdutecTheme
-import com.edutec.app.ui.theme.LaranjaFundo
-import com.edutec.app.ui.theme.Pilula
-import com.edutec.app.ui.theme.Revisar
-import com.edutec.app.ui.theme.TextoCorpo
-import com.edutec.app.ui.theme.TextoPrincipal
-import com.edutec.app.ui.theme.TextoSecundario
-import com.edutec.app.ui.theme.Trilho
+import com.edutec.app.ui.theme.Erro
+import com.edutec.app.ui.theme.MentaSuave
+import com.edutec.app.ui.theme.Primaria
+import com.edutec.app.ui.theme.Superficie
+import com.edutec.app.ui.theme.Tinta
+import com.edutec.app.ui.theme.TintaSuave
 import java.io.File
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 private val CantoCartao = RoundedCornerShape(24.dp)
 
@@ -58,21 +56,21 @@ private val CantoCartao = RoundedCornerShape(24.dp)
 @Composable
 fun GerandoConteudo(estado: EstadoGeracao.Gerando, onCancelar: () -> Unit, modifier: Modifier = Modifier) {
     CartaoCentral(modifier) {
-        CircularProgressIndicator(color = Consolidado, trackColor = Trilho, strokeWidth = 5.dp, modifier = Modifier.size(64.dp))
+        CircularProgressIndicator(color = Primaria, trackColor = Borda, strokeWidth = 5.dp, modifier = Modifier.size(64.dp))
         Text(
             formatarCronometro(estado.segundos),
-            color = TextoPrincipal, fontSize = 40.sp, fontWeight = FontWeight.Bold,
+            color = Tinta, fontSize = 40.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.semantics { contentDescription = "${estado.segundos} segundos" },
         )
         Text(
             "A IA está lendo o material e criando as questões — leva cerca de 1 minuto",
-            color = TextoPrincipal, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
+            color = Tinta, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
         )
-        Text(descreverPedido(estado.pedido), color = TextoSecundario, fontSize = 14.sp, textAlign = TextAlign.Center)
+        Text(descreverPedido(estado.pedido), color = TintaSuave, fontSize = 14.sp, textAlign = TextAlign.Center)
         if (estado.segundos >= 90) {
             Text(
                 "Está demorando mais que o normal. Você pode esperar mais um pouco ou cancelar.",
-                color = TextoCorpo, fontSize = 14.sp, textAlign = TextAlign.Center,
+                color = TintaSuave, fontSize = 14.sp, textAlign = TextAlign.Center,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
@@ -107,24 +105,24 @@ fun ErroGeracaoConteudo(
 
     CartaoCentral(modifier) {
         Box(
-            Modifier.size(64.dp).clip(CircleShape).background(LaranjaFundo),
+            Modifier.size(64.dp).clip(CircleShape).background(MentaSuave),
             contentAlignment = Alignment.Center,
-        ) { Text("!", color = Revisar, fontSize = 32.sp, fontWeight = FontWeight.Bold) }
+        ) { Text("!", color = Erro, fontSize = 32.sp, fontWeight = FontWeight.Bold) }
         Text(
             titulo,
-            color = TextoPrincipal, fontSize = 21.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+            color = Tinta, fontSize = 21.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
         )
-        Text(explicacao, color = TextoCorpo, fontSize = 15.sp, textAlign = TextAlign.Center)
+        Text(explicacao, color = TintaSuave, fontSize = 15.sp, textAlign = TextAlign.Center)
         estado.detalhe?.let {
-            Text("Detalhe: $it", color = TextoSecundario, fontSize = 13.sp, textAlign = TextAlign.Center)
+            Text("Detalhe: $it", color = TintaSuave, fontSize = 13.sp, textAlign = TextAlign.Center)
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.CheckCircle, null, tint = Consolidado, modifier = Modifier.size(18.dp))
+            Icon(Icons.Filled.CheckCircle, null, tint = Primaria, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(
                 "Nada foi perdido: suas escolhas e o PDF \"${estado.pedido.nomeArquivo}\" continuam aqui.",
-                color = Consolidado, fontSize = 14.sp,
+                color = Primaria, fontSize = 14.sp,
             )
         }
         Spacer(Modifier.height(4.dp))
@@ -132,7 +130,7 @@ fun ErroGeracaoConteudo(
             onClick = onTentarDeNovo,
             modifier = Modifier.fillMaxWidth().height(56.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Consolidado),
+            colors = ButtonDefaults.buttonColors(containerColor = Primaria),
         ) {
             Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
@@ -153,7 +151,7 @@ private fun CartaoCentral(modifier: Modifier, conteudo: @Composable () -> Unit) 
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            shape = CantoCartao, color = Cartao,
+            shape = CantoCartao, color = Superficie,
             modifier = Modifier.padding(vertical = 24.dp).widthIn(max = 560.dp).fillMaxWidth(),
         ) {
             Column(
@@ -171,7 +169,7 @@ private fun BotaoSecundario(texto: String, onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().height(50.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Pilula, contentColor = TextoPrincipal),
+        colors = ButtonDefaults.buttonColors(containerColor = MentaSuave, contentColor = Tinta),
     ) { Text(texto, fontWeight = FontWeight.SemiBold) }
 }
 

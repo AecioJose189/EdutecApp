@@ -18,6 +18,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
@@ -49,15 +50,13 @@ import com.edutec.app.data.ConceitoGrafo
 import com.edutec.app.data.DadosTurmaExemplo
 import com.edutec.app.data.GrafoTurma
 import com.edutec.app.data.PossivelDuplicata
-import com.edutec.app.ui.theme.AmareloTexto
-import com.edutec.app.ui.theme.Cartao
-import com.edutec.app.ui.theme.Consolidado
-import com.edutec.app.ui.theme.CremeFundo
 import com.edutec.app.ui.theme.EdutecTheme
 import com.edutec.app.ui.theme.Fundo
-import com.edutec.app.ui.theme.TextoCorpo
-import com.edutec.app.ui.theme.TextoPrincipal
-import com.edutec.app.ui.theme.TextoSecundario
+import com.edutec.app.ui.theme.MentaSuave
+import com.edutec.app.ui.theme.Primaria
+import com.edutec.app.ui.theme.Superficie
+import com.edutec.app.ui.theme.Tinta
+import com.edutec.app.ui.theme.TintaSuave
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 // UC05: juntar dois conceitos da turma que são o mesmo (nomes diferentes vindos de PDFs diferentes).
@@ -72,11 +71,11 @@ fun AvisoDuplicatas(duplicatas: List<PossivelDuplicata>, onRevisar: () -> Unit, 
     } else {
         "≈ ${duplicatas.size} pares de conceitos têm nomes parecidos e podem ser o mesmo conceito."
     }
-    Surface(shape = RoundedCornerShape(16.dp), color = CremeFundo, modifier = modifier) {
+    Surface(shape = RoundedCornerShape(16.dp), color = MentaSuave, modifier = modifier) {
         Row(Modifier.padding(start = 14.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(texto, color = AmareloTexto, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(vertical = 8.dp))
+            Text(texto, color = Tinta, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(vertical = 8.dp))
             TextButton(onClick = onRevisar, modifier = Modifier.maoAoPassar()) {
-                Text("Revisar", color = AmareloTexto, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text("Revisar", color = Primaria, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -119,16 +118,16 @@ private fun EscolherConceito(
 ) {
     AlertDialog(
         onDismissRequest = onFechar,
-        containerColor = Cartao,
+        containerColor = Superficie,
         title = { Text("Juntar \"${conceito.nome}\" com outro conceito") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     "Use quando os dois são o mesmo conceito com nomes diferentes (por exemplo, vindos de PDFs diferentes).",
-                    color = TextoCorpo, fontSize = 14.sp,
+                    color = TintaSuave, fontSize = 14.sp,
                 )
                 if (candidatos.isEmpty()) {
-                    Text("A turma não tem outros conceitos.", color = TextoSecundario, fontSize = 14.sp)
+                    Text("A turma não tem outros conceitos.", color = TintaSuave, fontSize = 14.sp)
                 }
                 LazyColumn(Modifier.heightIn(max = 340.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(candidatos, key = { it.conceito.nome }) { c ->
@@ -152,15 +151,15 @@ private fun LinhaCandidato(c: CandidatoJuntar, ocupado: Boolean, onEscolher: () 
     ) {
         Row(Modifier.padding(start = 14.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
-                Text(c.conceito.nome, color = TextoPrincipal, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(c.conceito.nome, color = Tinta, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
                     (if (c.parecido) "≈ nome parecido · " else "") + respostasTexto(c.conceito.respostas),
-                    color = if (c.parecido) AmareloTexto else TextoSecundario, fontSize = 12.sp,
+                    color = if (c.parecido) Primaria else TintaSuave, fontSize = 12.sp,
                 )
             }
             if (c.parecido) {
                 TextButton(onClick = onDistintos, enabled = !ocupado, modifier = Modifier.maoAoPassar()) {
-                    Text("São diferentes", fontSize = 12.sp, color = TextoSecundario)
+                    Text("São diferentes", fontSize = 12.sp, color = TintaSuave)
                 }
             }
         }
@@ -192,7 +191,7 @@ private fun ConfirmarJuntar(
 
     AlertDialog(
         onDismissRequest = { if (!juntando) onFechar() },
-        containerColor = Cartao,
+        containerColor = Superficie,
         title = { Text("Juntar os dois conceitos?") },
         text = {
             // O foco fica aqui para o Enter confirmar (Esc fecha o diálogo).
@@ -206,7 +205,7 @@ private fun ConfirmarJuntar(
                 },
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text("Nome que fica:", color = TextoSecundario, fontSize = 13.sp)
+                Text("Nome que fica:", color = TintaSuave, fontSize = 13.sp)
                 listOf(conceito, outro).forEach { c ->
                     Row(
                         Modifier.fillMaxWidth().maoAoPassar()
@@ -214,13 +213,13 @@ private fun ConfirmarJuntar(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = manter == c.nome, onClick = null, enabled = !juntando,
-                            colors = RadioButtonDefaults.colors(selectedColor = Consolidado))
-                        Text(c.nome, color = TextoPrincipal, fontSize = 15.sp, modifier = Modifier.padding(start = 8.dp))
+                            colors = RadioButtonDefaults.colors(selectedColor = Primaria))
+                        Text(c.nome, color = Tinta, fontSize = 15.sp, modifier = Modifier.padding(start = 8.dp))
                     }
                 }
                 Text(
                     "\"${origem.nome}\" deixa de existir e passa a fazer parte de \"${destino.nome}\":",
-                    color = TextoPrincipal, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                    color = Tinta, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     listOf(
@@ -229,20 +228,20 @@ private fun ConfirmarJuntar(
                         "${respostasTexto(origem.respostas).replaceFirstChar { it.uppercase() }} de \"${origem.nome}\" " +
                             "${if (origem.respostas == 1) "passa" else "passam"} a contar para \"${destino.nome}\", e o domínio " +
                             "estimado é recalculado com todas as respostas, na ordem em que foram dadas.",
-                    ).forEach { Text("• $it", color = TextoCorpo, fontSize = 13.sp) }
+                    ).forEach { Text("• $it", color = TintaSuave, fontSize = 13.sp) }
                 }
-                Text("Não dá para desfazer.", color = TextoSecundario, fontSize = 13.sp)
+                Text("Não dá para desfazer.", color = TintaSuave, fontSize = 13.sp)
             }
         },
         confirmButton = {
             Button(
                 onClick = confirmar,
                 enabled = !juntando,
-                colors = ButtonDefaults.buttonColors(containerColor = Consolidado),
+                colors = ButtonDefaults.buttonColors(containerColor = Primaria),
                 modifier = Modifier.maoAoPassar(),
             ) {
                 if (juntando) {
-                    CircularProgressIndicator(Modifier.size(16.dp), color = Cartao, strokeWidth = 2.dp)
+                    CircularProgressIndicator(Modifier.size(16.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
                 } else {
                     Text("Juntar")
                 }

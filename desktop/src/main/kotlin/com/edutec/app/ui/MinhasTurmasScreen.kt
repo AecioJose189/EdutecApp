@@ -1,5 +1,6 @@
 package com.edutec.app.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -52,58 +53,57 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import org.jetbrains.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.edutec.app.data.AtividadePendente
 import com.edutec.app.data.DadosExemplo
+import com.edutec.app.data.EstadoConceito
 import com.edutec.app.data.Turma
+import com.edutec.app.data.Usuario
 import com.edutec.app.data.rotuloAlunos
 import com.edutec.app.data.semDados
 import com.edutec.app.data.semestresRecentes
-import com.edutec.app.data.Usuario
-import com.edutec.app.ui.theme.AmareloFundo
-import com.edutec.app.ui.theme.AmareloIcone
-import com.edutec.app.ui.theme.AmareloTexto
-import com.edutec.app.ui.theme.AzulFundo
-import com.edutec.app.ui.theme.AzulNumero
-import com.edutec.app.ui.theme.AzulTexto
-import com.edutec.app.ui.theme.BordaTracejada
-import com.edutec.app.ui.theme.Cartao
-import com.edutec.app.ui.theme.Consolidado
+import com.edutec.app.ui.theme.Borda
+import com.edutec.app.ui.theme.BordaControle
 import com.edutec.app.ui.theme.EdutecTheme
-import com.edutec.app.ui.theme.EmDesenvolvimento
-import com.edutec.app.ui.theme.EtiquetaAzulFundo
-import com.edutec.app.ui.theme.EtiquetaAzulTexto
-import com.edutec.app.ui.theme.EtiquetaVermelhaFundo
-import com.edutec.app.ui.theme.EtiquetaVermelhaTexto
+import com.edutec.app.ui.theme.Erro
+import com.edutec.app.ui.theme.Espaco2
+import com.edutec.app.ui.theme.Espaco4
+import com.edutec.app.ui.theme.Espaco6
+import com.edutec.app.ui.theme.EspessuraBorda
+import com.edutec.app.ui.theme.EstadoConsolidado
+import com.edutec.app.ui.theme.EstadoDesenvolvimento
+import com.edutec.app.ui.theme.EstadoRevisar
+import com.edutec.app.ui.theme.EstiloApoio
+import com.edutec.app.ui.theme.EstiloNumero
 import com.edutec.app.ui.theme.Fundo
-import com.edutec.app.ui.theme.LaranjaFundo
-import com.edutec.app.ui.theme.LaranjaNumero
-import com.edutec.app.ui.theme.LaranjaTexto
-import com.edutec.app.ui.theme.Pilula
-import com.edutec.app.ui.theme.Revisar
-import com.edutec.app.ui.theme.TextoCorpo
-import com.edutec.app.ui.theme.TextoPrincipal
-import com.edutec.app.ui.theme.TextoSecundario
-import com.edutec.app.ui.theme.Trilho
+import com.edutec.app.ui.theme.Menta
+import com.edutec.app.ui.theme.MentaSuave
+import com.edutec.app.ui.theme.Primaria
+import com.edutec.app.ui.theme.RaioLg
+import com.edutec.app.ui.theme.SobrePrimaria
+import com.edutec.app.ui.theme.Superficie
+import com.edutec.app.ui.theme.Tinta
+import com.edutec.app.ui.theme.TintaSuave
+import com.edutec.app.ui.theme.comNumeros
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 private val CantoCartao = RoundedCornerShape(24.dp)
 private val EspacoGrade = 14.dp
@@ -235,7 +235,7 @@ private fun BarraSuperior(
     ) {
         Text(
             text = "LUMINI",
-            color = TextoPrincipal,
+            color = Tinta,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.5.sp,
@@ -246,7 +246,7 @@ private fun BarraSuperior(
             Surface(
                 onClick = { menuAberto = true },
                 shape = RoundedCornerShape(50),
-                color = Pilula,
+                color = MentaSuave,
             ) {
                 Row(
                     modifier = Modifier.padding(start = 18.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
@@ -254,7 +254,7 @@ private fun BarraSuperior(
                 ) {
                     Text(
                         text = "Semestre $semestre",
-                        color = TextoPrincipal,
+                        color = Tinta,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                     )
@@ -262,7 +262,7 @@ private fun BarraSuperior(
                     Icon(
                         imageVector = Icons.Filled.KeyboardArrowDown,
                         contentDescription = "Trocar semestre",
-                        tint = TextoPrincipal,
+                        tint = Tinta,
                         modifier = Modifier.size(20.dp),
                     )
                 }
@@ -294,18 +294,18 @@ private fun MenuUsuario(usuario: Usuario, onSair: () -> Unit) {
         Surface(
             onClick = { aberto = true },
             shape = RoundedCornerShape(50),
-            color = Pilula,
+            color = MentaSuave,
             modifier = Modifier.maoAoPassar(),
         ) {
             Row(Modifier.padding(start = 6.dp, end = 16.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 FotoUsuario(usuario.nome, usuario.fotoUrl, tamanho = 36.dp)
                 Spacer(Modifier.width(10.dp))
-                Text(usuario.nome, color = TextoPrincipal, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                Text(usuario.nome, color = Tinta, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1)
             }
         }
         DropdownMenu(expanded = aberto, onDismissRequest = { aberto = false }) {
             usuario.email?.let {
-                Text(it, color = TextoSecundario, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                Text(it, color = TintaSuave, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
             DropdownMenuItem(text = { Text("Sair") }, onClick = { aberto = false; onSair() })
         }
@@ -321,7 +321,7 @@ private fun Cabecalho(expandido: Boolean, mostrarLegenda: Boolean) {
     val titulo: @Composable () -> Unit = {
         Text(
             text = "Minhas turmas",
-            color = TextoPrincipal,
+            color = Tinta,
             fontSize = 30.sp,
             fontWeight = FontWeight.Bold,
         )
@@ -347,23 +347,16 @@ private fun Cabecalho(expandido: Boolean, mostrarLegenda: Boolean) {
 @Composable
 private fun Legenda() {
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        ItemLegenda(Consolidado, "Consolidado")
-        ItemLegenda(EmDesenvolvimento, "Em desenvolvimento")
-        ItemLegenda(Revisar, "Revisar")
+        EstadoConceito.entries.reversed().forEach { ItemLegenda(it) }
     }
 }
 
 @Composable
-private fun ItemLegenda(cor: Color, texto: String) {
+private fun ItemLegenda(estado: EstadoConceito) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(cor)
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(texto, color = TextoCorpo, fontSize = 13.sp)
+        SeloEstado(estado, tamanho = 18.dp)
+        Spacer(Modifier.width(Espaco2))
+        Text(estado.rotulo, color = TintaSuave, fontSize = 14.sp)
     }
 }
 
@@ -388,9 +381,7 @@ private fun Resumo(
         CartaoNumero(
             numero = conceitosARevisar.toString(),
             legenda = textoConceitos,
-            fundo = LaranjaFundo,
-            corNumero = LaranjaNumero,
-            corLegenda = LaranjaTexto,
+            estado = EstadoConceito.Revisar.takeIf { conceitosARevisar > 0 },
             modifier = mod,
         )
     }
@@ -398,9 +389,6 @@ private fun Resumo(
         CartaoNumero(
             numero = totalAlunos.toString(),
             legenda = "alunos neste semestre",
-            fundo = AzulFundo,
-            corNumero = AzulNumero,
-            corLegenda = AzulTexto,
             modifier = mod,
         )
     }
@@ -449,7 +437,7 @@ private fun CartaoAtividadePendente(
     val titulo = if (quantidade == 1) "1 atividade aguarda sua revisão"
     else "$quantidade atividades aguardam sua revisão"
 
-    Surface(shape = CantoCartao, color = AmareloFundo, modifier = modifier) {
+    Surface(shape = CantoCartao, color = MentaSuave, modifier = modifier) {
         Row(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -458,23 +446,23 @@ private fun CartaoAtividadePendente(
                 modifier = Modifier
                     .size(46.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(AmareloIcone),
+                    .background(Primaria),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Edit,
                     contentDescription = null,
-                    tint = TextoPrincipal,
+                    tint = SobrePrimaria,
                     modifier = Modifier.size(22.dp),
                 )
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(titulo, color = TextoPrincipal, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Text(descricao, color = AmareloTexto, fontSize = 14.sp)
+                Text(titulo, color = Tinta, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(descricao, color = Tinta, fontSize = 14.sp)
             }
             TextButton(onClick = onRevisar) {
-                Text("Revisar →", color = TextoPrincipal, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text("Revisar →", color = Primaria, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -484,18 +472,23 @@ private fun CartaoAtividadePendente(
 private fun CartaoNumero(
     numero: String,
     legenda: String,
-    fundo: Color,
-    corNumero: Color,
-    corLegenda: Color,
+    /** Estado de aprendizagem do número (ex.: conceitos a revisar), mostrado com o símbolo ao lado. */
+    estado: EstadoConceito? = null,
     modifier: Modifier = Modifier,
 ) {
-    Surface(shape = CantoCartao, color = fundo, modifier = modifier) {
+    Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = modifier) {
         Column(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+            modifier = Modifier.padding(horizontal = Espaco6, vertical = Espaco4),
             verticalArrangement = Arrangement.Center,
         ) {
-            Text(numero, color = corNumero, fontSize = 30.sp, fontWeight = FontWeight.Bold)
-            Text(legenda, color = corLegenda, fontSize = 14.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(numero, color = Tinta, style = EstiloNumero)
+                if (estado != null) {
+                    Spacer(Modifier.width(Espaco2))
+                    SeloEstado(estado, tamanho = 24.dp)
+                }
+            }
+            Text(legenda, color = TintaSuave, fontSize = 14.sp)
         }
     }
 }
@@ -540,14 +533,14 @@ private fun GradeTurmas(
 
 @Composable
 private fun CartaoTurma(turma: Turma, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(onClick = onClick, shape = CantoCartao, color = Cartao, modifier = modifier.maoAoPassar()) {
+    Surface(onClick = onClick, shape = CantoCartao, color = Superficie, modifier = modifier.maoAoPassar()) {
         Column(Modifier.padding(horizontal = 22.dp, vertical = 20.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
-                    Text(turma.nome, color = TextoPrincipal, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                    Text(turma.nome, color = Tinta, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                     Text(
                         "${turma.codigo} · ${turma.rotuloAlunos}",
-                        color = TextoSecundario,
+                        color = TintaSuave,
                         fontSize = 14.sp,
                     )
                 }
@@ -562,15 +555,15 @@ private fun CartaoTurma(turma: Turma, onClick: () -> Unit, modifier: Modifier = 
             val semDados = turma.consolidado + turma.desenvolvimento + turma.revisar == 0
             Text(
                 text = if (semDados) "Sem dados de aprendizagem ainda"
-                else "${turma.consolidado}% consolidado · ${turma.desenvolvimento}% em desenvolvimento · " +
-                    "${turma.revisar}% revisar",
-                color = TextoCorpo,
-                fontSize = 14.sp,
+                else "✓ ${turma.consolidado}% consolidado · ~ ${turma.desenvolvimento}% em desenvolvimento · " +
+                    "! ${turma.revisar}% revisar",
+                color = TintaSuave,
+                style = EstiloApoio.comNumeros(),
             )
 
             Spacer(Modifier.height(20.dp))
             Spacer(Modifier.weight(1f))
-            Text(turma.rodape, color = TextoSecundario, fontSize = 13.sp)
+            Text(turma.rodape, color = TintaSuave, fontSize = 13.sp)
         }
     }
 }
@@ -578,15 +571,17 @@ private fun CartaoTurma(turma: Turma, onClick: () -> Unit, modifier: Modifier = 
 @Composable
 private fun EtiquetaTurma(turma: Turma) {
     val (texto, fundo, cor) = when {
-        turma.semDados -> Triple("Nova turma", EtiquetaAzulFundo, EtiquetaAzulTexto)
-        turma.conceitosARevisar > 0 -> Triple(
-            if (turma.conceitosARevisar == 1) "1 conceito a revisar"
-            else "${turma.conceitosARevisar} conceitos a revisar",
-            EtiquetaVermelhaFundo,
-            EtiquetaVermelhaTexto,
-        )
-        turma.status != null -> Triple(turma.status, EtiquetaAzulFundo, EtiquetaAzulTexto)
-        else -> Triple("Sem alertas", EtiquetaAzulFundo, EtiquetaAzulTexto)
+        turma.semDados -> Triple("Nova turma", Menta, Tinta)
+        turma.conceitosARevisar > 0 -> {
+            ChipEstado(
+                EstadoConceito.Revisar,
+                texto = if (turma.conceitosARevisar == 1) "1 conceito a revisar"
+                else "${turma.conceitosARevisar} conceitos a revisar",
+            )
+            return
+        }
+        turma.status != null -> Triple(turma.status, Menta, Tinta)
+        else -> Triple("Sem alertas", Menta, Tinta)
     }
 
     Surface(shape = RoundedCornerShape(50), color = fundo) {
@@ -603,9 +598,9 @@ private fun EtiquetaTurma(turma: Turma) {
 @Composable
 private fun BarraProgresso(consolidado: Int, desenvolvimento: Int, revisar: Int) {
     val segmentos = listOf(
-        consolidado to Consolidado,
-        desenvolvimento to EmDesenvolvimento,
-        revisar to Revisar,
+        consolidado to EstadoConsolidado,
+        desenvolvimento to EstadoDesenvolvimento,
+        revisar to EstadoRevisar,
     ).filter { it.first > 0 }
 
     Row(
@@ -614,7 +609,7 @@ private fun BarraProgresso(consolidado: Int, desenvolvimento: Int, revisar: Int)
             .height(12.dp)
             .clip(RoundedCornerShape(50))
             // Fundo branco faz o espaço entre os segmentos parecer um corte.
-            .background(if (segmentos.isEmpty()) Trilho else Cartao),
+            .background(if (segmentos.isEmpty()) Borda else Superficie),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         segmentos.forEach { (valor, cor) ->
@@ -630,6 +625,7 @@ private fun BarraProgresso(consolidado: Int, desenvolvimento: Int, revisar: Int)
 
 @Composable
 private fun CartaoNovaTurma(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val contorno = BordaControle
     Box(
         modifier = modifier
             .heightIn(min = 180.dp)
@@ -639,10 +635,10 @@ private fun CartaoNovaTurma(onClick: () -> Unit, modifier: Modifier = Modifier) 
             .drawBehind {
                 val espessura = 2.dp.toPx()
                 drawRoundRect(
-                    color = BordaTracejada,
+                    color = contorno,
                     topLeft = Offset(espessura / 2, espessura / 2),
                     size = Size(size.width - espessura, size.height - espessura),
-                    cornerRadius = CornerRadius(24.dp.toPx()),
+                    cornerRadius = CornerRadius(RaioLg.toPx()),
                     style = Stroke(
                         width = espessura,
                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx())),
@@ -656,18 +652,18 @@ private fun CartaoNovaTurma(onClick: () -> Unit, modifier: Modifier = Modifier) 
                 modifier = Modifier
                     .size(54.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(AzulFundo),
+                    .background(MentaSuave),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
                     contentDescription = null,
-                    tint = Consolidado,
+                    tint = Primaria,
                     modifier = Modifier.size(26.dp),
                 )
             }
             Spacer(Modifier.height(12.dp))
-            Text("Nova turma", color = Consolidado, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            Text("Nova turma", color = Primaria, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -678,31 +674,31 @@ private fun CartaoNovaTurma(onClick: () -> Unit, modifier: Modifier = Modifier) 
 
 @Composable
 private fun EstadoVazioTurmas(onNovaTurma: () -> Unit) {
-    Surface(shape = CantoCartao, color = Cartao, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = CantoCartao, color = Superficie, modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 48.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Box(
-                Modifier.size(64.dp).clip(RoundedCornerShape(18.dp)).background(AzulFundo),
+                Modifier.size(64.dp).clip(RoundedCornerShape(18.dp)).background(MentaSuave),
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Filled.Add, null, tint = Consolidado, modifier = Modifier.size(30.dp)) }
+            ) { Icon(Icons.Filled.Add, null, tint = Primaria, modifier = Modifier.size(30.dp)) }
             Text(
                 "Nenhuma turma ainda",
-                color = TextoPrincipal, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+                color = Tinta, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
             )
             Text(
                 "Crie a primeira turma para enviar materiais em PDF, gerar atividades com a IA e, quando os " +
                     "alunos responderem, acompanhar o domínio estimado de cada conceito.",
-                color = TextoCorpo, fontSize = 15.sp, textAlign = TextAlign.Center,
+                color = TintaSuave, fontSize = 15.sp, textAlign = TextAlign.Center,
                 modifier = Modifier.widthIn(max = 560.dp),
             )
             Spacer(Modifier.height(4.dp))
             Button(
                 onClick = onNovaTurma,
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Consolidado),
+                colors = ButtonDefaults.buttonColors(containerColor = Primaria),
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
             ) {
                 Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -719,42 +715,42 @@ private fun EstadoVazioTurmas(onNovaTurma: () -> Unit) {
 
 @Composable
 private fun CarregandoTurmas() {
-    Surface(shape = CantoCartao, color = Cartao, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = CantoCartao, color = Superficie, modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 48.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            CircularProgressIndicator(color = Consolidado)
-            Text("Carregando suas turmas…", color = TextoCorpo, fontSize = 15.sp)
+            CircularProgressIndicator(color = Primaria)
+            Text("Carregando suas turmas…", color = TintaSuave, fontSize = 15.sp)
         }
     }
 }
 
 @Composable
 private fun ErroTurmas(mensagem: String, onTentarDeNovo: () -> Unit) {
-    Surface(shape = CantoCartao, color = Cartao, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = CantoCartao, color = Superficie, modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 48.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Box(
-                Modifier.size(64.dp).clip(CircleShape).background(EtiquetaVermelhaFundo),
+                Modifier.size(64.dp).clip(CircleShape).background(MentaSuave),
                 contentAlignment = Alignment.Center,
-            ) { Text("!", color = EtiquetaVermelhaTexto, fontSize = 26.sp, fontWeight = FontWeight.Bold) }
+            ) { Text("!", color = Erro, fontSize = 26.sp, fontWeight = FontWeight.Bold) }
             Text(
                 "Não foi possível carregar as turmas",
-                color = TextoPrincipal, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+                color = Tinta, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
             )
             Text(
-                mensagem, color = TextoCorpo, fontSize = 15.sp, textAlign = TextAlign.Center,
+                mensagem, color = TintaSuave, fontSize = 15.sp, textAlign = TextAlign.Center,
                 modifier = Modifier.widthIn(max = 560.dp),
             )
             Button(
                 onClick = onTentarDeNovo,
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Consolidado),
+                colors = ButtonDefaults.buttonColors(containerColor = Primaria),
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
             ) { Text("Tentar de novo", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
         }
@@ -790,7 +786,7 @@ private fun DialogoNovaTurma(
 
     AlertDialog(
         onDismissRequest = onCancelar,
-        containerColor = Cartao,
+        containerColor = Superficie,
         title = { Text("Nova turma", fontWeight = FontWeight.Bold) },
         text = {
             // Enter em qualquer campo confirma (Esc fecha o diálogo).
@@ -817,12 +813,12 @@ private fun DialogoNovaTurma(
                 )
                 if (criando) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Consolidado)
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Primaria)
                         Spacer(Modifier.width(10.dp))
-                        Text("Criando a turma…", color = TextoCorpo, fontSize = 14.sp)
+                        Text("Criando a turma…", color = TintaSuave, fontSize = 14.sp)
                     }
                 }
-                falha?.let { Text(it, color = EtiquetaVermelhaTexto, fontSize = 14.sp) }
+                falha?.let { Text(it, color = Erro, fontSize = 14.sp) }
             }
         },
         confirmButton = {
