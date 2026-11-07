@@ -352,7 +352,8 @@ private fun ItemQuestao(indice: Int, questao: QuestaoGerada, selecionada: Boolea
             }
             Text(
                 textoSimplesComLatex(questao.enunciado),
-                color = TintaSuave, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                // Sobre menta, texto sempre tinta (tinta-suave fica abaixo de 4,5:1).
+                color = if (selecionada) Tinta else TintaSuave, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -437,7 +438,7 @@ private fun LinhaAlternativa(indice: Int, alternativa: AlternativaGerada) {
                     fontSize = 15.sp,
                     fontWeight = if (alternativa.correta) FontWeight.SemiBold else FontWeight.Normal,
                 )
-                Text(textoComLatex(alternativa.feedback), color = TintaSuave, fontSize = 13.sp)
+                Text(textoComLatex(alternativa.feedback), color = if (alternativa.correta) Tinta else TintaSuave, fontSize = 13.sp)
             }
         }
     }

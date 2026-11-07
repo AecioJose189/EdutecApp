@@ -96,6 +96,7 @@ import com.edutec.app.ui.theme.Espaco4
 import com.edutec.app.ui.theme.Espaco6
 import com.edutec.app.ui.theme.Espaco8
 import com.edutec.app.ui.theme.EspessuraBorda
+import com.edutec.app.ui.theme.EstiloApoio
 import com.edutec.app.ui.theme.FormaLg
 import com.edutec.app.ui.theme.FormaMd
 import com.edutec.app.ui.theme.FormaPilula
@@ -112,6 +113,7 @@ import com.edutec.app.ui.theme.Superficie
 import com.edutec.app.ui.theme.Tinta
 import com.edutec.app.ui.theme.TintaSuave
 import com.edutec.app.ui.theme.Transparente
+import com.edutec.app.ui.theme.comNumeros
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
@@ -607,7 +609,7 @@ private fun ChipConceito(conceito: Conceito, selecionado: Boolean, onClick: () -
                 fontWeight = if (selecionado) FontWeight.Bold else FontWeight.Normal,
             )
             Spacer(Modifier.width(Espaco2))
-            Text("${conceito.dominio}%", color = TintaSuave, fontSize = 12.sp)
+            Text("${conceito.dominio}%", color = if (selecionado) Tinta else TintaSuave, style = EstiloApoio.comNumeros(), fontSize = 12.sp)
         }
     }
 }
