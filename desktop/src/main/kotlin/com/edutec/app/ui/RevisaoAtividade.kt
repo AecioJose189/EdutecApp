@@ -57,11 +57,21 @@ import com.edutec.app.data.QuestaoGerada
 import com.edutec.app.ui.theme.Borda
 import com.edutec.app.ui.theme.EdutecTheme
 import com.edutec.app.ui.theme.Erro
+import com.edutec.app.ui.theme.Espaco1
+import com.edutec.app.ui.theme.Espaco2
+import com.edutec.app.ui.theme.Espaco3
+import com.edutec.app.ui.theme.Espaco4
+import com.edutec.app.ui.theme.Espaco6
+import com.edutec.app.ui.theme.EspessuraBorda
+import com.edutec.app.ui.theme.FormaLg
+import com.edutec.app.ui.theme.FormaMd
+import com.edutec.app.ui.theme.FormaPilula
 import com.edutec.app.ui.theme.Fundo
 import com.edutec.app.ui.theme.Menta
 import com.edutec.app.ui.theme.MentaSuave
 import com.edutec.app.ui.theme.Primaria
 import com.edutec.app.ui.theme.SobrePrimaria
+import com.edutec.app.ui.theme.Sora
 import com.edutec.app.ui.theme.Superficie
 import com.edutec.app.ui.theme.Tinta
 import com.edutec.app.ui.theme.TintaSuave
@@ -70,8 +80,8 @@ import java.util.Locale
 import java.util.TimeZone
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
-private val CantoCartao = RoundedCornerShape(24.dp)
-private val Espaco = 14.dp
+private val CantoCartao = FormaLg
+private val Espaco = Espaco4
 
 /**
  * Etapa 4: revisão das questões geradas (só leitura nesta versão).
@@ -94,16 +104,16 @@ fun RevisaoConteudo(
             AvisoRevisao(estado, onGerarNovas)
             CartaoConceitos(atividade.conceitos, emUmaLinha = true)
             Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(Espaco)) {
-                Surface(shape = CantoCartao, color = Superficie, modifier = Modifier.width(380.dp).fillMaxHeight()) {
+                Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = Modifier.width(380.dp).fillMaxHeight()) {
                     LazyColumn(
-                        contentPadding = PaddingValues(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(Espaco4),
+                        verticalArrangement = Arrangement.spacedBy(Espaco3),
                     ) {
                         item {
                             Text(
                                 "Questões (${atividade.questoes.size})",
-                                color = Tinta, fontSize = 19.sp, fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(start = 8.dp, top = 6.dp, bottom = 4.dp),
+                                color = Tinta, fontFamily = Sora, fontSize = 19.sp, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(start = Espaco2, top = Espaco2, bottom = Espaco1),
                             )
                         }
                         itemsIndexed(atividade.questoes) { i, q ->
@@ -112,8 +122,8 @@ fun RevisaoConteudo(
                     }
                 }
                 atividade.questoes.getOrNull(selecionada)?.let { q ->
-                    Surface(shape = CantoCartao, color = Superficie, modifier = Modifier.weight(1f).fillMaxHeight()) {
-                        Box(Modifier.verticalScroll(rememberScrollState()).padding(22.dp)) {
+                    Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        Box(Modifier.verticalScroll(rememberScrollState()).padding(Espaco6)) {
                             DetalheQuestao(selecionada, q)
                         }
                     }
@@ -126,8 +136,8 @@ fun RevisaoConteudo(
             item { AvisoRevisao(estado, onGerarNovas) }
             item { CartaoConceitos(atividade.conceitos, emUmaLinha = false) }
             itemsIndexed(atividade.questoes) { i, q ->
-                Surface(shape = CantoCartao, color = Superficie, modifier = Modifier.fillMaxWidth()) {
-                    Box(Modifier.padding(20.dp)) { DetalheQuestao(i, q) }
+                Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = Modifier.fillMaxWidth()) {
+                    Box(Modifier.padding(Espaco6)) { DetalheQuestao(i, q) }
                 }
             }
             item { BarraPublicar(estado, onPublicar) }
@@ -138,8 +148,8 @@ fun RevisaoConteudo(
 @Composable
 private fun AvisoRevisao(estado: EstadoGeracao.Concluido, onGerarNovas: () -> Unit) {
     val atividade = estado.resultado
-    Surface(shape = RoundedCornerShape(18.dp), color = MentaSuave, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Surface(shape = FormaLg, color = MentaSuave, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = Espaco4, vertical = Espaco4), verticalArrangement = Arrangement.spacedBy(Espaco1)) {
             Text(
                 buildString {
                     if (atividade.reaproveitado) {
@@ -166,17 +176,17 @@ private fun AvisoRevisao(estado: EstadoGeracao.Concluido, onGerarNovas: () -> Un
 @Composable
 private fun AvisoReaproveitado(geradoEm: String?, onGerarNovas: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(18.dp), color = Superficie, border = BorderStroke(1.dp, Borda),
+        shape = FormaLg, color = Superficie, border = BorderStroke(1.dp, Borda),
         modifier = Modifier.fillMaxWidth(),
     ) {
         FlowRow(
-            modifier = Modifier.padding(start = 18.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(start = Espaco4, end = Espaco3, top = Espaco2, bottom = Espaco2),
+            horizontalArrangement = Arrangement.spacedBy(Espaco3),
+            verticalArrangement = Arrangement.spacedBy(Espaco1),
         ) {
             Row(Modifier.align(Alignment.CenterVertically), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Info, null, tint = TintaSuave, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Espaco2))
                 Text(
                     "Este material já tinha sido processado em ${formatarData(geradoEm)} — resultado " +
                         "reaproveitado, sem nova chamada à IA",
@@ -216,10 +226,10 @@ private fun BarraPublicar(estado: EstadoGeracao.Concluido, onPublicar: () -> Uni
         append(" · ")
         append(pedido.tempoMinutos?.let { "$it min por tentativa" } ?: "sem limite de tempo")
     }
-    Surface(shape = CantoCartao, color = Superficie, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(horizontal = Espaco6, vertical = Espaco4),
+            horizontalArrangement = Arrangement.spacedBy(Espaco4),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -238,13 +248,13 @@ private fun BarraPublicar(estado: EstadoGeracao.Concluido, onPublicar: () -> Uni
             Button(
                 onClick = onPublicar,
                 enabled = !estado.publicando,
-                shape = RoundedCornerShape(16.dp),
+                shape = FormaMd,
                 colors = ButtonDefaults.buttonColors(containerColor = Primaria),
-                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 14.dp),
+                contentPadding = PaddingValues(horizontal = Espaco6, vertical = Espaco4),
             ) {
                 if (estado.publicando) {
                     CircularProgressIndicator(Modifier.size(18.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
-                    Spacer(Modifier.width(10.dp))
+                    Spacer(Modifier.width(Espaco3))
                     Text("Publicando…", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 } else {
                     Text("Publicar para a turma", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
@@ -264,32 +274,32 @@ private fun CartaoConceitos(conceitos: List<ConceitoGerado>, emUmaLinha: Boolean
     val legenda: @Composable () -> Unit = {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Info, null, tint = TintaSuave, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(Espaco2))
             Text(
                 "? = sem dados: o domínio estimado aparece depois que os alunos responderem.",
                 color = TintaSuave, fontSize = 12.sp,
             )
         }
     }
-    Surface(shape = CantoCartao, color = Superficie, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(if (emUmaLinha) 16.dp else 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(if (emUmaLinha) 16.dp else 20.dp), verticalArrangement = Arrangement.spacedBy(Espaco3)) {
             if (emUmaLinha) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Conceitos extraídos", color = Tinta, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.width(16.dp))
+                    Text("Conceitos extraídos", color = Tinta, fontFamily = Sora, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(Espaco4))
                     legenda()
                 }
                 Row(
                     Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Espaco3),
                 ) {
                     conceitos.forEach { CartaoConceito(it) }
                 }
             } else {
-                Text("Conceitos extraídos", color = Tinta, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                Text("Conceitos extraídos", color = Tinta, fontFamily = Sora, fontSize = 19.sp, fontWeight = FontWeight.Bold)
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Espaco3),
+                    verticalArrangement = Arrangement.spacedBy(Espaco3),
                 ) {
                     conceitos.forEach { CartaoConceito(it) }
                 }
@@ -301,10 +311,10 @@ private fun CartaoConceitos(conceitos: List<ConceitoGerado>, emUmaLinha: Boolean
 
 @Composable
 private fun CartaoConceito(conceito: ConceitoGerado) {
-    Surface(shape = RoundedCornerShape(16.dp), color = Fundo, border = BorderStroke(1.dp, Borda)) {
-        Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Surface(shape = FormaMd, color = Fundo, border = BorderStroke(1.dp, Borda)) {
+        Row(Modifier.padding(horizontal = Espaco4, vertical = Espaco3), verticalAlignment = Alignment.CenterVertically) {
             SeloEstado(null)
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(Espaco3))
             Column {
                 Text(conceito.nome, color = Tinta, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 Text(
@@ -325,19 +335,19 @@ private fun CartaoConceito(conceito: ConceitoGerado) {
 private fun ItemQuestao(indice: Int, questao: QuestaoGerada, selecionada: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
+        shape = FormaMd,
         color = if (selecionada) Menta else Superficie,
         border = if (selecionada) BorderStroke(2.dp, Primaria) else BorderStroke(1.dp, Borda),
         modifier = Modifier.fillMaxWidth().maoAoPassar(),
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.padding(Espaco4), verticalArrangement = Arrangement.spacedBy(Espaco2)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "Questão ${indice + 1}",
                     color = Tinta,
                     fontSize = 15.sp, fontWeight = FontWeight.Bold,
                 )
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(Espaco3))
                 EtiquetaTipo(questao)
             }
             Text(
@@ -350,18 +360,18 @@ private fun ItemQuestao(indice: Int, questao: QuestaoGerada, selecionada: Boolea
 
 @Composable
 private fun DetalheQuestao(indice: Int, questao: QuestaoGerada) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Espaco3)) {
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Espaco3),
+            verticalArrangement = Arrangement.spacedBy(Espaco2),
         ) {
-            Text("Questão ${indice + 1}", color = Tinta, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text("Questão ${indice + 1}", color = Tinta, fontFamily = Sora, fontSize = 19.sp, fontWeight = FontWeight.Bold)
             EtiquetaTipo(questao)
             questao.paginaOrigem?.let { Text("Página $it", color = TintaSuave, fontSize = 14.sp) }
         }
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Espaco2),
+            verticalArrangement = Arrangement.spacedBy(Espaco2),
         ) {
             questao.conceitos.forEach { ChipConceitoGerado(it) }
         }
@@ -379,20 +389,20 @@ private fun DetalheQuestao(indice: Int, questao: QuestaoGerada) {
 private fun EtiquetaTipo(questao: QuestaoGerada) {
     val (texto, fundo, cor) = if (questao.multiplaEscolha) Triple("Múltipla escolha", Menta, Tinta)
     else Triple("Aberta", MentaSuave, Primaria)
-    Surface(shape = RoundedCornerShape(50), color = fundo) {
+    Surface(shape = FormaPilula, color = fundo) {
         Text(
             texto, color = cor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = Espaco3, vertical = Espaco1),
         )
     }
 }
 
 @Composable
 private fun ChipConceitoGerado(nome: String) {
-    Surface(shape = RoundedCornerShape(50), color = Superficie, border = BorderStroke(1.dp, Borda)) {
+    Surface(shape = FormaPilula, color = Superficie, border = BorderStroke(1.dp, Borda)) {
         Text(
             nome, color = TintaSuave, fontSize = 13.sp,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = Espaco3, vertical = Espaco2),
         )
     }
 }
@@ -401,14 +411,14 @@ private fun ChipConceitoGerado(nome: String) {
 private fun LinhaAlternativa(indice: Int, alternativa: AlternativaGerada) {
     val letra = ('A' + indice).toString()
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = FormaMd,
         color = if (alternativa.correta) Menta else Superficie,
         border = if (alternativa.correta) BorderStroke(2.dp, Primaria) else BorderStroke(1.dp, Borda),
         modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
             contentDescription = "Alternativa $letra${if (alternativa.correta) ", correta" else ""}"
         },
     ) {
-        Row(Modifier.padding(14.dp)) {
+        Row(Modifier.padding(Espaco4)) {
             Box(
                 Modifier.size(30.dp).clip(CircleShape).background(if (alternativa.correta) Primaria else MentaSuave),
                 contentAlignment = Alignment.Center,
@@ -416,8 +426,8 @@ private fun LinhaAlternativa(indice: Int, alternativa: AlternativaGerada) {
                 if (alternativa.correta) Icon(Icons.Filled.Check, null, tint = SobrePrimaria, modifier = Modifier.size(18.dp))
                 else Text(letra, color = TintaSuave, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Spacer(Modifier.width(Espaco3))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Espaco1)) {
                 if (alternativa.correta) {
                     Text("$letra · Correta", color = Primaria, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
@@ -435,8 +445,8 @@ private fun LinhaAlternativa(indice: Int, alternativa: AlternativaGerada) {
 
 @Composable
 private fun Rubrica(rubrica: String) {
-    Surface(shape = RoundedCornerShape(18.dp), color = MentaSuave, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Surface(shape = FormaLg, color = MentaSuave, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Espaco4), verticalArrangement = Arrangement.spacedBy(Espaco2)) {
             Text("Rubrica de correção", color = Primaria, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Text(textoComLatex(rubrica), color = Tinta, fontSize = 15.sp, lineHeight = 22.sp)
         }

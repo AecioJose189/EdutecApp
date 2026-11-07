@@ -51,6 +51,11 @@ import com.edutec.app.data.DadosTurmaExemplo
 import com.edutec.app.data.GrafoTurma
 import com.edutec.app.data.PossivelDuplicata
 import com.edutec.app.ui.theme.EdutecTheme
+import com.edutec.app.ui.theme.Espaco1
+import com.edutec.app.ui.theme.Espaco2
+import com.edutec.app.ui.theme.Espaco3
+import com.edutec.app.ui.theme.Espaco4
+import com.edutec.app.ui.theme.FormaMd
 import com.edutec.app.ui.theme.Fundo
 import com.edutec.app.ui.theme.MentaSuave
 import com.edutec.app.ui.theme.Primaria
@@ -71,9 +76,9 @@ fun AvisoDuplicatas(duplicatas: List<PossivelDuplicata>, onRevisar: () -> Unit, 
     } else {
         "≈ ${duplicatas.size} pares de conceitos têm nomes parecidos e podem ser o mesmo conceito."
     }
-    Surface(shape = RoundedCornerShape(16.dp), color = MentaSuave, modifier = modifier) {
-        Row(Modifier.padding(start = 14.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(texto, color = Tinta, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(vertical = 8.dp))
+    Surface(shape = FormaMd, color = MentaSuave, modifier = modifier) {
+        Row(Modifier.padding(start = Espaco4, end = Espaco1), verticalAlignment = Alignment.CenterVertically) {
+            Text(texto, color = Tinta, fontSize = 13.sp, modifier = Modifier.weight(1f).padding(vertical = Espaco2))
             TextButton(onClick = onRevisar, modifier = Modifier.maoAoPassar()) {
                 Text("Revisar", color = Primaria, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
@@ -121,7 +126,7 @@ private fun EscolherConceito(
         containerColor = Superficie,
         title = { Text("Juntar \"${conceito.nome}\" com outro conceito") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Espaco3)) {
                 Text(
                     "Use quando os dois são o mesmo conceito com nomes diferentes (por exemplo, vindos de PDFs diferentes).",
                     color = TintaSuave, fontSize = 14.sp,
@@ -129,7 +134,7 @@ private fun EscolherConceito(
                 if (candidatos.isEmpty()) {
                     Text("A turma não tem outros conceitos.", color = TintaSuave, fontSize = 14.sp)
                 }
-                LazyColumn(Modifier.heightIn(max = 340.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                LazyColumn(Modifier.heightIn(max = 340.dp), verticalArrangement = Arrangement.spacedBy(Espaco2)) {
                     items(candidatos, key = { it.conceito.nome }) { c ->
                         LinhaCandidato(c, ocupado, onEscolher = { onEscolher(c.conceito.nome) },
                             onDistintos = { onDistintos(conceito.nome, c.conceito.nome) })
@@ -145,12 +150,12 @@ private fun EscolherConceito(
 @Composable
 private fun LinhaCandidato(c: CandidatoJuntar, ocupado: Boolean, onEscolher: () -> Unit, onDistintos: () -> Unit) {
     Surface(
-        shape = RoundedCornerShape(14.dp),
+        shape = FormaMd,
         color = Fundo,
         modifier = Modifier.fillMaxWidth().maoAoPassar().clickable(enabled = !ocupado, role = Role.Button, onClick = onEscolher),
     ) {
-        Row(Modifier.padding(start = 14.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
+        Row(Modifier.padding(start = Espaco4, end = Espaco1), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(vertical = Espaco3)) {
                 Text(c.conceito.nome, color = Tinta, fontSize = 15.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
                     (if (c.parecido) "≈ nome parecido · " else "") + respostasTexto(c.conceito.respostas),
@@ -203,7 +208,7 @@ private fun ConfirmarJuntar(
                     if (enter && it.type == KeyEventType.KeyDown) confirmar()
                     enter
                 },
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(Espaco3),
             ) {
                 Text("Nome que fica:", color = TintaSuave, fontSize = 13.sp)
                 listOf(conceito, outro).forEach { c ->
@@ -214,14 +219,14 @@ private fun ConfirmarJuntar(
                     ) {
                         RadioButton(selected = manter == c.nome, onClick = null, enabled = !juntando,
                             colors = RadioButtonDefaults.colors(selectedColor = Primaria))
-                        Text(c.nome, color = Tinta, fontSize = 15.sp, modifier = Modifier.padding(start = 8.dp))
+                        Text(c.nome, color = Tinta, fontSize = 15.sp, modifier = Modifier.padding(start = Espaco2))
                     }
                 }
                 Text(
                     "\"${origem.nome}\" deixa de existir e passa a fazer parte de \"${destino.nome}\":",
                     color = Tinta, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(Espaco1)) {
                     listOf(
                         "as questões de \"${origem.nome}\" passam a avaliar \"${destino.nome}\";",
                         "os pré-requisitos dos dois são somados, e o que dependia de \"${origem.nome}\" passa a depender de \"${destino.nome}\";",

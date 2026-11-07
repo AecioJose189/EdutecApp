@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.edutec.app.data.EstadoConceito
 import com.edutec.app.ui.theme.Espaco1
+import com.edutec.app.ui.theme.Espaco2
 import com.edutec.app.ui.theme.Espaco3
 import com.edutec.app.ui.theme.EstadoConsolidado
 import com.edutec.app.ui.theme.EstadoDesenvolvimento
@@ -158,7 +159,7 @@ fun ChipEstado(estado: EstadoConceito?, modifier: Modifier = Modifier, texto: St
             )
             .padding(horizontal = Espaco3, vertical = Espaco1),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(Espaco2),
     ) {
         Text(simbolo, color = corTexto, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Text(rotulo, color = corTexto, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)

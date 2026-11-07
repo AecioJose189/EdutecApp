@@ -1,5 +1,6 @@
 package com.edutec.app.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,10 +30,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.edutec.app.ui.theme.Borda
 import com.edutec.app.ui.theme.EdutecTheme
 import com.edutec.app.ui.theme.Erro
+import com.edutec.app.ui.theme.Espaco1
+import com.edutec.app.ui.theme.Espaco3
+import com.edutec.app.ui.theme.Espaco4
+import com.edutec.app.ui.theme.Espaco6
+import com.edutec.app.ui.theme.Espaco8
+import com.edutec.app.ui.theme.EspessuraBorda
+import com.edutec.app.ui.theme.FormaLg
+import com.edutec.app.ui.theme.FormaMd
 import com.edutec.app.ui.theme.Fundo
 import com.edutec.app.ui.theme.Primaria
+import com.edutec.app.ui.theme.Sora
 import com.edutec.app.ui.theme.Superficie
 import com.edutec.app.ui.theme.Tinta
 import com.edutec.app.ui.theme.TintaSuave
@@ -52,23 +63,23 @@ fun LoginScreen(
     val avisar = LocalAvisar.current
     val area = LocalClipboardManager.current
     Box(modifier.fillMaxSize().background(Fundo), contentAlignment = Alignment.Center) {
-        Surface(shape = RoundedCornerShape(28.dp), color = Superficie, modifier = Modifier.widthIn(max = 460.dp).padding(24.dp)) {
+        Surface(shape = FormaLg, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = Modifier.widthIn(max = 460.dp).padding(Espaco6)) {
             Column(
-                Modifier.padding(horizontal = 40.dp, vertical = 36.dp),
+                Modifier.padding(horizontal = Espaco8, vertical = Espaco8),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(Espaco4),
             ) {
-                Text("LUMINI", color = Tinta, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text("LUMINI", color = Tinta, fontFamily = Sora, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                 Text(
                     "Grafo de conhecimento da turma e domínio estimado de cada conceito.",
                     color = TintaSuave, fontSize = 15.sp, textAlign = TextAlign.Center,
                 )
                 aviso?.let { Text(it, color = TintaSuave, fontSize = 14.sp, textAlign = TextAlign.Center) }
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(Espaco1))
                 if (entrando) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Primaria)
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(Espaco3))
                         Text("Continue no navegador…", color = TintaSuave, fontSize = 15.sp)
                     }
                     if (urlLogin != null) {
@@ -81,7 +92,7 @@ fun LoginScreen(
                 } else {
                     Button(
                         onClick = onEntrar,
-                        shape = RoundedCornerShape(16.dp),
+                        shape = FormaMd,
                         colors = ButtonDefaults.buttonColors(containerColor = Primaria),
                         modifier = Modifier.fillMaxWidth().height(52.dp).maoAoPassar(),
                     ) { Text("Entrar com Google", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }

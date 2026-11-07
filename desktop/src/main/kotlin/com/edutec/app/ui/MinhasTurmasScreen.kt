@@ -84,29 +84,37 @@ import com.edutec.app.ui.theme.Borda
 import com.edutec.app.ui.theme.BordaControle
 import com.edutec.app.ui.theme.EdutecTheme
 import com.edutec.app.ui.theme.Erro
+import com.edutec.app.ui.theme.Espaco1
+import com.edutec.app.ui.theme.Espaco12
 import com.edutec.app.ui.theme.Espaco2
+import com.edutec.app.ui.theme.Espaco3
 import com.edutec.app.ui.theme.Espaco4
 import com.edutec.app.ui.theme.Espaco6
+import com.edutec.app.ui.theme.Espaco8
 import com.edutec.app.ui.theme.EspessuraBorda
 import com.edutec.app.ui.theme.EstadoConsolidado
 import com.edutec.app.ui.theme.EstadoDesenvolvimento
 import com.edutec.app.ui.theme.EstadoRevisar
 import com.edutec.app.ui.theme.EstiloApoio
 import com.edutec.app.ui.theme.EstiloNumero
+import com.edutec.app.ui.theme.FormaLg
+import com.edutec.app.ui.theme.FormaMd
+import com.edutec.app.ui.theme.FormaPilula
 import com.edutec.app.ui.theme.Fundo
 import com.edutec.app.ui.theme.Menta
 import com.edutec.app.ui.theme.MentaSuave
 import com.edutec.app.ui.theme.Primaria
 import com.edutec.app.ui.theme.RaioLg
 import com.edutec.app.ui.theme.SobrePrimaria
+import com.edutec.app.ui.theme.Sora
 import com.edutec.app.ui.theme.Superficie
 import com.edutec.app.ui.theme.Tinta
 import com.edutec.app.ui.theme.TintaSuave
 import com.edutec.app.ui.theme.comNumeros
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
-private val CantoCartao = RoundedCornerShape(24.dp)
-private val EspacoGrade = 14.dp
+private val CantoCartao = FormaLg
+private val EspacoGrade = Espaco4
 
 @Composable
 fun MinhasTurmasScreen(
@@ -149,14 +157,14 @@ fun MinhasTurmasScreen(
             largura >= 600.dp -> 2
             else -> 1
         }
-        val margem = if (largura >= 600.dp) 26.dp else 16.dp
+        val margem = if (largura >= 600.dp) Espaco6 else Espaco4
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(horizontal = margem, vertical = 20.dp),
+                .padding(horizontal = margem, vertical = Espaco6),
             verticalArrangement = Arrangement.spacedBy(EspacoGrade),
         ) {
             BarraSuperior(
@@ -166,7 +174,7 @@ fun MinhasTurmasScreen(
                 usuario = usuario,
                 onSair = onSair,
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Espaco2))
             Cabecalho(expandido = expandido, mostrarLegenda = turmas.isNotEmpty() && !carregando && erro == null)
 
             if (carregando) {
@@ -236,7 +244,7 @@ private fun BarraSuperior(
         Text(
             text = "LUMINI",
             color = Tinta,
-            fontSize = 20.sp,
+            fontFamily = Sora, fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.5.sp,
         )
@@ -245,11 +253,11 @@ private fun BarraSuperior(
         Box {
             Surface(
                 onClick = { menuAberto = true },
-                shape = RoundedCornerShape(50),
+                shape = FormaPilula,
                 color = MentaSuave,
             ) {
                 Row(
-                    modifier = Modifier.padding(start = 18.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                    modifier = Modifier.padding(start = Espaco4, end = Espaco3, top = Espaco3, bottom = Espaco3),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -258,7 +266,7 @@ private fun BarraSuperior(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                     )
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(Espaco2))
                     Icon(
                         imageVector = Icons.Filled.KeyboardArrowDown,
                         contentDescription = "Trocar semestre",
@@ -280,7 +288,7 @@ private fun BarraSuperior(
             }
         }
 
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(Espaco4))
 
         if (usuario != null) MenuUsuario(usuario, onSair)
     }
@@ -293,19 +301,19 @@ private fun MenuUsuario(usuario: Usuario, onSair: () -> Unit) {
     Box {
         Surface(
             onClick = { aberto = true },
-            shape = RoundedCornerShape(50),
+            shape = FormaPilula,
             color = MentaSuave,
             modifier = Modifier.maoAoPassar(),
         ) {
-            Row(Modifier.padding(start = 6.dp, end = 16.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(start = Espaco2, end = Espaco4, top = Espaco2, bottom = Espaco2), verticalAlignment = Alignment.CenterVertically) {
                 FotoUsuario(usuario.nome, usuario.fotoUrl, tamanho = 36.dp)
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(Espaco3))
                 Text(usuario.nome, color = Tinta, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1)
             }
         }
         DropdownMenu(expanded = aberto, onDismissRequest = { aberto = false }) {
             usuario.email?.let {
-                Text(it, color = TintaSuave, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                Text(it, color = TintaSuave, fontSize = 13.sp, modifier = Modifier.padding(horizontal = Espaco4, vertical = Espaco2))
             }
             DropdownMenuItem(text = { Text("Sair") }, onClick = { aberto = false; onSair() })
         }
@@ -322,7 +330,7 @@ private fun Cabecalho(expandido: Boolean, mostrarLegenda: Boolean) {
         Text(
             text = "Minhas turmas",
             color = Tinta,
-            fontSize = 30.sp,
+            fontFamily = Sora, fontSize = 30.sp,
             fontWeight = FontWeight.Bold,
         )
     }
@@ -337,7 +345,7 @@ private fun Cabecalho(expandido: Boolean, mostrarLegenda: Boolean) {
             if (mostrarLegenda) Legenda()
         }
     } else {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Espaco3)) {
             titulo()
             if (mostrarLegenda) Legenda()
         }
@@ -346,7 +354,7 @@ private fun Cabecalho(expandido: Boolean, mostrarLegenda: Boolean) {
 
 @Composable
 private fun Legenda() {
-    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Espaco4)) {
         EstadoConceito.entries.reversed().forEach { ItemLegenda(it) }
     }
 }
@@ -439,13 +447,13 @@ private fun CartaoAtividadePendente(
 
     Surface(shape = CantoCartao, color = MentaSuave, modifier = modifier) {
         Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
+            modifier = Modifier.padding(horizontal = Espaco6, vertical = Espaco4),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
                     .size(46.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(FormaMd)
                     .background(Primaria),
                 contentAlignment = Alignment.Center,
             ) {
@@ -456,7 +464,7 @@ private fun CartaoAtividadePendente(
                     modifier = Modifier.size(22.dp),
                 )
             }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(Espaco4))
             Column(Modifier.weight(1f)) {
                 Text(titulo, color = Tinta, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Text(descricao, color = Tinta, fontSize = 14.sp)
@@ -533,24 +541,24 @@ private fun GradeTurmas(
 
 @Composable
 private fun CartaoTurma(turma: Turma, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(onClick = onClick, shape = CantoCartao, color = Superficie, modifier = modifier.maoAoPassar()) {
-        Column(Modifier.padding(horizontal = 22.dp, vertical = 20.dp)) {
+    Surface(onClick = onClick, shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = modifier.maoAoPassar()) {
+        Column(Modifier.padding(horizontal = Espaco6, vertical = Espaco6)) {
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
-                    Text(turma.nome, color = Tinta, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                    Text(turma.nome, color = Tinta, fontFamily = Sora, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                     Text(
                         "${turma.codigo} · ${turma.rotuloAlunos}",
                         color = TintaSuave,
                         fontSize = 14.sp,
                     )
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Espaco2))
                 EtiquetaTurma(turma)
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Espaco4))
             BarraProgresso(turma.consolidado, turma.desenvolvimento, turma.revisar)
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Espaco4))
 
             val semDados = turma.consolidado + turma.desenvolvimento + turma.revisar == 0
             Text(
@@ -561,7 +569,7 @@ private fun CartaoTurma(turma: Turma, onClick: () -> Unit, modifier: Modifier = 
                 style = EstiloApoio.comNumeros(),
             )
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(Espaco6))
             Spacer(Modifier.weight(1f))
             Text(turma.rodape, color = TintaSuave, fontSize = 13.sp)
         }
@@ -584,13 +592,13 @@ private fun EtiquetaTurma(turma: Turma) {
         else -> Triple("Sem alertas", Menta, Tinta)
     }
 
-    Surface(shape = RoundedCornerShape(50), color = fundo) {
+    Surface(shape = FormaPilula, color = fundo) {
         Text(
             text = texto,
             color = cor,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = Espaco3, vertical = Espaco2),
         )
     }
 }
@@ -607,7 +615,7 @@ private fun BarraProgresso(consolidado: Int, desenvolvimento: Int, revisar: Int)
         modifier = Modifier
             .fillMaxWidth()
             .height(12.dp)
-            .clip(RoundedCornerShape(50))
+            .clip(FormaPilula)
             // Fundo branco faz o espaço entre os segmentos parecer um corte.
             .background(if (segmentos.isEmpty()) Borda else Superficie),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -651,7 +659,7 @@ private fun CartaoNovaTurma(onClick: () -> Unit, modifier: Modifier = Modifier) 
             Box(
                 modifier = Modifier
                     .size(54.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(FormaMd)
                     .background(MentaSuave),
                 contentAlignment = Alignment.Center,
             ) {
@@ -662,7 +670,7 @@ private fun CartaoNovaTurma(onClick: () -> Unit, modifier: Modifier = Modifier) 
                     modifier = Modifier.size(26.dp),
                 )
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Espaco3))
             Text("Nova turma", color = Primaria, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         }
     }
@@ -674,19 +682,19 @@ private fun CartaoNovaTurma(onClick: () -> Unit, modifier: Modifier = Modifier) 
 
 @Composable
 private fun EstadoVazioTurmas(onNovaTurma: () -> Unit) {
-    Surface(shape = CantoCartao, color = Superficie, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 48.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Espaco8, vertical = Espaco12),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(Espaco4),
         ) {
             Box(
-                Modifier.size(64.dp).clip(RoundedCornerShape(18.dp)).background(MentaSuave),
+                Modifier.size(64.dp).clip(FormaLg).background(MentaSuave),
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Filled.Add, null, tint = Primaria, modifier = Modifier.size(30.dp)) }
             Text(
                 "Nenhuma turma ainda",
-                color = Tinta, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+                color = Tinta, fontFamily = Sora, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
             )
             Text(
                 "Crie a primeira turma para enviar materiais em PDF, gerar atividades com a IA e, quando os " +
@@ -694,15 +702,15 @@ private fun EstadoVazioTurmas(onNovaTurma: () -> Unit) {
                 color = TintaSuave, fontSize = 15.sp, textAlign = TextAlign.Center,
                 modifier = Modifier.widthIn(max = 560.dp),
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(Espaco1))
             Button(
                 onClick = onNovaTurma,
-                shape = RoundedCornerShape(16.dp),
+                shape = FormaMd,
                 colors = ButtonDefaults.buttonColors(containerColor = Primaria),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
+                contentPadding = PaddingValues(horizontal = Espaco6, vertical = Espaco4),
             ) {
                 Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Espaco2))
                 Text("Nova turma", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             }
         }
@@ -715,11 +723,11 @@ private fun EstadoVazioTurmas(onNovaTurma: () -> Unit) {
 
 @Composable
 private fun CarregandoTurmas() {
-    Surface(shape = CantoCartao, color = Superficie, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 48.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Espaco8, vertical = Espaco12),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(Espaco4),
         ) {
             CircularProgressIndicator(color = Primaria)
             Text("Carregando suas turmas…", color = TintaSuave, fontSize = 15.sp)
@@ -729,19 +737,19 @@ private fun CarregandoTurmas() {
 
 @Composable
 private fun ErroTurmas(mensagem: String, onTentarDeNovo: () -> Unit) {
-    Surface(shape = CantoCartao, color = Superficie, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 48.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Espaco8, vertical = Espaco12),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(Espaco4),
         ) {
             Box(
                 Modifier.size(64.dp).clip(CircleShape).background(MentaSuave),
                 contentAlignment = Alignment.Center,
-            ) { Text("!", color = Erro, fontSize = 26.sp, fontWeight = FontWeight.Bold) }
+            ) { Text("!", color = Erro, fontFamily = Sora, fontSize = 26.sp, fontWeight = FontWeight.Bold) }
             Text(
                 "Não foi possível carregar as turmas",
-                color = Tinta, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+                color = Tinta, fontFamily = Sora, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
             )
             Text(
                 mensagem, color = TintaSuave, fontSize = 15.sp, textAlign = TextAlign.Center,
@@ -749,9 +757,9 @@ private fun ErroTurmas(mensagem: String, onTentarDeNovo: () -> Unit) {
             )
             Button(
                 onClick = onTentarDeNovo,
-                shape = RoundedCornerShape(16.dp),
+                shape = FormaMd,
                 colors = ButtonDefaults.buttonColors(containerColor = Primaria),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
+                contentPadding = PaddingValues(horizontal = Espaco6, vertical = Espaco4),
             ) { Text("Tentar de novo", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
         }
     }
@@ -791,7 +799,7 @@ private fun DialogoNovaTurma(
         text = {
             // Enter em qualquer campo confirma (Esc fecha o diálogo).
             Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(Espaco3),
                 modifier = Modifier.onPreviewKeyEvent { evento ->
                     val enter = evento.key == Key.Enter || evento.key == Key.NumPadEnter
                     if (enter && evento.type == KeyEventType.KeyDown) criar()
@@ -814,7 +822,7 @@ private fun DialogoNovaTurma(
                 if (criando) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Primaria)
-                        Spacer(Modifier.width(10.dp))
+                        Spacer(Modifier.width(Espaco3))
                         Text("Criando a turma…", color = TintaSuave, fontSize = 14.sp)
                     }
                 }

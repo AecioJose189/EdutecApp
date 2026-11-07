@@ -42,15 +42,24 @@ import com.edutec.app.data.PedidoGeracao
 import com.edutec.app.ui.theme.Borda
 import com.edutec.app.ui.theme.EdutecTheme
 import com.edutec.app.ui.theme.Erro
+import com.edutec.app.ui.theme.Espaco1
+import com.edutec.app.ui.theme.Espaco2
+import com.edutec.app.ui.theme.Espaco3
+import com.edutec.app.ui.theme.Espaco4
+import com.edutec.app.ui.theme.Espaco6
+import com.edutec.app.ui.theme.Espaco8
+import com.edutec.app.ui.theme.FormaLg
+import com.edutec.app.ui.theme.FormaMd
 import com.edutec.app.ui.theme.MentaSuave
 import com.edutec.app.ui.theme.Primaria
+import com.edutec.app.ui.theme.Sora
 import com.edutec.app.ui.theme.Superficie
 import com.edutec.app.ui.theme.Tinta
 import com.edutec.app.ui.theme.TintaSuave
 import java.io.File
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
-private val CantoCartao = RoundedCornerShape(24.dp)
+private val CantoCartao = FormaLg
 
 /** Etapa 3: a Edge Function está lendo o PDF e o Gemini está criando as questões. */
 @Composable
@@ -59,7 +68,7 @@ fun GerandoConteudo(estado: EstadoGeracao.Gerando, onCancelar: () -> Unit, modif
         CircularProgressIndicator(color = Primaria, trackColor = Borda, strokeWidth = 5.dp, modifier = Modifier.size(64.dp))
         Text(
             formatarCronometro(estado.segundos),
-            color = Tinta, fontSize = 40.sp, fontWeight = FontWeight.Bold,
+            color = Tinta, fontFamily = Sora, fontSize = 40.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.semantics { contentDescription = "${estado.segundos} segundos" },
         )
         Text(
@@ -74,7 +83,7 @@ fun GerandoConteudo(estado: EstadoGeracao.Gerando, onCancelar: () -> Unit, modif
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(Espaco1))
         BotaoSecundario("Cancelar", onCancelar)
     }
 }
@@ -107,10 +116,10 @@ fun ErroGeracaoConteudo(
         Box(
             Modifier.size(64.dp).clip(CircleShape).background(MentaSuave),
             contentAlignment = Alignment.Center,
-        ) { Text("!", color = Erro, fontSize = 32.sp, fontWeight = FontWeight.Bold) }
+        ) { Text("!", color = Erro, fontFamily = Sora, fontSize = 32.sp, fontWeight = FontWeight.Bold) }
         Text(
             titulo,
-            color = Tinta, fontSize = 21.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+            color = Tinta, fontFamily = Sora, fontSize = 21.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
         )
         Text(explicacao, color = TintaSuave, fontSize = 15.sp, textAlign = TextAlign.Center)
@@ -119,21 +128,21 @@ fun ErroGeracaoConteudo(
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.CheckCircle, null, tint = Primaria, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Espaco2))
             Text(
                 "Nada foi perdido: suas escolhas e o PDF \"${estado.pedido.nomeArquivo}\" continuam aqui.",
                 color = Primaria, fontSize = 14.sp,
             )
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(Espaco1))
         Button(
             onClick = onTentarDeNovo,
             modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(16.dp),
+            shape = FormaMd,
             colors = ButtonDefaults.buttonColors(containerColor = Primaria),
         ) {
             Icon(Icons.Filled.Refresh, null, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(Espaco3))
             Text("Tentar de novo", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         }
         val sobrecarga = estado.tipo in setOf(TipoErro.Cota, TipoErro.Indisponivel, TipoErro.TempoEsgotado)
@@ -152,12 +161,12 @@ private fun CartaoCentral(modifier: Modifier, conteudo: @Composable () -> Unit) 
     ) {
         Surface(
             shape = CantoCartao, color = Superficie,
-            modifier = Modifier.padding(vertical = 24.dp).widthIn(max = 560.dp).fillMaxWidth(),
+            modifier = Modifier.padding(vertical = Espaco6).widthIn(max = 560.dp).fillMaxWidth(),
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 28.dp, vertical = 32.dp),
+                modifier = Modifier.padding(horizontal = Espaco8, vertical = Espaco8),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(Espaco4),
             ) { conteudo() }
         }
     }
@@ -168,7 +177,7 @@ private fun BotaoSecundario(texto: String, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().height(50.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = FormaMd,
         colors = ButtonDefaults.buttonColors(containerColor = MentaSuave, contentColor = Tinta),
     ) { Text(texto, fontWeight = FontWeight.SemiBold) }
 }

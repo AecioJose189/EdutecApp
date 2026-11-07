@@ -32,8 +32,18 @@ import com.edutec.app.data.AtividadePublicada
 import com.edutec.app.data.Membro
 import com.edutec.app.ui.theme.Borda
 import com.edutec.app.ui.theme.Erro
+import com.edutec.app.ui.theme.Espaco1
+import com.edutec.app.ui.theme.Espaco2
+import com.edutec.app.ui.theme.Espaco3
+import com.edutec.app.ui.theme.Espaco4
+import com.edutec.app.ui.theme.Espaco6
+import com.edutec.app.ui.theme.Espaco8
+import com.edutec.app.ui.theme.EspessuraBorda
+import com.edutec.app.ui.theme.FormaLg
+import com.edutec.app.ui.theme.FormaMd
 import com.edutec.app.ui.theme.MentaSuave
 import com.edutec.app.ui.theme.Primaria
+import com.edutec.app.ui.theme.Sora
 import com.edutec.app.ui.theme.Superficie
 import com.edutec.app.ui.theme.Tinta
 import com.edutec.app.ui.theme.TintaSuave
@@ -66,7 +76,7 @@ fun AbaAtividades(
                         modifier = Modifier.maoAoPassar()) { Text("Nova atividade") }
                 }
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(Espaco3)) {
                     items(atividades.valor.asReversed(), key = { it.id }) { ItemAtividade(it, onAbrirSessao) }
                 }
             }
@@ -78,12 +88,12 @@ fun AbaAtividades(
 private fun ItemAtividade(atividade: AtividadePublicada, onAbrirSessao: (AtividadePublicada) -> Unit) {
     val emAndamento = atividade.sessaoAberta != null
     Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = FormaLg,
         color = if (emAndamento) MentaSuave else Superficie,
         border = BorderStroke(if (emAndamento) 2.dp else 1.dp, if (emAndamento) Primaria else Borda),
     ) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = Espaco6, vertical = Espaco4), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Espaco1)) {
                 Text(atividade.titulo, color = Tinta, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                 Text(
                     buildString {
@@ -97,12 +107,12 @@ private fun ItemAtividade(atividade: AtividadePublicada, onAbrirSessao: (Ativida
                     Text("Sessão em andamento", color = Tinta, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(Espaco4))
             Button(
                 onClick = { onAbrirSessao(atividade) },
-                shape = RoundedCornerShape(14.dp),
+                shape = FormaMd,
                 colors = ButtonDefaults.buttonColors(containerColor = Primaria),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                contentPadding = PaddingValues(horizontal = Espaco6, vertical = Espaco3),
                 modifier = Modifier.maoAoPassar(),
             ) { Text(if (emAndamento) "Voltar à sessão" else "Abrir sessão em sala", fontWeight = FontWeight.SemiBold) }
         }
@@ -135,9 +145,9 @@ fun AbaMembros(
             } else {
                 LazyColumn {
                     items(membros.valor, key = { it.email ?: it.nome + it.entrouEm }) { m ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().padding(vertical = Espaco3), verticalAlignment = Alignment.CenterVertically) {
                             FotoUsuario(m.nome, null, tamanho = 38.dp)
-                            Spacer(Modifier.width(14.dp))
+                            Spacer(Modifier.width(Espaco4))
                             Column(Modifier.weight(1f)) {
                                 Text(m.nome, color = Tinta, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                                 m.email?.let { Text(it, color = TintaSuave, fontSize = 13.sp) }
@@ -163,10 +173,10 @@ private fun CartaoAba(
     acao: @Composable () -> Unit = {},
     conteudo: @Composable () -> Unit,
 ) {
-    Surface(shape = RoundedCornerShape(24.dp), color = Superficie, modifier = modifier) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Surface(shape = FormaLg, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = modifier) {
+        Column(Modifier.fillMaxSize().padding(horizontal = Espaco6, vertical = Espaco6), verticalArrangement = Arrangement.spacedBy(Espaco4)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(titulo, color = Tinta, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text(titulo, color = Tinta, fontFamily = Sora, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 acao()
             }
             conteudo()
@@ -176,15 +186,15 @@ private fun CartaoAba(
 
 @Composable
 private fun CarregandoAba() {
-    Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxWidth().padding(Espaco8), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(Modifier.size(28.dp), color = Primaria)
     }
 }
 
 @Composable
 private fun ErroAba(mensagem: String, onTentarDeNovo: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(Espaco6), horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Espaco2)) {
         Text(mensagem, color = Erro, fontSize = 15.sp)
         TextButton(onClick = onTentarDeNovo, modifier = Modifier.maoAoPassar()) { Text("Tentar de novo") }
     }
@@ -192,8 +202,8 @@ private fun ErroAba(mensagem: String, onTentarDeNovo: () -> Unit) {
 
 @Composable
 private fun VazioAba(titulo: String, texto: String, acao: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.fillMaxWidth().padding(Espaco8), horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Espaco3)) {
         Text(titulo, color = Tinta, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         Text(texto, color = TintaSuave, fontSize = 14.sp)
         acao()

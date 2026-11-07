@@ -89,7 +89,17 @@ import com.edutec.app.ui.theme.Borda
 import com.edutec.app.ui.theme.BordaControle
 import com.edutec.app.ui.theme.EdutecTheme
 import com.edutec.app.ui.theme.Erro
+import com.edutec.app.ui.theme.Espaco1
+import com.edutec.app.ui.theme.Espaco2
+import com.edutec.app.ui.theme.Espaco3
+import com.edutec.app.ui.theme.Espaco4
+import com.edutec.app.ui.theme.Espaco6
+import com.edutec.app.ui.theme.Espaco8
+import com.edutec.app.ui.theme.EspessuraBorda
 import com.edutec.app.ui.theme.FormaLg
+import com.edutec.app.ui.theme.FormaMd
+import com.edutec.app.ui.theme.FormaPilula
+import com.edutec.app.ui.theme.FormaSm
 import com.edutec.app.ui.theme.Fundo
 import com.edutec.app.ui.theme.Menta
 import com.edutec.app.ui.theme.MentaSuave
@@ -97,6 +107,7 @@ import com.edutec.app.ui.theme.Primaria
 import com.edutec.app.ui.theme.RaioLg
 import com.edutec.app.ui.theme.SobreErro
 import com.edutec.app.ui.theme.SobrePrimaria
+import com.edutec.app.ui.theme.Sora
 import com.edutec.app.ui.theme.Superficie
 import com.edutec.app.ui.theme.Tinta
 import com.edutec.app.ui.theme.TintaSuave
@@ -106,8 +117,8 @@ import java.awt.Frame
 import java.io.File
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
-private val CantoCartao = RoundedCornerShape(24.dp)
-private val Espaco = 14.dp
+private val CantoCartao = FormaLg
+private val Espaco = Espaco4
 private const val LimitePdfBytes = 20L * 1024 * 1024
 // A Edge Function gera tudo numa chamada só (limite de 150 s): 5 por padrão, no máximo 10.
 private const val QuantidadePadrao = 5
@@ -219,7 +230,7 @@ fun NovaAtividadeScreen(
             .background(Fundo)
     ) {
         val expandido = maxWidth >= 900.dp
-        val margem = if (maxWidth >= 600.dp) 20.dp else 16.dp
+        val margem = if (maxWidth >= 600.dp) Espaco6 else Espaco4
 
         val cartaoOrigem: @Composable () -> Unit = {
             CartaoOrigem(
@@ -289,7 +300,7 @@ fun NovaAtividadeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(horizontal = margem, vertical = 12.dp),
+                .padding(horizontal = margem, vertical = Espaco3),
             verticalArrangement = Arrangement.spacedBy(Espaco),
         ) {
             val etapa = when (estado) {
@@ -350,12 +361,12 @@ fun NovaAtividadeScreen(
 
 @Composable
 private fun Cabecalho(turma: Turma, expandido: Boolean, etapa: Int, onFechar: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Espaco3)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             BotaoTopo(Icons.Filled.Close, "Fechar", onFechar)
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(Espaco4))
             Column {
-                Text("Nova atividade", color = Tinta, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("Nova atividade", color = Tinta, fontFamily = Sora, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text("${turma.nome} · ${turma.codigo}", color = TintaSuave, fontSize = 14.sp)
             }
             Spacer(Modifier.weight(1f))
@@ -368,7 +379,7 @@ private fun Cabecalho(turma: Turma, expandido: Boolean, etapa: Int, onFechar: ()
 @Composable
 private fun Etapas(concluidas: Int = 2) {
     val nomes = listOf("Origem", "Formato", "Gerando", "Revisão", "Publicar")
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Espaco3)) {
         nomes.forEachIndexed { i, nome ->
             val ativa = i < concluidas
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -382,7 +393,7 @@ private fun Etapas(concluidas: Int = 2) {
                         fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                     )
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Espaco2))
                 Text(
                     nome,
                     color = if (ativa) Tinta else TintaSuave,
@@ -411,16 +422,16 @@ private fun CartaoOrigem(
     onEscolherPdf: () -> Unit,
     onRemoverPdf: () -> Unit,
 ) {
-    Surface(shape = CantoCartao, color = Superficie, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Espaco6), verticalArrangement = Arrangement.spacedBy(Espaco4)) {
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(Espaco3),
             ) {
                 Text(
                     "Gerar a partir de",
-                    color = Tinta, fontSize = 19.sp, fontWeight = FontWeight.Bold,
+                    color = Tinta, fontFamily = Sora, fontSize = 19.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.align(Alignment.CenterVertically),
                 )
                 SeletorOrigem(origem, onOrigem)
@@ -438,8 +449,8 @@ private fun CartaoOrigem(
 private fun SeletorOrigem(origem: Origem, onOrigem: (Origem) -> Unit) {
     // No desktop a janela tem largura mínima de tela larga: sempre cabem os rótulos completos.
     val curto = false
-    Surface(shape = RoundedCornerShape(50), color = MentaSuave) {
-        Row(Modifier.padding(5.dp)) {
+    Surface(shape = FormaPilula, color = MentaSuave) {
+        Row(Modifier.padding(Espaco1)) {
             OpcaoOrigem(if (curto) "Grafo" else "Conceitos do grafo", origem == Origem.Grafo, { onOrigem(Origem.Grafo) }) { cor ->
                 Icon(Icons.Filled.Share, null, tint = cor, modifier = Modifier.size(18.dp))
             }
@@ -455,16 +466,16 @@ private fun OpcaoOrigem(texto: String, ativa: Boolean, onClick: () -> Unit, icon
     val cor = if (ativa) Tinta else TintaSuave
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(50),
+        shape = FormaPilula,
         color = if (ativa) Menta else Transparente,
         modifier = Modifier.maoAoPassar(),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = Espaco4, vertical = Espaco3),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             icone(cor)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Espaco2))
             Text(
                 texto, color = cor, fontSize = 15.sp, maxLines = 1,
                 fontWeight = if (ativa) FontWeight.SemiBold else FontWeight.Normal,
@@ -515,25 +526,27 @@ private fun ConteudoGrafo(
         return
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Espaco3)) {
         if (aRevisar > 0) {
-            Surface(shape = RoundedCornerShape(16.dp), color = MentaSuave, modifier = Modifier.fillMaxWidth()) {
+            Surface(shape = FormaMd, color = MentaSuave, modifier = Modifier.fillMaxWidth()) {
                 Row(
-                    modifier = Modifier.padding(start = 16.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
+                    modifier = Modifier.padding(start = Espaco4, end = Espaco3, top = Espaco3, bottom = Espaco3),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    SeloEstado(EstadoConceito.Revisar, tamanho = 20.dp)
+                    Spacer(Modifier.width(Espaco2))
                     Text(
                         buildAnnotatedString {
                             withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("Sugestão: ") }
                             append("$aRevisar conceitos estão em \"revisar\" para a turma.")
                         },
-                        color = Erro, fontSize = 14.sp,
+                        color = Tinta, fontSize = 14.sp,
                         modifier = Modifier.weight(1f),
                     )
-                    Spacer(Modifier.width(10.dp))
+                    Spacer(Modifier.width(Espaco3))
                     Button(
                         onClick = onSelecionarRevisar,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = FormaMd,
                         colors = ButtonDefaults.buttonColors(containerColor = Primaria),
                     ) { Text("Selecionar esses", fontWeight = FontWeight.SemiBold) }
                 }
@@ -544,13 +557,13 @@ private fun ConteudoGrafo(
             val doGrupo = conceitos.filter { it.estado == estado }
             if (doGrupo.isEmpty()) return@forEach
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(10.dp).clip(CircleShape).background(estado.cor()))
-                Spacer(Modifier.width(8.dp))
+                SeloEstado(estado, tamanho = 18.dp)
+                Spacer(Modifier.width(Espaco2))
                 Text(estado.rotulo, color = TintaSuave, fontSize = 14.sp)
             }
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(Espaco3),
+                verticalArrangement = Arrangement.spacedBy(Espaco3),
             ) {
                 doGrupo.forEach { c ->
                     ChipConceito(c, selecionado = c.nome in selecionados, onClick = { onAlternar(c.nome) })
@@ -564,7 +577,7 @@ private fun ConteudoGrafo(
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Info, null, tint = TintaSuave, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(Espaco2))
             Text("Domínio = chance estimada de o aluno saber o conceito, não é nota.", color = TintaSuave, fontSize = 12.sp)
         }
     }
@@ -574,18 +587,18 @@ private fun ConteudoGrafo(
 private fun ChipConceito(conceito: Conceito, selecionado: Boolean, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(50),
+        shape = FormaPilula,
         color = if (selecionado) Menta else Superficie,
         border = if (selecionado) BorderStroke(2.dp, Primaria) else BorderStroke(1.dp, Borda),
         modifier = Modifier.maoAoPassar(),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 11.dp),
+            modifier = Modifier.padding(horizontal = Espaco4, vertical = Espaco3),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (selecionado) {
                 Icon(Icons.Filled.Check, null, tint = Tinta, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Espaco2))
             }
             Text(
                 conceito.nome,
@@ -593,7 +606,7 @@ private fun ChipConceito(conceito: Conceito, selecionado: Boolean, onClick: () -
                 fontSize = 15.sp,
                 fontWeight = if (selecionado) FontWeight.Bold else FontWeight.Normal,
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(Espaco2))
             Text("${conceito.dominio}%", color = TintaSuave, fontSize = 12.sp)
         }
     }
@@ -606,7 +619,7 @@ private fun ConteudoPdf(
     onEscolherPdf: () -> Unit,
     onRemover: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Espaco3)) {
         Text(
             "Envie a apostila, lista ou slides da aula. A IA vai usar o conteúdo do PDF como base para as questões.",
             color = TintaSuave, fontSize = 14.sp,
@@ -635,30 +648,30 @@ private fun ConteudoPdf(
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(20.dp)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(Espaco6)) {
                     Box(
-                        Modifier.size(56.dp).clip(RoundedCornerShape(14.dp)).background(MentaSuave),
+                        Modifier.size(56.dp).clip(FormaMd).background(MentaSuave),
                         contentAlignment = Alignment.Center,
                     ) { Icon(Icons.Filled.Add, null, tint = Primaria, modifier = Modifier.size(28.dp)) }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(Espaco3))
                     Text("Selecionar PDF", color = Primaria, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                     Text("Apenas arquivos .pdf · até 20 MB", color = TintaSuave, fontSize = 13.sp)
                 }
             }
         } else {
             Surface(
-                shape = RoundedCornerShape(18.dp),
+                shape = FormaLg,
                 color = Fundo,
                 border = BorderStroke(1.dp, Borda),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.padding(Espaco4), verticalArrangement = Arrangement.spacedBy(Espaco3)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
-                            Modifier.size(width = 44.dp, height = 52.dp).clip(RoundedCornerShape(8.dp)).background(Erro),
+                            Modifier.size(width = 44.dp, height = 52.dp).clip(FormaSm).background(Erro),
                             contentAlignment = Alignment.Center,
                         ) { Text("PDF", color = SobreErro, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
-                        Spacer(Modifier.width(14.dp))
+                        Spacer(Modifier.width(Espaco4))
                         Column(Modifier.weight(1f)) {
                             Text(
                                 pdf.nome,
@@ -677,14 +690,14 @@ private fun ConteudoPdf(
                     } else {
                         LinearProgressIndicator(
                             progress = { progressoEnvio },
-                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)),
+                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(FormaPilula),
                             color = Primaria,
                             trackColor = Borda,
                         )
                         Text("Enviando… ${(progressoEnvio * 100).toInt()}%", color = TintaSuave, fontSize = 13.sp)
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Espaco1)) {
                         TextButton(onClick = onEscolherPdf, enabled = pdf.enviado) {
                             Text("Trocar arquivo", color = Primaria, fontWeight = FontWeight.SemiBold)
                         }
@@ -714,8 +727,8 @@ private fun CartaoFormato(
     onDificuldade: (String) -> Unit,
     compacto: Boolean,
 ) {
-    Surface(shape = CantoCartao, color = Superficie, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Espaco6), verticalArrangement = Arrangement.spacedBy(Espaco4)) {
             OutlinedTextField(
                 value = titulo,
                 onValueChange = onTitulo,
@@ -724,16 +737,16 @@ private fun CartaoFormato(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Text("Formato das questões", color = Tinta, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text("Formato das questões", color = Tinta, fontFamily = Sora, fontSize = 19.sp, fontWeight = FontWeight.Bold)
 
             if (compacto) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(Espaco3)) {
                     Formato.entries.forEach { f ->
                         OpcaoFormato(f, f == formato, { onFormato(f) }, Modifier.fillMaxWidth())
                     }
                 }
             } else {
-                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Espaco3)) {
                     Formato.entries.forEach { f ->
                         OpcaoFormato(f, f == formato, { onFormato(f) }, Modifier.weight(1f).fillMaxHeight())
                     }
@@ -741,16 +754,16 @@ private fun CartaoFormato(
             }
 
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(28.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(Espaco8),
+                verticalArrangement = Arrangement.spacedBy(Espaco3),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Quantidade", color = TintaSuave, fontSize = 14.sp)
-                    Spacer(Modifier.width(14.dp))
+                    Spacer(Modifier.width(Espaco4))
                     BotaoContador("−", "Diminuir", enabled = quantidade > 1) { onQuantidade(quantidade - 1) }
                     Text(
                         "$quantidade",
-                        color = Tinta, fontSize = 20.sp, fontWeight = FontWeight.SemiBold,
+                        color = Tinta, fontFamily = Sora, fontSize = 20.sp, fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.width(52.dp),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     )
@@ -758,14 +771,14 @@ private fun CartaoFormato(
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Dificuldade", color = TintaSuave, fontSize = 14.sp)
-                    Spacer(Modifier.width(14.dp))
-                    Surface(shape = RoundedCornerShape(50), color = MentaSuave) {
-                        Row(Modifier.padding(4.dp)) {
+                    Spacer(Modifier.width(Espaco4))
+                    Surface(shape = FormaPilula, color = MentaSuave) {
+                        Row(Modifier.padding(Espaco1)) {
                             Dificuldades.forEach { d ->
                                 val ativa = d == dificuldade
                                 Surface(
                                     onClick = { onDificuldade(d) },
-                                    shape = RoundedCornerShape(50),
+                                    shape = FormaPilula,
                                     color = if (ativa) Menta else Transparente,
                                 ) {
                                     Text(
@@ -773,7 +786,7 @@ private fun CartaoFormato(
                                         color = if (ativa) Tinta else TintaSuave,
                                         fontSize = 15.sp,
                                         fontWeight = if (ativa) FontWeight.SemiBold else FontWeight.Normal,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                        modifier = Modifier.padding(horizontal = Espaco4, vertical = Espaco3),
                                     )
                                 }
                             }
@@ -789,12 +802,12 @@ private fun CartaoFormato(
 private fun OpcaoFormato(formato: Formato, selecionado: Boolean, onClick: () -> Unit, modifier: Modifier) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
+        shape = FormaMd,
         color = if (selecionado) Menta else Superficie,
         border = if (selecionado) BorderStroke(2.dp, Primaria) else BorderStroke(1.dp, Borda),
         modifier = modifier.maoAoPassar(),
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Column(Modifier.padding(horizontal = Espaco4, vertical = Espaco4)) {
             Text(
                 formato.titulo,
                 color = Tinta,
@@ -810,7 +823,7 @@ private fun BotaoContador(simbolo: String, descricao: String, enabled: Boolean, 
     Surface(
         onClick = onClick,
         enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
+        shape = FormaMd,
         color = MentaSuave,
         modifier = Modifier.size(46.dp),
     ) {
@@ -818,7 +831,7 @@ private fun BotaoContador(simbolo: String, descricao: String, enabled: Boolean, 
             Text(
                 simbolo,
                 color = if (enabled) Tinta else BordaControle,
-                fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
+                fontFamily = Sora, fontSize = 22.sp, fontWeight = FontWeight.SemiBold,
             )
         }
     }
@@ -842,17 +855,17 @@ private fun PainelTentativas(
     preencherAltura: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Surface(shape = CantoCartao, color = Superficie, modifier = modifier) {
-        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = modifier) {
+        Column(Modifier.padding(Espaco6), verticalArrangement = Arrangement.spacedBy(Espaco4)) {
             // No tablet as opções rolam e os botões ficam fixos no rodapé do painel.
             Column(
                 modifier = if (preencherAltura) Modifier.weight(1f).verticalScroll(rememberScrollState()) else Modifier,
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(Espaco4),
             ) {
-                Text("Tentativas", color = Tinta, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                Text("Tentativas", color = Tinta, fontFamily = Sora, fontSize = 19.sp, fontWeight = FontWeight.Bold)
 
-                Surface(shape = RoundedCornerShape(18.dp), color = MentaSuave, modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(shape = FormaLg, color = MentaSuave, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(Espaco4), verticalArrangement = Arrangement.spacedBy(Espaco2)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 "Permitir refazer",
@@ -876,14 +889,14 @@ private fun PainelTentativas(
 
                 Text("Tempo máximo por tentativa", color = TintaSuave, fontSize = 14.sp)
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Espaco3),
+                    verticalArrangement = Arrangement.spacedBy(Espaco3),
                 ) {
                     Tempos.forEach { t ->
                         val ativo = t == tempo
                         Surface(
                             onClick = { onTempo(t) },
-                            shape = RoundedCornerShape(50),
+                            shape = FormaPilula,
                             color = if (ativo) Menta else Superficie,
                             border = if (ativo) null else BorderStroke(1.dp, BordaControle),
                         ) {
@@ -892,16 +905,16 @@ private fun PainelTentativas(
                                 color = if (ativo) Tinta else TintaSuave,
                                 fontSize = 14.sp,
                                 fontWeight = if (ativo) FontWeight.SemiBold else FontWeight.Normal,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
+                                modifier = Modifier.padding(horizontal = Espaco4, vertical = Espaco3),
                             )
                         }
                     }
                 }
 
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(Espaco1))
 
-                Surface(shape = RoundedCornerShape(18.dp), color = MentaSuave, modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Surface(shape = FormaLg, color = MentaSuave, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(Espaco4), verticalArrangement = Arrangement.spacedBy(Espaco2)) {
                         Text("A IA vai gerar", color = Primaria, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         Text(resumo, color = Tinta, fontSize = 15.sp)
                         Text(
@@ -916,25 +929,25 @@ private fun PainelTentativas(
                 onClick = onGerar,
                 enabled = motivoDesabilitado == null,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(16.dp),
+                shape = FormaMd,
                 colors = ButtonDefaults.buttonColors(containerColor = Primaria),
-                contentPadding = PaddingValues(horizontal = 16.dp),
+                contentPadding = PaddingValues(horizontal = Espaco4),
             ) {
                 Icon(Icons.Filled.Star, null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(Espaco3))
                 Text("Gerar atividade", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
             }
             motivoDesabilitado?.let { motivo ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Info, null, tint = TintaSuave, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(Espaco2))
                     Text(motivo, color = TintaSuave, fontSize = 13.sp)
                 }
             }
             Button(
                 onClick = onManual,
                 modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(16.dp),
+                shape = FormaMd,
                 colors = ButtonDefaults.buttonColors(containerColor = MentaSuave, contentColor = Tinta),
             ) { Text("Criar questões manualmente", fontWeight = FontWeight.SemiBold) }
         }

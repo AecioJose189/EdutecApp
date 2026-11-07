@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowPlacement
@@ -57,13 +58,25 @@ import com.edutec.app.data.AtividadePublicada
 import com.edutec.app.data.Participante
 import com.edutec.app.data.SessaoSala
 import com.edutec.app.data.TokenQr
+import com.edutec.app.ui.theme.Acento
 import com.edutec.app.ui.theme.Borda
+import com.edutec.app.ui.theme.BordaControle
 import com.edutec.app.ui.theme.EdutecTheme
 import com.edutec.app.ui.theme.Erro
+import com.edutec.app.ui.theme.Espaco2
+import com.edutec.app.ui.theme.Espaco3
+import com.edutec.app.ui.theme.Espaco4
+import com.edutec.app.ui.theme.Espaco6
+import com.edutec.app.ui.theme.Espaco8
+import com.edutec.app.ui.theme.EspessuraBorda
+import com.edutec.app.ui.theme.EstiloNumero
+import com.edutec.app.ui.theme.FormaLg
+import com.edutec.app.ui.theme.FormaMd
 import com.edutec.app.ui.theme.Fundo
 import com.edutec.app.ui.theme.Menta
 import com.edutec.app.ui.theme.MentaSuave
 import com.edutec.app.ui.theme.Primaria
+import com.edutec.app.ui.theme.Sora
 import com.edutec.app.ui.theme.Superficie
 import com.edutec.app.ui.theme.Tinta
 import com.edutec.app.ui.theme.TintaSuave
@@ -105,28 +118,28 @@ fun ProjecaoScreen(
     val encerrada = sessao?.aberta == false
     val entradaFechada = sessao?.entradaAberta == false
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(Fundo).padding(28.dp)) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(Fundo).padding(Espaco8)) {
         val largo = maxWidth >= 1100.dp
-        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Espaco6)) {
             // Topo: atividade, ao vivo, botões
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(atividade.titulo, color = Tinta, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Column(Modifier.weight(1f).padding(end = Espaco6)) {
+                    Text(atividade.titulo, color = Tinta, fontFamily = Sora, fontSize = 28.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(nomeTurma, color = TintaSuave, fontSize = 17.sp)
                 }
                 if (!encerrada) {
                     IndicadorAoVivo(aoVivo)
-                    Spacer(Modifier.width(16.dp))
+                    Spacer(Modifier.width(Espaco4))
                 }
                 if (!encerrada) {
                     if (!entradaFechada) {
                         OutlinedButton(onClick = onEncerrarEntrada, border = BorderStroke(1.dp, Primaria),
                             modifier = Modifier.maoAoPassar()) { Text("Encerrar entrada", color = Primaria) }
-                        Spacer(Modifier.width(10.dp))
+                        Spacer(Modifier.width(Espaco3))
                     }
                     Button(onClick = { confirmarEncerrar = true }, colors = ButtonDefaults.buttonColors(containerColor = Erro),
                         modifier = Modifier.maoAoPassar()) { Text("Encerrar sessão") }
-                    Spacer(Modifier.width(10.dp))
+                    Spacer(Modifier.width(Espaco3))
                 }
                 TextButton(onClick = onSair, modifier = Modifier.maoAoPassar()) {
                     Text(if (encerrada) "Ver a turma" else "Sair da projeção", color = TintaSuave)
@@ -141,12 +154,12 @@ fun ProjecaoScreen(
                 PainelParticipantes(participantes, enviaram, mod)
             }
             if (largo) {
-                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(Espaco6)) {
                     painelQr(Modifier.weight(1.3f).fillMaxHeight())
                     painelAlunos(Modifier.weight(1f).fillMaxHeight())
                 }
             } else {
-                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(Espaco4)) {
                     painelQr(Modifier.fillMaxWidth().weight(1.3f))
                     painelAlunos(Modifier.fillMaxWidth().weight(1f))
                 }
@@ -185,9 +198,9 @@ fun ProjecaoScreen(
 private fun PainelQr(qr: TokenQr?, segundosParaTrocar: Int, sessao: SessaoSala?, enviaram: Int, modifier: Modifier) {
     val avisar = LocalAvisar.current
     val area = LocalClipboardManager.current
-    Surface(shape = RoundedCornerShape(28.dp), color = Superficie, modifier = modifier) {
-        Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)) {
+    Surface(shape = FormaLg, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = modifier) {
+        Column(Modifier.fillMaxSize().padding(Espaco6), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Espaco4, Alignment.CenterVertically)) {
             when {
                 sessao == null -> CircularProgressIndicator(color = Primaria)
                 !sessao.aberta -> MensagemGrande(
@@ -197,7 +210,7 @@ private fun PainelQr(qr: TokenQr?, segundosParaTrocar: Int, sessao: SessaoSala?,
                 !sessao.entradaAberta -> MensagemGrande("Entrada encerrada", "Quem já entrou ainda pode enviar as respostas.")
                 qr == null -> CircularProgressIndicator(color = Primaria)
                 else -> {
-                    Text("Aponte a câmera do celular para o código", color = Tinta, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Aponte a câmera do celular para o código", color = Tinta, fontFamily = Sora, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
                     CodigoQr(qr.url, Modifier.weight(1f).aspectRatio(1f))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(contentAlignment = Alignment.Center) {
@@ -207,9 +220,9 @@ private fun PainelQr(qr: TokenQr?, segundosParaTrocar: Int, sessao: SessaoSala?,
                             )
                             Text("$segundosParaTrocar", color = Tinta, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         }
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(Espaco3))
                         Text("O código muda a cada ${ProjecaoViewModel.INTERVALO_QR} s · ${host(qr.url)}", color = TintaSuave, fontSize = 16.sp)
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(Espaco2))
                         // Para ensaiar sem celular (scripts/simular-aluno.ts); o link vale ~40 s.
                         TextButton(onClick = {
                             area.setText(AnnotatedString(qr.url))
@@ -224,9 +237,9 @@ private fun PainelQr(qr: TokenQr?, segundosParaTrocar: Int, sessao: SessaoSala?,
 
 @Composable
 private fun PainelParticipantes(participantes: List<Participante>, enviaram: Int, modifier: Modifier) {
-    Surface(shape = RoundedCornerShape(28.dp), color = Superficie, modifier = modifier) {
-        Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+    Surface(shape = FormaLg, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = modifier) {
+        Column(Modifier.fillMaxSize().padding(Espaco6), verticalArrangement = Arrangement.spacedBy(Espaco4)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Espaco4)) {
                 Contador(participantes.size, "entraram", Modifier.weight(1f))
                 Contador(enviaram, "enviaram", Modifier.weight(1f))
             }
@@ -235,10 +248,10 @@ private fun PainelParticipantes(participantes: List<Participante>, enviaram: Int
             } else {
                 // Quem ainda responde primeiro; depois quem enviou, pela ordem de envio.
                 val ordem = participantes.sortedWith(compareBy<Participante>({ it.enviou }, { it.enviadaEm ?: it.iniciadaEm }))
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(Espaco2)) {
                     items(ordem, key = { it.tentativaId }) { p ->
-                        Row(Modifier.fillMaxWidth().background(if (p.enviou) Menta else MentaSuave, RoundedCornerShape(14.dp))
-                            .padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().background(if (p.enviou) Menta else MentaSuave, FormaMd)
+                            .padding(horizontal = Espaco4, vertical = Espaco3), verticalAlignment = Alignment.CenterVertically) {
                             Text(p.nome, color = Tinta, fontSize = 18.sp, modifier = Modifier.weight(1f), maxLines = 1)
                             Text(
                                 if (p.enviou) "✓ enviou" else "… respondendo",
@@ -254,8 +267,8 @@ private fun PainelParticipantes(participantes: List<Participante>, enviaram: Int
 
 @Composable
 private fun Contador(numero: Int, legenda: String, modifier: Modifier) {
-    Column(modifier.background(Fundo, RoundedCornerShape(20.dp)).padding(horizontal = 20.dp, vertical = 14.dp)) {
-        Text("$numero", color = Tinta, fontSize = 48.sp, fontWeight = FontWeight.Bold)
+    Column(modifier.background(Fundo, FormaLg).padding(horizontal = Espaco6, vertical = Espaco4)) {
+        Text("$numero", color = Tinta, style = EstiloNumero, fontSize = 48.sp, lineHeight = 52.sp, fontWeight = FontWeight.Bold)
         Text(legenda, color = TintaSuave, fontSize = 17.sp)
     }
 }
@@ -263,17 +276,17 @@ private fun Contador(numero: Int, legenda: String, modifier: Modifier) {
 @Composable
 private fun IndicadorAoVivo(ligado: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(10.dp).background(if (ligado) Primaria else Borda, CircleShape))
-        Spacer(Modifier.width(6.dp))
+        Box(Modifier.size(10.dp).background(if (ligado) Acento else BordaControle, CircleShape))
+        Spacer(Modifier.width(Espaco2))
         Text(if (ligado) "ao vivo" else "atualiza a cada 10 s", color = TintaSuave, fontSize = 14.sp)
     }
 }
 
 @Composable
 private fun MensagemGrande(titulo: String, texto: String) {
-    Text(titulo, color = Tinta, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+    Text(titulo, color = Tinta, fontFamily = Sora, fontSize = 40.sp, fontWeight = FontWeight.Bold)
     Text(texto, color = TintaSuave, fontSize = 20.sp, textAlign = TextAlign.Center)
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(Espaco2))
 }
 
 private fun host(url: String) = runCatching { URI(url).host + (URI(url).port.takeIf { it > 0 }?.let { ":$it" } ?: "") }.getOrDefault("")
