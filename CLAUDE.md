@@ -229,7 +229,7 @@ só depois de conferir o papel na turma):
 - Ao vivo no desktop: Realtime `postgres_changes` em `public.tentativas` com filtro `sessao_id=eq.<id>`
   e o JWT do professor (INSERT = entrou; UPDATE com `enviada_em` = enviou).
 
-Testes: pgTAP (6 arquivos, 67 testes, inclusive `rls.test.sql` e `tentativas.test.sql`) e o fluxo
+Testes: pgTAP (7 arquivos, 108 testes, inclusive `rls.test.sql`, `tentativas.test.sql` e `conceitos.test.sql`) e o fluxo
 inteiro com dois usuários de teste contra o projeto real:
 `SUPABASE_CHAVE_SECRETA=<service_role> npx deno run -A scripts/testar-fluxo-mvp.ts` (o comando
 que obtém a chave está no cabeçalho do script). Cada execução cria uma turma na conta
@@ -284,6 +284,42 @@ que obtém a chave está no cabeçalho do script). Cada execução cria uma turm
 - Guia de uma página para os avaliadores: `docs/GUIA-AVALIADOR.md` (marcadores `[LINK DOS PDFs DE TESTE]`
   e `[CONTATO]`). Site do aluno: https://lumini-aluno.vercel.app. Os PDFs de teste devem ser gerados antes
   com as opções padrão (5, múltipla escolha, média) para a resposta vir na hora (RN12).
+
+## Conceitos sem duplicata (06/11/2026, branch `fase0-conceitos`)
+
+Problema: PDFs diferentes sobre o mesmo assunto davam o mesmo conceito com nomes diferentes no mapa
+("Evento complementar" × "Evento Complementar"); `conceitos_turma` só juntava pelo nome exato.
+- **Geração:** `gerar-atividade` aceita `turma_id` (opcional; outra turma → 404). Com ele, o prompt leva
+  os conceitos da turma (até 150 nomes; só nomes, RN13) e pede o nome exato quando for o mesmo conceito.
+  O desktop envia o da turma aberta. O cache por hash (RN12) não muda: a publicação normaliza.
+- **Banco** (migration `20261106120000_conceitos_normalizados`): `normalizar_conceito` (minúsculas, sem
+  acento por `translate`, espaços colapsados, trim; sem a extensão unaccent, que não é immutable);
+  `conceitos_turma.nome_normalizado` (coluna gerada) + índice único (turma, nome normalizado) (criado na
+  `..130000`). `publicar_atividade` troca cada nome da geração (conceitos, pré-requisitos, questões) pelo
+  da turma com o mesmo nome normalizado (senão o 1º da própria geração), sem laço.
+- **Possíveis duplicatas** (`possiveis_duplicatas(turma)`, pg_trgm): similaridade de trigramas ≥ 0,6 **ou**
+  um nome inteiro dentro do outro ("Clássica" × "Probabilidade Clássica"). Calibrado com os nomes de
+  produção: o 2º critério também pega "Fila" × "Fila Circular", por isso há `conceitos_distintos`
+  ("São diferentes", `marcar_conceitos_distintos`). Nunca funde sozinho.
+- **Fusão (UC05)** `fundir_conceitos(turma, origem, destino)`: security definer, confere `auth.uid()` = dono
+  (a turma-api chama com o JWT do professor); o trabalho fica em `privado.fundir_conceitos_interno`.
+  Move pré-requisitos (destino soma os dois; quem dependia da origem passa ao destino; laço some; ciclo →
+  ED003 com o caminho), as questões das atividades (`questoes_aluno` acompanha), as respostas, e refaz o
+  BKT do destino aluno a aluno em ordem (criado_em, id) com os parâmetros do destino. Registro em
+  `conceitos_fusoes` (origem, destino, n_respostas, fundido_por, automática, transação).
+- **Respostas continuam só-inserção**: o gatilho aceita UPDATE só com `edutec.fundir_conceitos = 'on'`
+  (ligada só dentro da fusão, local à transação), mudando só `conceito`/`conceito_original`
+  (`conceito_original` = o 1º nome, coalesce), para um conceito da MESMA turma e com uma linha de
+  `conceitos_fusoes` desta transação (que só as funções de fusão escrevem: ligar a chave à mão não basta).
+- **turma-api:** `fundir_conceitos`, `marcar_distintos`; `grafo` e `publicar` ganham `possiveis_duplicatas`.
+- **Desktop:** painel do conceito → "Juntar com outro conceito…" (`ui/JuntarConceitos.kt`: parecidos no
+  topo, "São diferentes", confirmação com o nome que fica e o que acontece; Enter confirma); aviso
+  discreto acima do mapa com "Revisar".
+- **Dados existentes** (migration `..130000_fundir_conceitos_iguais`): funde só os de nome normalizado
+  IGUAL, no mais antigo do grupo. Prévia sem alterar nada: `supabase/tests/previa_fundir_conceitos.sql`
+  (em 06/11: só "Calculo I", 5 fusões, 12 → 7 conceitos).
+- Testes: `supabase/tests/database/conceitos.test.sql` (41). Rodar local sem tocar na produção:
+  `npx supabase db start` (Docker; aplica as migrations) e `npx supabase test db supabase/tests/database`.
 
 Ainda não existe: correção das abertas, edição na Revisão, prazo/liberação na publicação, gerar a partir do
 grafo, abas Materiais/Estatísticas, histórico semanal, "Ver alunos com dificuldade".
