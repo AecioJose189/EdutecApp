@@ -18,12 +18,14 @@ import java.lang.reflect.Modifier
  *
  *     LUMINI_CAPTURAS=/tmp/capturas ./gradlew :desktop:test --tests '*CapturasTelasTest*'
  *
- * Saída: `<pasta>/<claro|escuro>/<Arquivo>-<Preview>.png` (1280×800, o tamanho padrão da janela).
+ * Saída: `<pasta>/<tela>[-<variante>]-<claro|escuro>.png`, ex.: `minhas-turmas-claro.png`,
+ * `turma-sem-respostas-escuro.png`, `minhas-turmas-celular-claro.png`. Os de tablet saem em 1280×800 (o
+ * tamanho padrão da janela); os `Preview*Celular` em 412×892.
  */
 class CapturasTelasTest {
     private val arquivos = listOf(
         "LoginScreen", "MinhasTurmasScreen", "TurmaScreen", "NovaAtividadeScreen", "GerandoAtividade",
-        "RevisaoAtividade", "ProjecaoScreen", "JuntarConceitos", "ConviteDialogo", "AbasTurma",
+        "RevisaoAtividade", "ProjecaoScreen", "JuntarConceitos",
     )
 
     @Test
@@ -39,16 +41,16 @@ class CapturasTelasTest {
         }
         for (tema in listOf("claro", "escuro")) {
             System.setProperty("lumini.tema", tema)
-            val destino = File(pasta, tema).apply { mkdirs() }
+            val destino = File(pasta).apply { mkdirs() }
             for ((arquivo, metodo) in previews) {
-                // As telas de celular (Preview*Celular) ficam fora: o desktop tem largura mínima de 1024.
-                if (metodo.name.endsWith("Celular")) continue
-                val cena = ImageComposeScene(1280, 800, Density(1f)) { Chamar(metodo) }
+                val celular = metodo.name.endsWith("Celular")
+                val cena = if (celular) ImageComposeScene(412, 892, Density(1f)) { Chamar(metodo) }
+                else ImageComposeScene(1280, 800, Density(1f)) { Chamar(metodo) }
                 try {
                     cena.render() // primeiro quadro: carrega fontes e imagens
                     val imagem = cena.render(500_000_000L)
                     val png = imagem.encodeToData(EncodedImageFormat.PNG) ?: continue
-                    File(destino, "$arquivo-${metodo.name.removePrefix("Preview")}.png").writeBytes(png.bytes)
+                    File(destino, "${nomeCaptura(arquivo, metodo.name)}-$tema.png").writeBytes(png.bytes)
                 } finally {
                     cena.close()
                 }
@@ -56,6 +58,20 @@ class CapturasTelasTest {
         }
         System.clearProperty("lumini.tema")
     }
+}
+
+/** Palavras de um nome em CamelCase: "MinhasTurmasScreen" → [Minhas, Turmas, Screen]. */
+private fun palavras(nome: String) = Regex("[A-Z][a-z0-9]*").findAll(nome).map { it.value }.toList()
+
+/**
+ * "MinhasTurmasScreen" + "PreviewVazioTablet" → "minhas-turmas-vazio". A tela é o nome do arquivo sem
+ * "Screen"; a variante é o nome do preview sem "Preview", sem "Tablet" (o padrão do desktop) e sem as
+ * palavras que já estão no nome da tela ("PreviewTurmaTablet" → "turma").
+ */
+internal fun nomeCaptura(arquivo: String, preview: String): String {
+    val tela = palavras(arquivo).filter { it != "Screen" }
+    val variante = palavras(preview.removePrefix("Preview")).filter { it != "Tablet" && it !in tela }
+    return (tela + variante).joinToString("-") { it.lowercase() }
 }
 
 @Composable
