@@ -278,6 +278,7 @@ fun NovaAtividadeScreen(
                                 permitirRefazer = permitirRefazer,
                                 tempoMinutos = tempo.removeSuffix(" min").toIntOrNull(),
                                 titulo = titulo.trim(),
+                                turmaId = turma.id.ifBlank { null },
                             )
                         )
                     }

@@ -15,6 +15,8 @@ data class PedidoGeracao(
     val dificuldade: String,
     /** true: gera de novo mesmo que o servidor já tenha um resultado para este PDF e parâmetros. */
     val forcarNova: Boolean = false,
+    /** Turma de destino: a IA recebe os conceitos dela e reutiliza o nome quando for o mesmo conceito. */
+    val turmaId: String? = null,
     // Configurações de publicação escolhidas no formulário (usadas só ao publicar).
     val permitirRefazer: Boolean = true,
     /** null = sem limite de tempo. */

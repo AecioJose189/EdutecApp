@@ -6,6 +6,10 @@
 //   formato      multipla_escolha | aberta | mista (padrão mista)
 //   dificuldade  facil | media | dificil (padrão media)
 //   forcar_nova  "true" para gerar de novo mesmo havendo resultado salvo (padrão false)
+//   turma_id     uuid da turma (opcional; só do próprio professor, senão 404). Com ele, a IA recebe os
+//                conceitos que a turma já tem e reutiliza o nome exato quando for o mesmo conceito.
+//                O reaproveitamento por hash (RN12) não depende dele: publicar_atividade normaliza os
+//                nomes (minúsculas, sem acento) e liga ao conceito que a turma já tem.
 //
 // Saída 200: { conceitos, questoes, arquivo, modelo, nivel_raciocinio, tokens, duracao_ms,
 //              reaproveitado, gerado_em, geracao_id, reserva, tentativas }
@@ -26,10 +30,14 @@
 // Storage continuam acessados com a service_role: geracoes é um cache por PDF, sem dono (RN12).
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { usuarioDoPedido } from "../_shared/auth.ts";
+import { type Usuario, usuarioDoPedido } from "../_shared/auth.ts";
 import { ErroGemini, gerarComReserva } from "../_shared/gemini.ts";
 
 const TAMANHO_MAXIMO = 20 * 1024 * 1024;
+/** Limites da lista de conceitos da turma enviada à IA (o prompt não cresce sem controle). */
+const MAX_CONCEITOS_TURMA = 150;
+const MAX_TAMANHO_NOME = 120;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Prazo total do pedido (a Edge Function é encerrada em 150 s). */
 const PRAZO_TOTAL_MS = 140_000;
 const BUCKET = "materiais";
@@ -83,11 +91,14 @@ Deno.serve(async (req) => {
 
   const inicio = Date.now();
   try {
-    if (!(await usuarioDoPedido(req))) {
+    const usuario = await usuarioDoPedido(req);
+    if (!usuario) {
       return erro("Entre com sua conta Google para gerar atividades.", 401);
     }
 
-    const { pdf, quantidade, formato, dificuldade, forcarNova } = await lerFormulario(req);
+    const { pdf, quantidade, formato, dificuldade, forcarNova, turmaId } = await lerFormulario(req);
+    // Antes do cache: turma de outro professor é 404 mesmo quando o resultado viria salvo.
+    const conceitosTurma = turmaId ? await conceitosDaTurma(usuario, turmaId) : [];
     const hash = await sha256(pdf);
     const caminho = `pdfs/${hash}.pdf`;
     const supabase = clienteServico();
@@ -122,7 +133,7 @@ Deno.serve(async (req) => {
       gerarComReserva<Atividade>({
         pdf,
         instrucaoSistema: INSTRUCAO_SISTEMA,
-        prompt: montarPrompt(quantidade, formato, dificuldade),
+        prompt: montarPrompt(quantidade, formato, dificuldade, conceitosTurma),
         schema: SCHEMA_ATIVIDADE,
       }, inicio + PRAZO_TOTAL_MS),
     ]);
@@ -213,7 +224,31 @@ async function lerFormulario(req: Request) {
 
   const forcarNova = (form.get("forcar_nova") ?? "").toString().trim().toLowerCase() === "true";
 
-  return { pdf, quantidade, formato, dificuldade, forcarNova };
+  const turmaTexto = (form.get("turma_id") ?? "").toString().trim();
+  if (turmaTexto && !UUID.test(turmaTexto)) throw new ErroPedido('"turma_id" deve ser um uuid.', 400);
+  const turmaId = turmaTexto || null;
+
+  return { pdf, quantidade, formato, dificuldade, forcarNova, turmaId };
+}
+
+/**
+ * Nomes dos conceitos que a turma já tem, lidos com o JWT do professor (o RLS só mostra as turmas
+ * dele). Turma de outro professor ou inexistente → 404. Só nomes de conceitos vão para a IA (RN13).
+ */
+async function conceitosDaTurma(usuario: Usuario, turmaId: string): Promise<string[]> {
+  const { data: turma, error: erroTurma } = await usuario.cliente
+    .from("turmas").select("id").eq("id", turmaId).eq("professor_id", usuario.id).maybeSingle();
+  if (erroTurma) throw new ErroPedido(`Não foi possível conferir a turma: ${erroTurma.message}`, 500);
+  if (!turma) throw new ErroPedido("Turma não encontrada.", 404);
+
+  const { data, error } = await usuario.cliente
+    .from("conceitos_turma").select("nome").eq("turma_id", turmaId).order("criado_em").limit(MAX_CONCEITOS_TURMA);
+  if (error) {
+    // Sem a lista a geração ainda funciona (a publicação normaliza os nomes).
+    console.error("Falha ao ler os conceitos da turma:", error.message);
+    return [];
+  }
+  return (data as { nome: string }[]).map((c) => c.nome.trim().slice(0, MAX_TAMANHO_NOME)).filter((n) => n);
 }
 
 async function sha256(dados: Uint8Array): Promise<string> {
@@ -303,7 +338,12 @@ const NOMES_DIFICULDADE: Record<Dificuldade, string> = {
   dificil: "difícil",
 };
 
-function montarPrompt(quantidade: number, formato: Formato, dificuldade: Dificuldade): string {
+function montarPrompt(
+  quantidade: number,
+  formato: Formato,
+  dificuldade: Dificuldade,
+  conceitosTurma: string[] = [],
+): string {
   const regraFormato = {
     multipla_escolha: `Todas as ${quantidade} questões devem ser do tipo "multipla_escolha".`,
     aberta: `Todas as ${quantidade} questões devem ser do tipo "aberta".`,
@@ -318,7 +358,7 @@ CONCEITOS
 - Identifique de 3 a 8 conceitos centrais do material, com nomes curtos e únicos.
 - Em "prerequisitos", liste os nomes (exatamente iguais) dos outros conceitos desta lista que
   precisam ser dominados antes. O grafo de pré-requisitos não pode ter ciclos. Use [] se não houver.
-
+${blocoConceitosTurma(conceitosTurma)}
 QUESTÕES
 - Gere exatamente ${quantidade} questão(ões) de dificuldade ${NOMES_DIFICULDADE[dificuldade]}.
 - ${regraFormato}
@@ -327,6 +367,23 @@ QUESTÕES
 - "multipla_escolha": exatamente 4 alternativas, exatamente 1 com "correta": true; cada alternativa
   tem um "feedback" curto explicando por que está certa ou errada. Use "rubrica": null.
 - "aberta": "rubrica" com os critérios de correção e a resposta esperada. Use "alternativas": null.`;
+}
+
+/**
+ * Conceitos que a turma já tem: a IA reutiliza o nome exato quando é o mesmo conceito, para o mapa
+ * da turma não ganhar duplicatas ("Evento complementar" × "Evento Complementar").
+ */
+function blocoConceitosTurma(conceitos: string[]): string {
+  if (conceitos.length === 0) return "";
+  const lista = conceitos.map((c) => `  - ${JSON.stringify(c)}`).join("\n");
+  return `
+CONCEITOS QUE A TURMA JÁ TEM
+${lista}
+- Se um conceito do material for o mesmo de um desta lista (mesmo significado, ainda que com outra
+  grafia ou outras palavras), use EXATAMENTE o nome da lista: mesmas letras, maiúsculas e acentos.
+- Crie um nome novo só para conceitos que não estão na lista. Não inclua conceitos da lista que o
+  material não ensina.
+`;
 }
 
 const SCHEMA_ATIVIDADE = {

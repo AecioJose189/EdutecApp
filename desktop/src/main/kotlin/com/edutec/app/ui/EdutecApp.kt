@@ -119,6 +119,21 @@ private fun AppDoProfessor(usuario: Usuario, onSair: () -> Unit) {
                 membros = dadosTurma.membros,
                 onRecarregarAba = { dadosTurma.carregarAba() },
                 onConvidar = { dadosTurma.abrirConvite() },
+                onJuntarConceitos = { origem, destino, aoTerminar ->
+                    dadosTurma.juntar(origem, destino) { r ->
+                        r.onSuccess {
+                            avisar("\"${it.origem}\" agora faz parte de \"${it.destino}\"")
+                            navegacao.recarregarTurmas(silencioso = true)
+                        }.onFailure { avisar(it.message ?: "Não foi possível juntar os conceitos.") }
+                        aoTerminar(r.isSuccess)
+                    }
+                },
+                onMarcarDistintos = { a, b ->
+                    dadosTurma.marcarComoDistintos(a, b) { r ->
+                        avisar(r.exceptionOrNull()?.message ?: "\"$a\" e \"$b\" ficam como conceitos diferentes")
+                    }
+                },
+                juntando = dadosTurma.juntando,
             )
             dadosTurma.convite?.let { convite ->
                 ConviteDialogo(
