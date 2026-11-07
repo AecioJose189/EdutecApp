@@ -8,7 +8,9 @@
 //   criar_convite { turma_id, novo? } → { convite: { codigo, link, criado_em } }
 //                                       devolve o convite ativo; novo = true desativa e cria outro
 //   publicar      { turma_id, geracao_id, permitir_refazer, tempo_minutos, titulo? }
-//                                     → { atividade_id }   (409 se já publicada ou se formar ciclo)
+//                                     → { atividade_id, possiveis_duplicatas: [Duplicata] }
+//                                       (409 se já publicada ou se formar ciclo). Conceitos com o mesmo nome
+//                                       normalizado (sem acento/maiúsculas) são ligados aos da turma.
 //   listar_atividades { turma_id }    → { atividades: [{ id, titulo, publicada_em, n_questoes, tempo_minutos,
 //                                         permitir_refazer, sessao_aberta: Sessao | null }] }
 //   abrir_sessao  { atividade_id }    → { sessao: Sessao }   (devolve a aberta, se já houver)
@@ -17,7 +19,13 @@
 //   encerrar_entrada { sessao_id }    → { sessao: Sessao }   (quem já entrou ainda envia)
 //   encerrar_sessao  { sessao_id }    → { sessao: Sessao }
 //   sessao        { sessao_id }       → { sessao: Sessao, participantes: [Participante] }
-//   grafo         { turma_id }        → { conceitos: [ConceitoGrafo], alunos: [AlunoGrafo] }
+//   grafo         { turma_id }        → { conceitos: [ConceitoGrafo], alunos: [AlunoGrafo],
+//                                         possiveis_duplicatas: [Duplicata] }
+//   fundir_conceitos { turma_id, origem, destino }
+//                                     → { origem, destino, n_respostas, n_alunos }   (UC05) a origem some; questões,
+//                                       pré-requisitos e respostas vão para o destino e o BKT dele é refeito.
+//                                       404 conceito/turma, 400 iguais, 409 se formar ciclo
+//   marcar_distintos { turma_id, conceito_a, conceito_b } → { ok: true }   o par sai das possíveis duplicatas
 //   simular       { turma_id }        → { n_alunos, n_respostas }   DEMONSTRAÇÃO: 25 pseudônimos
 //                                       respondendo às questões publicadas (substitui a anterior)
 //
@@ -31,6 +39,8 @@
 //                  estado_da_media, estado_moda, n_revisar }  (sem respostas: números 0 e estados null)
 // AlunoGrafo: { aluno_id, rotulo, pior_estado, menor_dominio }  rotulo = nome do aluno (pseudônimo
 //             "Aluno NN" para a simulação)
+// Duplicata: { conceito_a, conceito_b, similaridade }  nomes parecidos mas não iguais (pg_trgm), para o
+//             professor decidir; nada é fundido sozinho. Da mais parecida para a menos.
 // Erro: { erro: "..." } com status 4xx/5xx (401 sem usuário).
 //
 // Ao vivo (Realtime, no cliente com o JWT do professor): postgres_changes em public.tentativas com
@@ -68,6 +78,8 @@ const ACOES: Record<string, (ctx: Contexto, corpo: Corpo) => Promise<unknown>> =
   sessao: verSessao,
   grafo,
   simular,
+  fundir_conceitos: fundirConceitos,
+  marcar_distintos: marcarDistintos,
 };
 
 Deno.serve(async (req) => {
@@ -284,7 +296,7 @@ async function publicar(ctx: Contexto, corpo: Corpo) {
     if (status) throw new ErroPedido(error.message, status);
     throw falhaBanco("publicar a atividade", error);
   }
-  return { atividade_id: data };
+  return { atividade_id: data, possiveis_duplicatas: await possiveisDuplicatas(ctx, turma) };
 }
 
 async function listarAtividades(ctx: Contexto, corpo: Corpo) {
@@ -449,7 +461,57 @@ async function grafo(ctx: Contexto, corpo: Corpo) {
     }))
     .sort((a, b) => ORDEM_ESTADO[a.pior_estado] - ORDEM_ESTADO[b.pior_estado] || a.rotulo.localeCompare(b.rotulo));
 
-  return { conceitos: nos, alunos };
+  return { conceitos: nos, alunos, possiveis_duplicatas: await possiveisDuplicatas(ctx, turma) };
+}
+
+// ---------- conceitos duplicados ----------
+
+interface Duplicata {
+  conceito_a: string;
+  conceito_b: string;
+  similaridade: number;
+}
+
+/** Pares parecidos (não iguais) da turma. Falhar aqui não derruba o grafo nem a publicação. */
+async function possiveisDuplicatas(ctx: Contexto, turma: string): Promise<Duplicata[]> {
+  const { data, error } = await ctx.servico.rpc("possiveis_duplicatas", { turma });
+  if (error) {
+    console.error("Falha ao buscar possíveis duplicatas:", error.code, error.message);
+    return [];
+  }
+  return (data as Duplicata[]).map((d) => ({ ...d, similaridade: Math.round(Number(d.similaridade) * 100) / 100 }));
+}
+
+/** Erros das funções de conceitos (ED404/ED400/ED003) → status HTTP com a mensagem do banco. */
+function erroConceitos(oQue: string, error: { message: string; code?: string }): ErroPedido {
+  const status = { ED404: 404, ED400: 400, ED003: 409 }[error.code ?? ""];
+  return status ? new ErroPedido(error.message, status) : falhaBanco(oQue, error);
+}
+
+/**
+ * UC05. Roda com o cliente do professor (JWT): a função confere no banco que auth.uid() é o dono da
+ * turma, e só ela liga a exceção do gatilho só-inserção de respostas.
+ */
+async function fundirConceitos(ctx: Contexto, corpo: Corpo) {
+  const turma = uuid(corpo.turma_id, "turma_id");
+  await exigirTurma(ctx, turma);
+  const origem = texto(corpo.origem, "origem", 200);
+  const destino = texto(corpo.destino, "destino", 200);
+  const { data, error } = await ctx.usuario.cliente.rpc("fundir_conceitos", { turma, origem, destino });
+  if (error) throw erroConceitos("juntar os conceitos", error);
+  return data;
+}
+
+async function marcarDistintos(ctx: Contexto, corpo: Corpo) {
+  const turma = uuid(corpo.turma_id, "turma_id");
+  await exigirTurma(ctx, turma);
+  const { error } = await ctx.usuario.cliente.rpc("marcar_conceitos_distintos", {
+    turma,
+    conceito_a: texto(corpo.conceito_a, "conceito_a", 200),
+    conceito_b: texto(corpo.conceito_b, "conceito_b", 200),
+  });
+  if (error) throw erroConceitos("marcar os conceitos como distintos", error);
+  return { ok: true };
 }
 
 /** Mesmos limiares (propostos) de public.estado_dominio: 0,5 e 0,8. */
