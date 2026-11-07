@@ -55,4 +55,24 @@ class GrafoTurmaTest {
     fun conceitoInicialEhOMaisFraco() {
         assertEquals("Quiescência", grafo.conceitoInicial()?.nome)
     }
+
+    @Test
+    fun candidatosParaJuntarComParecidosNoTopo() {
+        val g = GrafoTurma(
+            conceitos = listOf(c("Probabilidade Clássica", 0.5), c("Clássica", null), c("Regra da adição", 0.7),
+                c("espaço amostral", 0.9), c("Fila", null)),
+            alunos = emptyList(),
+            possiveisDuplicatas = listOf(
+                PossivelDuplicata("Clássica", "Probabilidade Clássica", 1.0),
+                PossivelDuplicata("Fila", "Probabilidade Clássica", 0.6),
+                PossivelDuplicata("Fila", "Regra da adição", 0.6),
+            ),
+        )
+        val candidatos = g.candidatosParaJuntar("Probabilidade Clássica")
+        assertEquals(
+            listOf("Clássica", "Fila", "espaço amostral", "Regra da adição"),
+            candidatos.map { it.conceito.nome },
+        )
+        assertEquals(listOf(true, true, false, false), candidatos.map { it.parecido })
+    }
 }

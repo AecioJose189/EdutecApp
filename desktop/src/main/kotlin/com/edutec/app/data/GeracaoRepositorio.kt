@@ -57,6 +57,7 @@ object GeracaoRepositorio {
                 append("formato", pedido.formato)
                 append("dificuldade", pedido.dificuldade)
                 if (pedido.forcarNova) append("forcar_nova", "true")
+                pedido.turmaId?.let { append("turma_id", it) }
             }
         )
 
