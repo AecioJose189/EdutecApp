@@ -65,8 +65,14 @@ compose.desktop {
             // Saída de ./gradlew :desktop:suggestRuntimeModules (refaça ao trocar dependências)
             // + jdk.httpserver, do retorno do login Google (data/Login.kt).
             modules("java.instrument", "java.management", "java.prefs", "jdk.unsupported", "jdk.httpserver")
-            linux { debPackageVersion = versao }
+            // Ícones gerados do símbolo por scripts/gerar-icones.py (refaça ao trocar o símbolo).
+            linux {
+                debPackageVersion = versao
+                iconFile.set(project.file("icones/lumini.png"))
+            }
+            macOS { iconFile.set(project.file("icones/lumini.icns")) }
             windows {
+                iconFile.set(project.file("icones/lumini.ico"))
                 menu = true
                 shortcut = true
                 // Instala na pasta do usuário, sem pedir senha de administrador (computadores de laboratório).
