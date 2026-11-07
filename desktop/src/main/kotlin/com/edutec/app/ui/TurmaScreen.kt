@@ -140,6 +140,10 @@ fun TurmaScreen(
     membros: Carga<List<Membro>> = Carga.Carregando,
     onRecarregarAba: () -> Unit = {},
     onConvidar: () -> Unit = {},
+    /** UC05: junta origem em destino; [aoTerminar] recebe true se deu certo. */
+    onJuntarConceitos: (origem: String, destino: String, aoTerminar: (Boolean) -> Unit) -> Unit = { _, _, _ -> },
+    onMarcarDistintos: (String, String) -> Unit = { _, _ -> },
+    juntando: Boolean = false,
 ) {
     val avisar = LocalAvisar.current
 
@@ -217,7 +221,10 @@ fun TurmaScreen(
                 }
             }
         } else {
-            ConteudoGrafo(turma, dados, expandido, colunaTablet, colunaCelular, cabecalho, onNovaAtividade, simulando)
+            ConteudoGrafo(
+                turma, dados, expandido, colunaTablet, colunaCelular, cabecalho, onNovaAtividade, simulando,
+                onJuntarConceitos, onMarcarDistintos, juntando,
+            )
         }
     }
 }
@@ -232,11 +239,45 @@ private fun ConteudoGrafo(
     cabecalho: @Composable () -> Unit,
     onNovaAtividade: (Set<String>) -> Unit,
     simulando: Boolean,
+    onJuntarConceitos: (origem: String, destino: String, aoTerminar: (Boolean) -> Unit) -> Unit,
+    onMarcarDistintos: (String, String) -> Unit,
+    juntando: Boolean,
 ) {
     val avisar = LocalAvisar.current
     // Conceito selecionado: o tocado no grafo, ou o mais fraco da turma.
     var selecionado by rememberSaveable(turma.id) { mutableStateOf<String?>(null) }
     val conceito = selecionado?.let(dados::conceito) ?: dados.conceitoInicial()
+    // Diálogo "Juntar com outro conceito…": conceito de partida e, vindo do aviso, o parecido já escolhido.
+    var juntarDe by rememberSaveable(turma.id) { mutableStateOf<String?>(null) }
+    var juntarCom by rememberSaveable(turma.id) { mutableStateOf<String?>(null) }
+
+    juntarDe?.let(dados::conceito)?.let { de ->
+        DialogoJuntarConceitos(
+            conceito = de,
+            grafo = dados,
+            juntando = juntando,
+            escolhidoInicial = juntarCom,
+            onJuntar = { origem, destino ->
+                onJuntarConceitos(origem, destino) { ok ->
+                    if (ok) { selecionado = destino; juntarDe = null; juntarCom = null }
+                }
+            },
+            onDistintos = { a, b -> onMarcarDistintos(a, b) },
+            onFechar = { juntarDe = null; juntarCom = null },
+        )
+    }
+    val aviso: @Composable () -> Unit = {
+        AvisoDuplicatas(
+            dados.possiveisDuplicatas,
+            onRevisar = {
+                val par = dados.possiveisDuplicatas.first()
+                selecionado = par.conceitoA
+                juntarDe = par.conceitoA
+                juntarCom = null
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 
     val cartaoGrafo: @Composable (Modifier) -> Unit = { mod ->
         CartaoGrafo(dados, conceito?.nome, onSelecionar = { selecionado = it }, modifier = mod)
@@ -251,6 +292,7 @@ private fun ConteudoGrafo(
                 grafo = dados,
                 onReforco = { onNovaAtividade(setOf(conceito.nome)) },
                 onVerAlunos = { avisar("Lista de alunos com dificuldade (próxima versão)") },
+                onJuntar = { juntarDe = conceito.nome; juntarCom = null },
                 preencherAltura = expandido,
                 modifier = mod,
             )
@@ -263,6 +305,7 @@ private fun ConteudoGrafo(
             Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(Espaco)) {
                 ListaAlunos(dados.alunos, rolavel = true, modifier = Modifier.width(290.dp).fillMaxHeight())
                 Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(Espaco)) {
+                    aviso()
                     cartaoGrafo(Modifier.fillMaxWidth().weight(1f))
                     demonstracao()
                 }
@@ -272,6 +315,7 @@ private fun ConteudoGrafo(
     } else {
         Column(colunaCelular, verticalArrangement = Arrangement.spacedBy(Espaco)) {
             cabecalho()
+            aviso()
             cartaoGrafo(Modifier.fillMaxWidth().height(460.dp))
             demonstracao()
             painel(Modifier.fillMaxWidth())
@@ -736,6 +780,7 @@ private fun PainelConceito(
     grafo: GrafoTurma,
     onReforco: () -> Unit,
     onVerAlunos: () -> Unit,
+    onJuntar: () -> Unit,
     preencherAltura: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -814,6 +859,10 @@ private fun PainelConceito(
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AzulFundo, contentColor = Consolidado),
             ) { Text("Ver alunos com dificuldade", fontWeight = FontWeight.SemiBold) }
+            // Ação de manutenção do mapa: discreta, abaixo das ações principais.
+            TextButton(onClick = onJuntar, modifier = Modifier.fillMaxWidth().maoAoPassar()) {
+                Text("Juntar com outro conceito…", color = TextoSecundario, fontSize = 13.sp)
+            }
         }
     }
 }

@@ -11,6 +11,7 @@ import com.edutec.app.data.ErroTurmaApi
 import com.edutec.app.data.Membro
 import com.edutec.app.data.SessaoExpirada
 import com.edutec.app.data.GrafoTurma
+import com.edutec.app.data.ResultadoFusao
 import com.edutec.app.data.TurmaRepositorio
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -36,6 +37,8 @@ class TurmaViewModel(
     private val buscarAtividades: suspend (String) -> List<AtividadePublicada> = TurmaRepositorio::atividades,
     private val buscarMembros: suspend (String) -> List<Membro> = TurmaRepositorio::membros,
     private val buscarConvite: suspend (String, Boolean) -> Convite = TurmaRepositorio::convite,
+    private val fundirConceitos: suspend (String, String, String) -> ResultadoFusao = TurmaRepositorio::fundirConceitos,
+    private val marcarDistintos: suspend (String, String, String) -> Unit = TurmaRepositorio::marcarDistintos,
 ) : ViewModel() {
     var aba by mutableStateOf(ABA_GRAFO)
 
@@ -47,6 +50,10 @@ class TurmaViewModel(
 
     /** null = diálogo de convite fechado. */
     var convite by mutableStateOf<Carga<Convite>?>(null)
+        private set
+
+    /** Juntar conceitos (ou marcar como distintos) em andamento. */
+    var juntando by mutableStateOf(false)
         private set
 
     /** Simulação de demonstração em andamento. */
@@ -107,6 +114,41 @@ class TurmaViewModel(
                 aoTerminar((e as? ErroTurmaApi)?.message ?: "Não foi possível simular as respostas.")
             } finally {
                 simulando = false
+            }
+        }
+    }
+
+    /**
+     * Junta [origem] em [destino] na turma aberta e recarrega o grafo. [aoTerminar] recebe o resultado
+     * (sucesso) ou a mensagem de erro (ex.: formaria ciclo).
+     */
+    fun juntar(origem: String, destino: String, aoTerminar: (Result<ResultadoFusao>) -> Unit) {
+        val turma = turmaId ?: return
+        executarEdicao(turma, "juntar os conceitos", { fundirConceitos(turma, origem, destino) }, aoTerminar)
+    }
+
+    /** Marca dois conceitos parecidos como distintos (somem das possíveis duplicatas). */
+    fun marcarComoDistintos(conceitoA: String, conceitoB: String, aoTerminar: (Result<Unit>) -> Unit) {
+        val turma = turmaId ?: return
+        executarEdicao(turma, "marcar os conceitos", { marcarDistintos(turma, conceitoA, conceitoB) }, aoTerminar)
+    }
+
+    private fun <T> executarEdicao(turma: String, oQue: String, acao: suspend () -> T, aoTerminar: (Result<T>) -> Unit) {
+        if (juntando) return
+        juntando = true
+        viewModelScope.launch {
+            try {
+                val resultado = acao()
+                if (this@TurmaViewModel.turmaId == turma) {
+                    _grafo.value = EstadoGrafo.Pronto(buscarGrafo(turma))
+                }
+                aoTerminar(Result.success(resultado))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                aoTerminar(Result.failure(Exception((e as? ErroTurmaApi ?: e as? SessaoExpirada)?.message ?: "Não foi possível $oQue.")))
+            } finally {
+                juntando = false
             }
         }
     }

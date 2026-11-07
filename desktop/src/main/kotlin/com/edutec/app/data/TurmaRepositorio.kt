@@ -96,6 +96,18 @@ object TurmaRepositorio {
     suspend fun grafo(turmaId: String): GrafoTurma =
         chamar<RespostaGrafo>("grafo", "turma_id" to turmaId).paraGrafo()
 
+    /**
+     * Junta [origem] em [destino] (UC05): a origem some do mapa; questões, pré-requisitos e respostas
+     * passam para o destino e o domínio estimado dele é recalculado. Recusa se formar ciclo.
+     */
+    suspend fun fundirConceitos(turmaId: String, origem: String, destino: String): ResultadoFusao =
+        chamar("fundir_conceitos", "turma_id" to turmaId, "origem" to origem, "destino" to destino)
+
+    /** O professor diz que os dois conceitos parecidos são diferentes: saem das possíveis duplicatas. */
+    suspend fun marcarDistintos(turmaId: String, conceitoA: String, conceitoB: String) {
+        chamar<JsonObject>("marcar_distintos", "turma_id" to turmaId, "conceito_a" to conceitoA, "conceito_b" to conceitoB)
+    }
+
     /** DEMONSTRAÇÃO: simula 25 alunos (pseudônimos) respondendo; substitui a simulação anterior da turma. */
     suspend fun simular(turmaId: String) {
         chamar<RespostaSimular>("simular", "turma_id" to turmaId)
@@ -177,9 +189,25 @@ private data class PerfilApi(val nome: String, val email: String? = null)
 private data class RespostaSimular(@SerialName("n_respostas") val respostas: Int)
 
 @Serializable
+data class ResultadoFusao(
+    val origem: String,
+    val destino: String,
+    @SerialName("n_respostas") val respostas: Int = 0,
+    @SerialName("n_alunos") val alunos: Int = 0,
+)
+
+@Serializable
+private data class DuplicataApi(
+    @SerialName("conceito_a") val conceitoA: String,
+    @SerialName("conceito_b") val conceitoB: String,
+    val similaridade: Double = 0.0,
+)
+
+@Serializable
 private data class RespostaGrafo(
     val conceitos: List<ConceitoApi>,
     val alunos: List<AlunoApi>,
+    @SerialName("possiveis_duplicatas") val possiveisDuplicatas: List<DuplicataApi> = emptyList(),
 ) {
     fun paraGrafo() = GrafoTurma(
         conceitos = conceitos.map {
@@ -195,6 +223,7 @@ private data class RespostaGrafo(
             )
         },
         alunos = alunos.mapNotNull { a -> estadoDoServidor(a.piorEstado)?.let { Aluno(a.rotulo, it) } },
+        possiveisDuplicatas = possiveisDuplicatas.map { PossivelDuplicata(it.conceitoA, it.conceitoB, it.similaridade) },
     )
 }
 
