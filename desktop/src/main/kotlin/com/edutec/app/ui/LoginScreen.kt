@@ -43,9 +43,7 @@ import com.edutec.app.ui.theme.FormaLg
 import com.edutec.app.ui.theme.FormaMd
 import com.edutec.app.ui.theme.Fundo
 import com.edutec.app.ui.theme.Primaria
-import com.edutec.app.ui.theme.Sora
 import com.edutec.app.ui.theme.Superficie
-import com.edutec.app.ui.theme.Tinta
 import com.edutec.app.ui.theme.TintaSuave
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -69,7 +67,7 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(Espaco4),
             ) {
-                Text("LUMINI", color = Tinta, fontFamily = Sora, fontSize = 30.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                LogoLumini(altura = 72.dp)
                 Text(
                     "Grafo de conhecimento da turma e domínio estimado de cada conceito.",
                     color = TintaSuave, fontSize = 15.sp, textAlign = TextAlign.Center,

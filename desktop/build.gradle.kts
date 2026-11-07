@@ -37,6 +37,14 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
 }
 
+// Logo do Design System: os SVGs vêm de docs/design/logo (fonte única), empacotados em resources/logo.
+tasks.named<ProcessResources>("processResources") {
+    from(rootProject.file("docs/design/logo")) {
+        include("lumini-horizontal-primaria.svg", "lumini-horizontal-branco.svg", "lumini-simbolo-primaria.svg")
+        into("logo")
+    }
+}
+
 compose.desktop {
     application {
         mainClass = "com.edutec.app.MainKt"

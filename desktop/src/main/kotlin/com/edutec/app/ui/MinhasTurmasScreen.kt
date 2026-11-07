@@ -241,13 +241,7 @@ private fun BarraSuperior(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "LUMINI",
-            color = Tinta,
-            fontFamily = Sora, fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.5.sp,
-        )
+        LogoLumini()
         Spacer(Modifier.weight(1f))
 
         Box {
