@@ -318,6 +318,12 @@ Problema: PDFs diferentes sobre o mesmo assunto davam o mesmo conceito com nomes
 - **Dados existentes** (migration `..130000_fundir_conceitos_iguais`): funde só os de nome normalizado
   IGUAL, no mais antigo do grupo. Prévia sem alterar nada: `supabase/tests/previa_fundir_conceitos.sql`
   (em 06/11: só "Calculo I", 5 fusões, 12 → 7 conceitos).
+- **Aplicado em produção em 06/11/2026** (as duas migrations + deploy de `turma-api` e `gerar-atividade`),
+  depois de ensaiar a `..130000` numa transação desfeita. Backup antes: `amostras/backup-calculo-i-2026-11-06.json`
+  (conceitos, respostas, domínio e atividades da Calculo I). Teste de ponta a ponta numa cópia da Calculo I
+  na conta de teste, com o `introducao-probabilidade.pdf` (o PDF que gerou as duplicatas): as gerações
+  antigas do cache e uma nova ("difícil", 63 s, modelo reserva) ficaram nos mesmos 7 conceitos; a IA
+  reutilizou os 6 nomes da turma. API no ar: fundir em turma alheia → 404, ciclo → 409 com o caminho.
 - Testes: `supabase/tests/database/conceitos.test.sql` (41). Rodar local sem tocar na produção:
   `npx supabase db start` (Docker; aplica as migrations) e `npx supabase test db supabase/tests/database`.
 
