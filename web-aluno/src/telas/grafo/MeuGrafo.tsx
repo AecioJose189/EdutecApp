@@ -30,14 +30,14 @@ export function MeuGrafo() {
 
   return (
     <main className="pagina grafo-pagina">
-      <Topo titulo="Meu grafo" voltarPara="/" />
+      <Topo titulo="Mapa do conhecimento" voltarPara="/" />
       {turma && (
         <p className="secundario">
           {turma.nome} · {turma.codigo}
         </p>
       )}
 
-      {estado.tipo === 'carregando' && <Carregando texto="Montando o seu grafo…" />}
+      {estado.tipo === 'carregando' && <Carregando texto="Montando o seu mapa do conhecimento…" />}
       {estado.tipo === 'erro' && <AvisoErro erro={estado.erro} aoRepetir={repetir} />}
       {estado.tipo === 'ok' &&
         (estado.dados.conceitos.length === 0 ? (
@@ -87,7 +87,7 @@ function Conteudo({
       <div className="cartao grafo-cartao">
         <GrafoSvg conceitos={conceitos} selecionado={selecionado} aoSelecionar={aoSelecionar} />
         <p className="secundario pequeno grafo-dica">
-          Arraste para ver o grafo todo. Toque num conceito para ver os detalhes. As setas vão do pré-requisito para o
+          Arraste para ver o mapa todo. Toque num conceito para ver os detalhes. As setas vão do pré-requisito para o
           conceito que depende dele.
         </p>
       </div>
