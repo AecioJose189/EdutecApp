@@ -12,7 +12,7 @@ export function EntrarNaTurma({ turma, aoEntrar }: { turma: Turma; aoEntrar: () 
           Ao entrar, você passa a ser aluno desta turma e a atividade abre em seguida. Suas respostas atualizam o seu
           mapa do conhecimento.
         </p>
-        <button className="botao largo" onClick={aoEntrar} autoFocus>
+        <button className="botao largo" onClick={aoEntrar}>
           Entrar na turma e começar
         </button>
       </section>

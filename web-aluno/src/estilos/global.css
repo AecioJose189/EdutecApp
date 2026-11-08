@@ -846,3 +846,10 @@ a.cartao:active {
 .privacidade li {
   margin-bottom: var(--espaco-2);
 }
+
+/* Link de texto com área de toque de 44 px. */
+.link-toque {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--toque-minimo);
+}

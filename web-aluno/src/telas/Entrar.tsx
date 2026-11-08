@@ -57,7 +57,7 @@ export function Entrar() {
         )}
         {apiSimulada && <p className="secundario">Modo simulado: o login é de mentira e nenhum dado sai do celular.</p>}
         <p className="secundario">
-          <Link to="/privacidade">Política de privacidade</Link>
+          <Link to="/privacidade" className="link-toque">Política de privacidade</Link>
         </p>
       </div>
     </main>
