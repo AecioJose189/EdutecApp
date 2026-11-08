@@ -1,10 +1,11 @@
 import type { EstadoConceito } from '../api/tipos'
 
-export const estados: Record<EstadoConceito, { simbolo: string; rotulo: string; cor: string }> = {
-  consolidado: { simbolo: '✓', rotulo: 'Consolidado', cor: '#1F5BA8' },
-  em_desenvolvimento: { simbolo: '~', rotulo: 'Em desenvolvimento', cor: '#F2C14E' },
-  revisar: { simbolo: '!', rotulo: 'Revisar', cor: '#D0531F' },
-  sem_dados: { simbolo: '?', rotulo: 'Sem dados', cor: '#9A968E' },
+// Cores: classes .estado-<estado> em estilos/global.css (tokens do tema).
+export const estados: Record<EstadoConceito, { simbolo: string; rotulo: string }> = {
+  consolidado: { simbolo: '✓', rotulo: 'Consolidado' },
+  em_desenvolvimento: { simbolo: '~', rotulo: 'Em desenvolvimento' },
+  revisar: { simbolo: '!', rotulo: 'Revisar' },
+  sem_dados: { simbolo: '?', rotulo: 'Sem dados' },
 }
 
 /** Estado de aprendizagem sempre com símbolo além da cor. */
