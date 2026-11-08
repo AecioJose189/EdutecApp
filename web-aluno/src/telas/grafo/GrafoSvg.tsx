@@ -168,7 +168,7 @@ export function GrafoSvg({ conceitos, selecionado, aoSelecionar }: Props) {
                 role="button"
                 tabIndex={0}
                 aria-pressed={sel}
-                aria-label={`${c.nome}: ${e.rotulo}`}
+                aria-label={`${c.nome}: ${e.rotulo}, ${c.n_respostas === 1 ? '1 resposta' : `${c.n_respostas} respostas`}`}
                 onClick={() => aoSelecionar(c.nome)}
                 onKeyDown={(ev) => {
                   if (ev.key === 'Enter' || ev.key === ' ') {

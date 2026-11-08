@@ -5,6 +5,24 @@ export function formatarDominio(d: number | null): string {
   return d === null ? '—' : `${Math.round(d * 100)}%`
 }
 
+/** Abaixo disto o domínio estimado ainda muda muito a cada resposta: o conceito leva o selo "poucos dados". */
+export const MINIMO_RESPOSTAS = 5
+
+/** "baseado em N respostas" e, com menos de 5, o selo "poucos dados". */
+export function BaseRespostas({ n }: { n: number }) {
+  if (n === 0) return <span className="secundario pequeno">Ainda sem respostas</span>
+  return (
+    <span className="base-respostas pequeno">
+      <span className="secundario">baseado em {n === 1 ? '1 resposta' : `${n} respostas`}</span>
+      {n < MINIMO_RESPOSTAS && (
+        <span className="selo-poucos-dados">
+          poucos dados<span className="so-leitor">: a estimativa ainda pode mudar bastante</span>
+        </span>
+      )}
+    </span>
+  )
+}
+
 interface Props {
   conceito: ConceitoAluno
   todos: ConceitoAluno[]
@@ -16,7 +34,6 @@ export function PainelConceito({ conceito, todos, aoSelecionar, aoFechar }: Prop
   const porNome = new Map(todos.map((c) => [c.nome, c]))
   const pres = conceito.prerequisitos.map((n) => porNome.get(n)).filter((c): c is ConceitoAluno => !!c)
   const dependentes = todos.filter((c) => c.prerequisitos.includes(conceito.nome))
-  const respostas = conceito.n_respostas === 1 ? '1 resposta' : `${conceito.n_respostas} respostas`
 
   return (
     <section className="cartao painel-conceito" aria-live="polite">
@@ -44,7 +61,7 @@ export function PainelConceito({ conceito, todos, aoSelecionar, aoFechar }: Prop
           <p className="secundario pequeno">Chance estimada de você saber o conceito; não é nota.</p>
         </div>
       )}
-      <p className="corpo">Com base em {respostas} suas.</p>
+      <BaseRespostas n={conceito.n_respostas} />
 
       {pres.length > 0 && <ListaLigados titulo="Depende de" conceitos={pres} aoSelecionar={aoSelecionar} />}
       {dependentes.length > 0 && (
@@ -71,8 +88,11 @@ function ListaLigados({
           <li key={c.nome}>
             <button className="ligado" onClick={() => aoSelecionar(c.nome)}>
               <SeloEstado estado={c.estado} comRotulo={false} />
-              <span>{c.nome}</span>
-              <span className="secundario">{formatarDominio(c.dominio)}</span>
+              <span className="ligado-texto">
+                {c.nome}
+                <BaseRespostas n={c.n_respostas} />
+              </span>
+              <span className="ligado-dominio">{formatarDominio(c.dominio)}</span>
             </button>
           </li>
         ))}

@@ -8,7 +8,7 @@ import { estados, SeloEstado } from '../../componentes/SeloEstado'
 import { Topo } from '../../componentes/Topo'
 import { useChamada } from '../../componentes/useChamada'
 import { GrafoSvg } from './GrafoSvg'
-import { formatarDominio, PainelConceito } from './PainelConceito'
+import { BaseRespostas, formatarDominio, MINIMO_RESPOSTAS, PainelConceito } from './PainelConceito'
 
 const ORDEM_ESTADOS: EstadoConceito[] = ['consolidado', 'em_desenvolvimento', 'revisar', 'sem_dados']
 /** Na lista, primeiro o que pede atenção. */
@@ -75,6 +75,17 @@ function Conteudo({
 
   return (
     <>
+      <div className="cartao aviso-info">
+        <p>
+          <strong>Domínio estimado</strong> é a chance estimada de você saber o conceito, atualizada a cada resposta.{' '}
+          <strong>Não é nota.</strong>
+        </p>
+        <p className="pequeno">
+          Com menos de {MINIMO_RESPOSTAS} respostas o conceito leva o selo “poucos dados”: a estimativa ainda pode mudar
+          bastante.
+        </p>
+      </div>
+
       <div className="legenda" aria-label="Legenda">
         {contagem.map(([e, n]) => (
           <span key={e} className="legenda-item">
@@ -106,18 +117,18 @@ function Conteudo({
                   onClick={() => aoSelecionar(c.nome)}
                 >
                   <SeloEstado estado={c.estado} comRotulo={false} />
-                  <span>{c.nome}</span>
-                  <span className="secundario" title={estados[c.estado].rotulo}>
+                  <span className="ligado-texto">
+                    {c.nome}
+                    <BaseRespostas n={c.n_respostas} />
+                  </span>
+                  <span className="ligado-dominio" title={estados[c.estado].rotulo}>
                     {formatarDominio(c.dominio)}
                   </span>
                 </button>
               </li>
             ))}
         </ul>
-        <p className="secundario pequeno">
-          A porcentagem é o domínio estimado: a chance estimada de você saber o conceito, calculada a partir das suas
-          respostas. Não é nota.
-        </p>
+        <p className="secundario pequeno">A porcentagem é o domínio estimado de cada conceito; não é nota.</p>
       </section>
     </>
   )
