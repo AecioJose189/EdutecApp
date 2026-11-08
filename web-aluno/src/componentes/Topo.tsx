@@ -16,11 +16,14 @@ export function Topo({ titulo, voltarPara, direita }: { titulo: ReactNode; volta
   )
 }
 
+/** Logo horizontal do Lumini (versão branca no tema escuro, como pede o Design System). */
 export function Marca() {
   return (
     <span className="marca">
-      <span className="marca-icone" aria-hidden="true" />
-      Lumini
+      <picture>
+        <source srcSet="/lumini-horizontal-branco.svg" media="(prefers-color-scheme: dark)" />
+        <img src="/lumini-horizontal-primaria.svg" alt="Lumini" width={128} height={47} />
+      </picture>
     </span>
   )
 }

@@ -57,7 +57,11 @@ export interface ConceitoAluno {
 export interface AcoesAlunoApi {
   minhas_turmas: { entrada: Record<string, never>; saida: { turmas: Turma[] } }
   aceitar_convite: { entrada: { codigo: string }; saida: { turma: Turma; ja_era_membro: boolean } }
-  entrar_sessao: { entrada: { token: string }; saida: Tentativa }
+  /**
+   * `entrar_na_turma: true` (fase 2, PROVISÓRIO até a função do Júlio estar no ar): quem leu o QR sem estar na
+   * turma entra nela e já recebe a tentativa. Sem o campo, o servidor responde `nao_matriculado` com `turma`.
+   */
+  entrar_sessao: { entrada: { token: string; entrar_na_turma?: boolean }; saida: Tentativa }
   enviar_respostas: { entrada: { tentativa_id: string; respostas: Resposta[] }; saida: ResultadoEnvio }
   meu_grafo: { entrada: { turma_id: string }; saida: { conceitos: ConceitoAluno[] } }
 }
@@ -75,11 +79,13 @@ export type CodigoErro =
   | 'erro_interno'
   | 'sem_conexao'
 
-/** Erro vindo do servidor (`{ erro, mensagem }`) ou da rede. */
+/** Erro vindo do servidor (`{ erro, mensagem, ...detalhes }`) ou da rede. */
 export class ErroApi extends Error {
   constructor(
     public codigo: CodigoErro | string,
     mensagem: string,
+    /** Campos extras do corpo do erro (ex.: `turma` no `nao_matriculado` de `entrar_sessao`). */
+    public detalhes: Record<string, unknown> = {},
   ) {
     super(mensagem)
   }

@@ -106,7 +106,7 @@ export function GrafoSvg({ conceitos, selecionado, aoSelecionar }: Props) {
           height={altura}
           viewBox={`0 0 ${largura} ${altura}`}
           role="group"
-          aria-label="Grafo de conceitos: cada seta vai de um pré-requisito para o conceito que depende dele"
+          aria-label="Mapa do conhecimento: cada seta vai de um pré-requisito para o conceito que depende dele"
         >
           <defs>
             <marker
@@ -118,7 +118,7 @@ export function GrafoSvg({ conceitos, selecionado, aoSelecionar }: Props) {
               markerHeight="7"
               orient="auto-start-reverse"
             >
-              <path d="M0,0 L10,5 L0,10 z" fill="#B5B0A6" />
+              <path d="M0,0 L10,5 L0,10 z" className="grafo-ponta" />
             </marker>
             <marker
               id="seta-forte"
@@ -129,7 +129,7 @@ export function GrafoSvg({ conceitos, selecionado, aoSelecionar }: Props) {
               markerHeight="7"
               orient="auto-start-reverse"
             >
-              <path d="M0,0 L10,5 L0,10 z" fill="#1A1A1A" />
+              <path d="M0,0 L10,5 L0,10 z" className="grafo-ponta forte" />
             </marker>
           </defs>
 
@@ -147,9 +147,7 @@ export function GrafoSvg({ conceitos, selecionado, aoSelecionar }: Props) {
                   <path
                     key={`${p}→${c.nome}`}
                     d={`M${x1},${a.y} C${meio},${a.y} ${meio},${b.y} ${x2},${b.y}`}
-                    fill="none"
-                    stroke={forte ? '#1A1A1A' : '#C9C6BF'}
-                    strokeWidth={forte ? 2.5 : 2}
+                    className={`grafo-seta${forte ? ' forte' : ''}`}
                     markerEnd={`url(#${forte ? 'seta-forte' : 'seta'})`}
                   />
                 )
@@ -170,7 +168,7 @@ export function GrafoSvg({ conceitos, selecionado, aoSelecionar }: Props) {
                 role="button"
                 tabIndex={0}
                 aria-pressed={sel}
-                aria-label={`${c.nome}: ${e.rotulo}`}
+                aria-label={`${c.nome}: ${e.rotulo}, ${c.n_respostas === 1 ? '1 resposta' : `${c.n_respostas} respostas`}`}
                 onClick={() => aoSelecionar(c.nome)}
                 onKeyDown={(ev) => {
                   if (ev.key === 'Enter' || ev.key === ' ') {
@@ -187,18 +185,13 @@ export function GrafoSvg({ conceitos, selecionado, aoSelecionar }: Props) {
                   height={ALTURA_LINHA - 8}
                   fill="transparent"
                 />
-                {sel && <circle r={RAIO + 6} fill="none" stroke="#1A1A1A" strokeWidth={3} />}
-                <circle r={RAIO} fill={e.cor} stroke="#fff" strokeWidth={3} />
-                <text
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fontSize={20}
-                  fontWeight={800}
-                  fill={c.estado === 'em_desenvolvimento' ? '#3D300A' : '#fff'}
-                >
+                <circle r={RAIO + 10} className="no-anel-foco" />
+                {sel && <circle r={RAIO + 6} className="no-anel" />}
+                <circle r={RAIO} className={`no-circulo ${c.estado}`} />
+                <text textAnchor="middle" dominantBaseline="central" className={`no-simbolo ${c.estado}`}>
                   {e.simbolo}
                 </text>
-                <text textAnchor="middle" y={RAIO + 20} fontSize={15} fill="#1A1A1A" fontWeight={sel ? 700 : 500}>
+                <text textAnchor="middle" y={RAIO + 20} className="no-nome">
                   {linhas.map((l, i) => (
                     <tspan key={i} x={0} dy={i === 0 ? 0 : 18}>
                       {l}

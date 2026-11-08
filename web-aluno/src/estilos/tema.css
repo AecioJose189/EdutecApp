@@ -1,0 +1,114 @@
+/*
+ * Tema do Lumini: uma variável para cada token de docs/design/tokens.json.
+ * ÚNICO lugar com cores literais no site. Ao trocar a paleta, só este arquivo muda.
+ */
+:root {
+  color-scheme: light dark;
+
+  /* ---------- Cores (tema claro) ---------- */
+  --primaria: #0f5765;
+  --primaria-forte: #0b4651;
+  --sobre-primaria: #fefefe;
+  --menta: #a2d7c9;
+  --menta-suave: #dcefe9;
+  --teal-medio: #709fa5;
+  --acento: #02d496;
+  --sobre-acento: #12302f;
+  --fundo: #f3f8f6;
+  --superficie: #fefefe;
+  --tinta: #12302f;
+  --tinta-suave: #4a6461;
+  --borda: #d5e3df;
+  --borda-controle: #5e8c92;
+  --foco: #0f5765;
+  --estado-consolidado: #0f5765;
+  --estado-desenvolvimento: #f2c14e;
+  --estado-revisar: #b8461a;
+  --estado-sem-dados: #6f807d;
+  --sobre-consolidado: #fefefe;
+  --sobre-desenvolvimento: #12302f;
+  --sobre-revisar: #fefefe;
+  --erro: #b3261e;
+
+  /* Fundo escurecido atrás de diálogos (derivado de tinta). */
+  --veu: rgb(18 48 47 / 0.45);
+
+  /* ---------- Tipografia ---------- */
+  --fonte-display: 'Sora', 'DM Sans', system-ui, sans-serif;
+  --fonte-sans: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --titulo-1-tamanho: 40px;
+  --titulo-1-altura: 46px;
+  --titulo-1-peso: 700;
+  --titulo-1-espacamento: -0.01em;
+  --titulo-2-tamanho: 28px;
+  --titulo-2-altura: 34px;
+  --titulo-2-peso: 700;
+  --titulo-3-tamanho: 20px;
+  --titulo-3-altura: 26px;
+  --titulo-3-peso: 600;
+  --numero-tamanho: 32px;
+  --numero-altura: 36px;
+  --numero-peso: 700;
+  --corpo-tamanho: 16px;
+  --corpo-altura: 24px;
+  --corpo-peso: 400;
+  --corpo-forte-peso: 600;
+  --apoio-tamanho: 14px;
+  --apoio-altura: 20px;
+  --rotulo-tamanho: 12px;
+  --rotulo-altura: 16px;
+  --rotulo-peso: 700;
+  --rotulo-espacamento: 0.08em;
+
+  /* ---------- Espaço e forma ---------- */
+  --espaco-1: 4px;
+  --espaco-2: 8px;
+  --espaco-3: 12px;
+  --espaco-4: 16px;
+  --espaco-6: 24px;
+  --espaco-8: 32px;
+  --espaco-12: 48px;
+
+  --raio-sm: 8px;
+  --raio-md: 14px;
+  --raio-lg: 22px;
+  --raio-pilula: 999px;
+
+  --sombra-cartao: 0 1px 2px rgba(15, 87, 101, 0.08), 0 6px 18px rgba(15, 87, 101, 0.06);
+
+  /* Acessibilidade: área mínima de toque. */
+  --toque-minimo: 44px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primaria: #a2d7c9;
+    --primaria-forte: #c3e6dc;
+    --sobre-primaria: #0c1f22;
+    --menta: #24504c;
+    --menta-suave: #183b3a;
+    --teal-medio: #709fa5;
+    --acento: #02d496;
+    --sobre-acento: #0c1f22;
+    --fundo: #0c1f22;
+    --superficie: #132b2f;
+    --tinta: #e6f1ee;
+    --tinta-suave: #9db5b1;
+    --borda: #24393c;
+    --borda-controle: #6f9aa0;
+    --foco: #a2d7c9;
+    --estado-consolidado: #1f7a88;
+    --estado-desenvolvimento: #f2c14e;
+    --estado-revisar: #e8723f;
+    --estado-sem-dados: #7f9894;
+    --sobre-consolidado: #fefefe;
+    --sobre-desenvolvimento: #12302f;
+    --sobre-revisar: #0c1f22;
+    --erro: #ff8a80;
+
+    --veu: rgb(0 0 0 / 0.6);
+
+    --sombra-cartao: 0 1px 2px rgba(0, 0, 0, 0.45);
+  }
+}

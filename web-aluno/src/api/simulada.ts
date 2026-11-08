@@ -1,7 +1,9 @@
 // Modo simulado (VITE_API_SIMULADA=true): devolve os exemplos de docs/contrato-api-mvp.md sem tocar no
 // Supabase. Valores especiais disparam os erros do contrato, para testar todas as telas:
 //   convite  XXXXXX                     → convite_invalido
-//   token    expirado | encerrada | fora → qr_expirado | sessao_encerrada | nao_matriculado
+//   token    expirado | encerrada        → qr_expirado | sessao_encerrada
+//   token    fora                        → nao_matriculado com a turma; com entrar_na_turma: true, entra e abre
+//   token    fora-antigo                 → nao_matriculado sem a turma (como o servidor do MVP)
 //   token    deslogado                  → nao_autenticado (sai e volta para o login)
 //   token    enviada                    → tentativa com ja_enviada = true
 //   token    rapida                     → prazo de 45 s (para ver o cronômetro acabar)
@@ -178,7 +180,18 @@ export async function chamarSimulada<A extends Acao>(
       }
       if (token === 'expirado') throw new ErroApi('qr_expirado', 'Este código QR já expirou.')
       if (token === 'encerrada') throw new ErroApi('sessao_encerrada', 'O professor já encerrou esta atividade.')
-      if (token === 'fora') throw new ErroApi('nao_matriculado', 'Sua conta não faz parte da turma desta atividade.')
+      if (token === 'fora-antigo') {
+        throw new ErroApi('nao_matriculado', 'Sua conta não faz parte da turma desta atividade.')
+      }
+      if (token === 'fora' && !turmasDoAluno.has(TURMA_IA.id)) {
+        if (!p.entrar_na_turma) {
+          throw new ErroApi('nao_matriculado', 'Sua conta não faz parte da turma desta atividade.', {
+            turma: { id: TURMA_IA.id, nome: TURMA_IA.nome, codigo: TURMA_IA.codigo },
+          })
+        }
+        turmasDoAluno.set(TURMA_IA.id, TURMA_IA)
+        guardar('sim.turmas', [...turmasDoAluno])
+      }
       return tentativa(token) as Saida
     }
 

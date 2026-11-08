@@ -46,7 +46,8 @@ async function chamarReal<A extends Acao>(
     const resposta = error.context as Response
     const corpo = await resposta.json().catch(() => null)
     if (corpo && typeof corpo.erro === 'string') {
-      throw new ErroApi(corpo.erro, typeof corpo.mensagem === 'string' ? corpo.mensagem : '')
+      const { erro, mensagem, ...detalhes } = corpo
+      throw new ErroApi(erro, typeof mensagem === 'string' ? mensagem : '', detalhes)
     }
     // Token ausente ou vencido é barrado pela plataforma (verify_jwt), sem o JSON do contrato.
     if (resposta.status === 401) throw new ErroApi('nao_autenticado', '')
