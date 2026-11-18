@@ -22,11 +22,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.edutec.app.ui.theme.Pilula
-import com.edutec.app.ui.theme.TextoPrincipal
+import com.edutec.app.ui.theme.MentaSuave
+import com.edutec.app.ui.theme.Tinta
+import java.net.URI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.net.URI
 
 /** Foto do Google (baixada uma vez por URL); sem foto ou sem rede, as iniciais. */
 @Composable
@@ -41,13 +41,13 @@ fun FotoUsuario(nome: String, fotoUrl: String?, tamanho: Dp = 44.dp) {
             }.getOrNull()
         }?.also { fotosBaixadas[fotoUrl] = it }
     }
-    Surface(shape = CircleShape, color = Pilula, modifier = Modifier.size(tamanho)) {
+    Surface(shape = CircleShape, color = MentaSuave, modifier = Modifier.size(tamanho)) {
         val atual = foto
         if (atual != null) {
             Image(atual, contentDescription = nome, contentScale = ContentScale.Crop, modifier = Modifier.size(tamanho).clip(CircleShape))
         } else {
             Box(contentAlignment = Alignment.Center) {
-                Text(iniciais(nome), color = TextoPrincipal, fontSize = (tamanho.value * 0.36f).sp, fontWeight = FontWeight.SemiBold)
+                Text(iniciais(nome), color = Tinta, fontSize = (tamanho.value * 0.36f).sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }

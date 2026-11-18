@@ -14,6 +14,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -24,6 +25,7 @@ import com.edutec.app.ui.EdutecApp
 import com.edutec.app.ui.LocalAcoesVoltar
 import com.edutec.app.ui.LocalAvisar
 import com.edutec.app.ui.LocalJanela
+import com.edutec.app.ui.simboloLumini
 import com.edutec.app.ui.theme.EdutecTheme
 import kotlinx.coroutines.launch
 import java.awt.Dimension
@@ -35,6 +37,7 @@ fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         title = "Lumini",
+        icon = remember { simboloLumini(Density(1f)) },
         state = estadoJanela,
         onPreviewKeyEvent = { evento ->
             evento.type == KeyEventType.KeyDown && evento.key == Key.Escape && acoesVoltar.voltar()

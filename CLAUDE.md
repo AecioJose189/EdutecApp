@@ -53,8 +53,22 @@ Plataforma decidida com o professor da disciplina:
   (`Turma`, `Conceito`, `EstadoConceito`, `NovaAtividadeScreen`...).
 - Pacote base `com.edutec.app`: `data/` (modelos e acesso a dados) e `ui/` (telas, componentes, `theme/`).
   Desktop em `desktop/src/main/kotlin/`, Android (congelado) em `app/src/main/java/`.
-- Seguir o visual já existente (cores em `ui/theme/Color.kt`, cantos grandes, abas em pílula). Estado de
-  aprendizagem sempre com **símbolo além da cor**: ✓ consolidado, ~ em desenvolvimento, ! revisar, ? sem dados.
+- **Design System:** `docs/design/design-system.md` + `docs/design/tokens.json` (logos em `docs/design/logo/`).
+  - **Cores só via tokens.** Cada token tem constante clara e escura em `ui/theme/Color.kt`; o `ColorScheme`
+    do Material 3 sai deles em `ui/theme/Theme.kt`. Nas telas use os atalhos de `Theme.kt` (`Primaria`,
+    `Tinta`, `TintaSuave`, `Superficie`, `Menta`, `EstadoRevisar`...), que seguem o tema claro/escuro.
+    **Nenhuma cor literal (`Color(0x...)`, `Color.White`...) fora desses dois arquivos.** Cor nova = token novo
+    no `tokens.json` e no `Color.kt` (combine com o grupo de design).
+  - Dentro de `Canvas`/`drawBehind` (não são `@Composable`), leia o token antes: `val cor = TealMedio`.
+  - Texto sobre `primaria` em `SobrePrimaria`; sobre `menta` (seleção, aba ativa) sempre `Tinta`.
+    Par novo de texto e fundo → acrescente no `ContrasteTest` (4,5:1 nos dois temas).
+  - Estado de aprendizagem sempre com **símbolo além da cor** (✓ consolidado, ~ em desenvolvimento, ! revisar,
+    ? sem dados): use `SeloEstado(estado)` / `ChipEstado(estado)` de `ui/Componentes.kt` (`null` = sem dados,
+    contorno tracejado).
+  - Tipografia em `ui/theme/Type.kt`: Sora em títulos e números (`fontFamily = Sora`, `EstiloNumero`,
+    `.comNumeros()` para algarismos tabulares; o DM Sans não tem `tnum`), DM Sans no resto (padrão do tema).
+  - Forma em `ui/theme/Forma.kt`: espaços `Espaco1..Espaco12` (grade de 4 dp), cantos `FormaSm/Md/Lg/Pilula`;
+    cartões comuns em `Superficie` com borda `Borda` de `EspessuraBorda`, sem sombra.
 - Usar "**refazer**" (nunca "reteste") e "**domínio estimado**" (deixar claro que não é nota).
 - Lógica de rede e de estado em **ViewModel**, não dentro dos Composables.
 - Manter os `@Preview` nas telas (no desktop, `org.jetbrains.compose.ui.tooling.preview.Preview`, sem tamanho).
@@ -65,7 +79,10 @@ Plataforma decidida com o professor da disciplina:
 
 ```bash
 ./gradlew :desktop:run          # professor (desktop); em dev usa SUPABASE_* do local.properties
-./gradlew :desktop:test         # testes unitários (layout do grafo, causa raiz, LaTeX, semestres)
+./gradlew :desktop:test         # testes unitários (layout do grafo, causa raiz, LaTeX, semestres, contraste)
+LUMINI_TEMA=escuro ./gradlew :desktop:run   # força o tema (padrão: o do sistema)
+LUMINI_CAPTURAS=/tmp/cap ./gradlew :desktop:test --tests '*CapturasTelasTest*'  # @Preview em PNG, 2 temas
+python3 scripts/gerar-icones.py # ícones dos instaladores (desktop/icones) a partir do símbolo
 ./gradlew :desktop:packageDeb   # instalador Linux; no Windows: gradlew.bat :desktop:packageMsi
 ./gradlew assembleDebug         # Android congelado: app/build/outputs/apk/debug/app-debug.apk
 ```
@@ -326,6 +343,22 @@ Problema: PDFs diferentes sobre o mesmo assunto davam o mesmo conceito com nomes
   reutilizou os 6 nomes da turma. API no ar: fundir em turma alheia → 404, ciclo → 409 com o caminho.
 - Testes: `supabase/tests/database/conceitos.test.sql` (41). Rodar local sem tocar na produção:
   `npx supabase db start` (Docker; aplica as migrations) e `npx supabase test db supabase/tests/database`.
+
+## Design System no desktop (07/11/2026, branch `fase1-design`)
+
+- Paleta teal/menta com tema claro e escuro (segue o sistema; `LUMINI_TEMA=claro|escuro` ou
+  `-Dlumini.tema=` força). A paleta antiga (azul, roxo, creme, laranja) saiu toda.
+- Fontes Sora e DM Sans (`.ttf` estáticos do Google Fonts, com as licenças OFL) em `resources/font`.
+- Logo: `ui/Logo.kt` (`LogoLumini`: horizontal primaria no claro, branco no escuro) na entrada e no topo de
+  Minhas turmas; símbolo como ícone da janela. Os SVGs **não são copiados**: o `processResources` do
+  `:desktop` os pega de `docs/design/logo`. `carregarSvg` põe `width`/`height` do `viewBox` (sem isso o
+  Skia assume 100×100 e achata o desenho).
+- Ícones dos instaladores em `desktop/icones/` (`.png`/`.ico`/`.icns`, versionados), gerados por
+  `scripts/gerar-icones.py` (librsvg + Pillow; símbolo sobre quadrado claro arredondado). Quando o grupo
+  de design entregar o símbolo simplificado para 16–32 px: `--pequeno <svg>` e gerar de novo.
+- Conferido: `ContrasteTest` (todos os pares de texto ≥ 4,5:1 e controles ≥ 3:1 nos dois temas), capturas
+  dos `@Preview` nos dois temas e o `.deb` rodando no Xvfb (logo e fontes carregados do pacote).
+- O `:app` Android congelado não foi tocado (continua com a paleta antiga).
 
 Ainda não existe: correção das abertas, edição na Revisão, prazo/liberação na publicação, gerar a partir do
 grafo, abas Materiais/Estatísticas, histórico semanal, "Ver alunos com dificuldade".

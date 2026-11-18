@@ -6,7 +6,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
+import com.edutec.app.ui.theme.QrFundo
+import com.edutec.app.ui.theme.QrModulo
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.common.BitMatrix
@@ -32,9 +33,9 @@ fun CodigoQr(texto: String, modifier: Modifier = Modifier) {
         val modulo = floor(min(size.width, size.height) / n).coerceAtLeast(1f)
         val lado = modulo * n
         val origem = Offset(floor((size.width - lado) / 2), floor((size.height - lado) / 2))
-        drawRect(Color.White, origem, Size(lado, lado))
+        drawRect(QrFundo, origem, Size(lado, lado))
         for (y in 0 until n) for (x in 0 until n) {
-            if (matriz[x, y]) drawRect(Color.Black, Offset(origem.x + x * modulo, origem.y + y * modulo), Size(modulo, modulo))
+            if (matriz[x, y]) drawRect(QrModulo, Offset(origem.x + x * modulo, origem.y + y * modulo), Size(modulo, modulo))
         }
     }
 }

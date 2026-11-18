@@ -22,18 +22,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.edutec.app.data.Convite
-import com.edutec.app.ui.theme.Cartao
-import com.edutec.app.ui.theme.Consolidado
-import com.edutec.app.ui.theme.EtiquetaVermelhaTexto
-import com.edutec.app.ui.theme.Pilula
-import com.edutec.app.ui.theme.TextoCorpo
-import com.edutec.app.ui.theme.TextoPrincipal
-import com.edutec.app.ui.theme.TextoSecundario
+import com.edutec.app.ui.theme.Erro
+import com.edutec.app.ui.theme.Espaco2
+import com.edutec.app.ui.theme.Espaco3
+import com.edutec.app.ui.theme.Espaco6
+import com.edutec.app.ui.theme.Espaco8
+import com.edutec.app.ui.theme.EstiloNumero
+import com.edutec.app.ui.theme.FormaMd
+import com.edutec.app.ui.theme.MentaSuave
+import com.edutec.app.ui.theme.Primaria
+import com.edutec.app.ui.theme.Superficie
+import com.edutec.app.ui.theme.Tinta
+import com.edutec.app.ui.theme.TintaSuave
 
 /** "Convidar alunos": código curto em letras grandes, link com "Copiar" e QR do link. */
 @Composable
@@ -48,37 +52,37 @@ fun ConviteDialogo(
     val area = LocalClipboardManager.current
     AlertDialog(
         onDismissRequest = onFechar,
-        containerColor = Cartao,
+        containerColor = Superficie,
         title = { Text("Convidar alunos · $nomeTurma", fontWeight = FontWeight.Bold) },
         text = {
             when (convite) {
-                Carga.Carregando -> Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Consolidado)
+                Carga.Carregando -> Box(Modifier.fillMaxWidth().padding(Espaco8), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Primaria)
                 }
-                is Carga.Erro -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(convite.mensagem, color = EtiquetaVermelhaTexto)
+                is Carga.Erro -> Column(verticalArrangement = Arrangement.spacedBy(Espaco2)) {
+                    Text(convite.mensagem, color = Erro)
                     TextButton(onClick = onTentarDeNovo, modifier = Modifier.maoAoPassar()) { Text("Tentar de novo") }
                 }
-                is Carga.Pronto -> Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                is Carga.Pronto -> Row(horizontalArrangement = Arrangement.spacedBy(Espaco6), verticalAlignment = Alignment.CenterVertically) {
                     CodigoQr(convite.valor.link, Modifier.size(220.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.width(340.dp)) {
-                        Text("Código da turma", color = TextoSecundario, fontSize = 14.sp)
+                    Column(verticalArrangement = Arrangement.spacedBy(Espaco3), modifier = Modifier.width(340.dp)) {
+                        Text("Código da turma", color = TintaSuave, fontSize = 14.sp)
                         Text(
-                            convite.valor.codigo, color = TextoPrincipal, fontSize = 52.sp, fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace, letterSpacing = 6.sp,
+                            convite.valor.codigo, color = Tinta, fontSize = 52.sp, fontWeight = FontWeight.Bold,
+                            style = EstiloNumero, letterSpacing = 6.sp,
                         )
-                        Text("Os alunos abrem o link (ou leem o QR) no celular e entram com o Google.", color = TextoCorpo, fontSize = 14.sp)
-                        Surface(shape = RoundedCornerShape(12.dp), color = Pilula) {
-                            Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(convite.valor.link, color = TextoPrincipal, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 2)
-                                Spacer(Modifier.width(8.dp))
+                        Text("Os alunos abrem o link (ou leem o QR) no celular e entram com o Google.", color = TintaSuave, fontSize = 14.sp)
+                        Surface(shape = FormaMd, color = MentaSuave) {
+                            Row(Modifier.padding(start = Espaco3), verticalAlignment = Alignment.CenterVertically) {
+                                Text(convite.valor.link, color = Tinta, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 2)
+                                Spacer(Modifier.width(Espaco2))
                                 Button(
                                     onClick = {
                                         area.setText(AnnotatedString(convite.valor.link))
                                         avisar("Link do convite copiado")
                                     },
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Consolidado),
+                                    shape = FormaMd,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Primaria),
                                     modifier = Modifier.maoAoPassar(),
                                 ) { Text("Copiar") }
                             }
@@ -91,7 +95,7 @@ fun ConviteDialogo(
         dismissButton = {
             if (convite is Carga.Pronto) {
                 TextButton(onClick = onTrocarCodigo, modifier = Modifier.maoAoPassar()) {
-                    Text("Trocar código", color = TextoSecundario)
+                    Text("Trocar código", color = TintaSuave)
                 }
             }
         },
