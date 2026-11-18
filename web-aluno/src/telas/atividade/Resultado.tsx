@@ -5,7 +5,7 @@ function Proximos({ turmaId }: { turmaId: string }) {
   return (
     <>
       <Link to={`/turmas/${turmaId}/grafo`} className="botao largo">
-        Ver meu grafo
+        Ver meu mapa do conhecimento
       </Link>
       <Link to="/" className="botao largo secundario-btn">
         Minhas turmas
@@ -44,7 +44,7 @@ export function Resultado({
           </p>
         )}
         <p className="secundario">
-          Suas respostas atualizam o seu domínio estimado de cada conceito. Veja como ficou no seu grafo.
+          Suas respostas atualizam o seu domínio estimado de cada conceito. Veja como ficou no seu mapa do conhecimento.
         </p>
       </section>
       <Proximos turmaId={turmaId} />

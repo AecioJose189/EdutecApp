@@ -1,7 +1,7 @@
 # Lumini — site do aluno (`web-aluno/`)
 
 Site leve, feito para o celular, onde o aluno entra na turma, responde às atividades da aula (pelo QR code
-projetado pelo app do professor) e vê o próprio grafo de conceitos com o domínio estimado.
+projetado pelo app do professor) e vê o próprio mapa do conhecimento com o domínio estimado.
 
 **Stack:** Vite + React 18 + TypeScript + supabase-js, CSS próprio (sem biblioteca de UI), KaTeX para as
 fórmulas `$...$` dos enunciados. Contrato com o back-end: `docs/contrato-api-mvp.md`.
@@ -38,7 +38,9 @@ O aluno começa sem turmas. As respostas seguem `docs/contrato-api-mvp.md`, e al
 | `/s/rapida` | Prazo de 45 s, para ver o cronômetro acabar e o envio automático. |
 | `/s/semprazo` | `prazo_em: null` (sem cronômetro). |
 | `/s/enviada` | `ja_enviada: true` |
-| `/s/expirado` · `/s/encerrada` · `/s/fora` | `qr_expirado` · `sessao_encerrada` · `nao_matriculado` |
+| `/s/expirado` · `/s/encerrada` | `qr_expirado` · `sessao_encerrada` |
+| `/s/fora` | Ainda não está na turma: "Entrar na turma e começar" (`entrar_na_turma: true`, formato provisório da fase 2). |
+| `/s/fora-antigo` | `nao_matriculado` sem a turma, como no servidor do MVP. |
 | `/s/deslogado` | `nao_autenticado`: sai e vai para o login, que depois volta para `/s/deslogado`. |
 
 Para recomeçar do zero, feche a aba (o estado simulado fica no sessionStorage).
@@ -51,7 +53,7 @@ Para recomeçar do zero, feche a aba (o estado simulado fica no sessionStorage).
 | `/` | Minhas turmas (`minhas_turmas`). |
 | `/convite/:codigo` | Aceita o convite (`aceitar_convite`, idempotente). |
 | `/s/:token` | Atividade do QR (`entrar_sessao` → `enviar_respostas`). |
-| `/turmas/:turmaId/grafo` | Meu grafo (`meu_grafo`), em SVG, camadas da esquerda para a direita. |
+| `/turmas/:turmaId/grafo` | Mapa do conhecimento (`meu_grafo`), em SVG, camadas da esquerda para a direita. |
 
 Comportamentos combinados:
 
@@ -77,7 +79,7 @@ src/
 ├── telas/        Entrar, MinhasTurmas, Convite, atividade/, grafo/
 ├── componentes/  Cartão de erro, selo de estado (cor + símbolo), LaTeX, carregando, topo
 ├── grafo/        layout em camadas (+ testes)
-└── estilos/      global.css com as cores do desktop
+└── estilos/      tema.css (tokens do Design System; única fonte de cores) e global.css
 ```
 
 ## Ligar no Supabase de verdade

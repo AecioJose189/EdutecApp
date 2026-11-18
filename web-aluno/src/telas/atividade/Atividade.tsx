@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { chamarAlunoApi } from '../../api/alunoApi'
-import { codigoErro } from '../../api/erros'
+import { codigoErro, turmaForaDaTurma } from '../../api/erros'
 import type { Resposta, ResultadoEnvio, Tentativa } from '../../api/tipos'
 import { AvisoErro } from '../../componentes/AvisoErro'
 import { Carregando } from '../../componentes/Carregando'
@@ -19,6 +19,7 @@ import {
   type RespostasLocais,
 } from './armazenamento'
 import { Cronometro, useSegundosRestantes } from './Cronometro'
+import { EntrarNaTurma } from './EntrarNaTurma'
 import { Questao } from './Questao'
 import { JaEnviada, Resultado } from './Resultado'
 import { ConfirmarEnvio, Revisao } from './Revisao'
@@ -28,9 +29,9 @@ const ENVIO_AUTOMATICO_S = 3
 
 // O servidor aceita o token velho de quem já tem tentativa (recarregar funciona e traz ja_enviada
 // atualizado). A cópia guardada só entra quando a rede da sala falha.
-async function carregarTentativa(token: string): Promise<Tentativa> {
+async function carregarTentativa(token: string, entrarNaTurma: boolean): Promise<Tentativa> {
   try {
-    const t = await chamarAlunoApi('entrar_sessao', { token })
+    const t = await chamarAlunoApi('entrar_sessao', entrarNaTurma ? { token, entrar_na_turma: true } : { token })
     guardarTentativa(token, t)
     return t
   } catch (e) {
@@ -42,16 +43,22 @@ async function carregarTentativa(token: string): Promise<Tentativa> {
 
 export function Atividade() {
   const { token = '' } = useParams()
-  const { estado, repetir } = useChamada(() => carregarTentativa(token), [token])
+  // Vira true quando quem não é da turma toca em "Entrar na turma e começar" (refaz a chamada com entrar_na_turma).
+  const [entrarNaTurma, setEntrarNaTurma] = useState(false)
+  const { estado, repetir } = useChamada(() => carregarTentativa(token, entrarNaTurma), [token, entrarNaTurma])
 
   if (estado.tipo === 'ok') return <Respondendo key={estado.dados.tentativa_id} tentativa={estado.dados} />
+  const foraDaTurma = estado.tipo === 'erro' && !entrarNaTurma ? turmaForaDaTurma(estado.erro) : null
   return (
     <main className="pagina">
       <header className="topo">
         <Marca />
       </header>
-      {estado.tipo === 'carregando' && <Carregando texto="Abrindo a atividade…" />}
-      {estado.tipo === 'erro' && (
+      {estado.tipo === 'carregando' && (
+        <Carregando texto={entrarNaTurma ? 'Entrando na turma e abrindo a atividade…' : 'Abrindo a atividade…'} />
+      )}
+      {foraDaTurma && <EntrarNaTurma turma={foraDaTurma} aoEntrar={() => setEntrarNaTurma(true)} />}
+      {estado.tipo === 'erro' && !foraDaTurma && (
         <AvisoErro erro={estado.erro} aoRepetir={repetir}>
           <Link to="/" className="botao secundario-btn">
             Minhas turmas

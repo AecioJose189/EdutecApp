@@ -1,4 +1,4 @@
-import { ErroApi } from './tipos'
+import { ErroApi, type Turma } from './tipos'
 
 export interface ErroExplicado {
   titulo: string
@@ -43,6 +43,18 @@ export function explicarErro(e: unknown): ErroExplicado {
   const base = textos[codigo] ?? textos.erro_interno
   const mensagem = e instanceof ErroApi && e.message ? e.message : ''
   return { ...base, mensagem }
+}
+
+/**
+ * Turma da sessão quando quem leu o QR ainda não é aluno dela (`nao_matriculado` com `turma`).
+ * Formato PROVISÓRIO (fase 2): `{ erro: "nao_matriculado", mensagem, turma: { id, nome, codigo } }`.
+ * Sem `turma` (servidor antigo), devolve null e a tela mostra o erro de sempre.
+ */
+export function turmaForaDaTurma(e: unknown): Turma | null {
+  if (!(e instanceof ErroApi) || e.codigo !== 'nao_matriculado') return null
+  const t = e.detalhes.turma as Partial<Turma> | undefined
+  if (!t || typeof t.id !== 'string' || typeof t.nome !== 'string') return null
+  return { id: t.id, nome: t.nome, codigo: typeof t.codigo === 'string' ? t.codigo : '' }
 }
 
 export function codigoErro(e: unknown): string | null {

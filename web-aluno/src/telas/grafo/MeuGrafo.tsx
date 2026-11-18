@@ -8,7 +8,7 @@ import { estados, SeloEstado } from '../../componentes/SeloEstado'
 import { Topo } from '../../componentes/Topo'
 import { useChamada } from '../../componentes/useChamada'
 import { GrafoSvg } from './GrafoSvg'
-import { formatarDominio, PainelConceito } from './PainelConceito'
+import { BaseRespostas, formatarDominio, MINIMO_RESPOSTAS, PainelConceito } from './PainelConceito'
 
 const ORDEM_ESTADOS: EstadoConceito[] = ['consolidado', 'em_desenvolvimento', 'revisar', 'sem_dados']
 /** Na lista, primeiro o que pede atenção. */
@@ -30,14 +30,14 @@ export function MeuGrafo() {
 
   return (
     <main className="pagina grafo-pagina">
-      <Topo titulo="Meu grafo" voltarPara="/" />
+      <Topo titulo="Mapa do conhecimento" voltarPara="/" />
       {turma && (
         <p className="secundario">
           {turma.nome} · {turma.codigo}
         </p>
       )}
 
-      {estado.tipo === 'carregando' && <Carregando texto="Montando o seu grafo…" />}
+      {estado.tipo === 'carregando' && <Carregando texto="Montando o seu mapa do conhecimento…" />}
       {estado.tipo === 'erro' && <AvisoErro erro={estado.erro} aoRepetir={repetir} />}
       {estado.tipo === 'ok' &&
         (estado.dados.conceitos.length === 0 ? (
@@ -75,6 +75,17 @@ function Conteudo({
 
   return (
     <>
+      <div className="cartao aviso-info">
+        <p>
+          <strong>Domínio estimado</strong> é a chance estimada de você saber o conceito, atualizada a cada resposta.{' '}
+          <strong>Não é nota.</strong>
+        </p>
+        <p className="pequeno">
+          Com menos de {MINIMO_RESPOSTAS} respostas o conceito leva o selo “poucos dados”: a estimativa ainda pode mudar
+          bastante.
+        </p>
+      </div>
+
       <div className="legenda" aria-label="Legenda">
         {contagem.map(([e, n]) => (
           <span key={e} className="legenda-item">
@@ -87,7 +98,7 @@ function Conteudo({
       <div className="cartao grafo-cartao">
         <GrafoSvg conceitos={conceitos} selecionado={selecionado} aoSelecionar={aoSelecionar} />
         <p className="secundario pequeno grafo-dica">
-          Arraste para ver o grafo todo. Toque num conceito para ver os detalhes. As setas vão do pré-requisito para o
+          Arraste para ver o mapa todo. Toque num conceito para ver os detalhes. As setas vão do pré-requisito para o
           conceito que depende dele.
         </p>
       </div>
@@ -106,18 +117,18 @@ function Conteudo({
                   onClick={() => aoSelecionar(c.nome)}
                 >
                   <SeloEstado estado={c.estado} comRotulo={false} />
-                  <span>{c.nome}</span>
-                  <span className="secundario" title={estados[c.estado].rotulo}>
+                  <span className="ligado-texto">
+                    {c.nome}
+                    <BaseRespostas n={c.n_respostas} />
+                  </span>
+                  <span className="ligado-dominio" title={estados[c.estado].rotulo}>
                     {formatarDominio(c.dominio)}
                   </span>
                 </button>
               </li>
             ))}
         </ul>
-        <p className="secundario pequeno">
-          A porcentagem é o domínio estimado: a chance estimada de você saber o conceito, calculada a partir das suas
-          respostas. Não é nota.
-        </p>
+        <p className="secundario pequeno">A porcentagem é o domínio estimado de cada conceito; não é nota.</p>
       </section>
     </>
   )

@@ -43,7 +43,7 @@ export function MinhasTurmas() {
                   <span className="etiqueta">{t.codigo}</span>
                   <h2>{t.nome}</h2>
                   {t.professor_nome && <p className="secundario">Prof. {t.professor_nome}</p>}
-                  <span className="cartao-acao">Ver meu grafo ›</span>
+                  <span className="cartao-acao">Ver meu mapa do conhecimento ›</span>
                 </Link>
               </li>
             ))}
