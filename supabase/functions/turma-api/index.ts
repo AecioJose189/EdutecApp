@@ -11,8 +11,11 @@
 //                                     → { atividade_id, possiveis_duplicatas: [Duplicata] }
 //                                       (409 se já publicada ou se formar ciclo). Conceitos com o mesmo nome
 //                                       normalizado (sem acento/maiúsculas) são ligados aos da turma.
-//   listar_atividades { turma_id }    → { atividades: [{ id, titulo, publicada_em, n_questoes, tempo_minutos,
-//                                         permitir_refazer, sessao_aberta: Sessao | null }] }
+//   listar_atividades { turma_id }    → { atividades: [{ id, numero, titulo, publicada_em, n_questoes, tempo_minutos,
+//                                         permitir_refazer, sessao_aberta: Sessao | null, n_sessoes,
+//                                         n_enviadas, ultima_encerrada_em }] }
+//                                       numero = ordem na turma (1, 2...); n_enviadas = tentativas enviadas
+//                                       em todas as sessões da atividade
 //   abrir_sessao  { atividade_id }    → { sessao: Sessao }   (devolve a aberta, se já houver)
 //   token_qr      { sessao_id }       → { token, url, expira_em, janela_segundos }
 //                                       url = <SITE_URL>/s/<token>; pedir de novo a cada janela (20 s)
@@ -304,18 +307,33 @@ async function listarAtividades(ctx: Contexto, corpo: Corpo) {
   await exigirTurma(ctx, turma);
   const { data, error } = await ctx.servico
     .from("atividades")
-    .select(`id, titulo, publicada_em, tempo_minutos, permitir_refazer, questoes_aluno, sessoes(${COLUNAS_SESSAO})`)
+    .select(`id, titulo, publicada_em, tempo_minutos, permitir_refazer, questoes_aluno,
+             sessoes(${COLUNAS_SESSAO}, tentativas(enviada_em))`)
     .eq("turma_id", turma)
-    .eq("sessoes.aberta", true)
     .order("publicada_em");
   if (error) throw falhaBanco("listar as atividades", error);
-  const atividades = (data as (Record<string, unknown> & { questoes_aluno: unknown[]; sessoes: SessaoLinha[] })[])
-    .map(({ questoes_aluno, sessoes, ...a }) => ({
+  type Linha = Record<string, unknown> & {
+    questoes_aluno: unknown[];
+    sessoes: (SessaoLinha & { tentativas: { enviada_em: string | null }[] })[];
+  };
+  const atividades = (data as Linha[]).map(({ questoes_aluno, sessoes, ...a }, i) => {
+    const aberta = sessoes.find((s) => s.aberta);
+    const encerradas = sessoes.map((s) => s.encerrada_em).filter((d): d is string => !!d).sort();
+    return {
       ...a,
+      numero: i + 1,
       n_questoes: questoes_aluno.length,
-      sessao_aberta: sessoes[0] ?? null,
-    }));
+      sessao_aberta: aberta ? semTentativas(aberta) : null,
+      n_sessoes: sessoes.length,
+      n_enviadas: sessoes.reduce((n, s) => n + s.tentativas.filter((t) => t.enviada_em).length, 0),
+      ultima_encerrada_em: encerradas.at(-1) ?? null,
+    };
+  });
   return { atividades };
+}
+
+function semTentativas<T extends { tentativas?: unknown }>({ tentativas: _, ...s }: T) {
+  return s;
 }
 
 // ---------- sessão em sala ----------
