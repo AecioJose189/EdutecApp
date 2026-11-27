@@ -246,7 +246,7 @@ só depois de conferir o papel na turma):
 - Ao vivo no desktop: Realtime `postgres_changes` em `public.tentativas` com filtro `sessao_id=eq.<id>`
   e o JWT do professor (INSERT = entrou; UPDATE com `enviada_em` = enviou).
 
-Testes: pgTAP (12 arquivos, 202 testes, inclusive `rls.test.sql`, `tentativas.test.sql` e `conceitos.test.sql`) e o fluxo
+Testes: pgTAP (13 arquivos, 251 testes, inclusive `rls.test.sql`, `tentativas.test.sql` e `conceitos.test.sql`) e o fluxo
 inteiro com dois usuários de teste contra o projeto real:
 `SUPABASE_CHAVE_SECRETA=<service_role> npx deno run -A scripts/testar-fluxo-mvp.ts` (o comando
 que obtém a chave está no cabeçalho do script). Cada execução cria uma turma na conta
@@ -461,6 +461,41 @@ Ideias do grupo inspiradas no LearnHarness; só back-end e contrato (`docs/contr
   `TurmaViewModelTest` (50 testes no total); `ContrasteTest` ganhou "superficie sobre tinta" (a dica). Capturas
   em `amostras/capturas/` (fora do git): `turma-estatisticas`, `estatisticas*`, `turma-mapa-do-aluno`,
   `mapa-aluno-historico`.
+
+## Fase 4 — Revisão espaçada com flashcards (27/11/2026, branch `fase4-flashcards`, sai da `fase3-estatisticas`)
+
+Ideia do grupo (inspirada no LearnHarness). O aluno treina no site (do Aécio) com as próprias questões
+publicadas; aqui ficam o back-end, o contrato (`docs/contrato-api-fase2.md`, seção "Fase 4") e o pouco que o
+professor vê.
+- **Regras:** só **múltipla escolha** publicada (RN04), de atividades da turma do aluno com sessão **encerrada**
+  e **nenhuma aberta** (reabrir em sala esconde os cartões: nada vaza). **Sem Gemini.** O treino **não** entra no
+  BKT nem em `respostas`/`dominio`: vai para `treinos` (só inserção, gatilho como o de `respostas`).
+- **Banco** (migration `20261130120000_revisao_espacada`): `cartoes` (aluno, turma, atividade, questão; caixa 1..3,
+  `proxima_revisao`/`ultima_revisao` como data, acertos, erros) e `treinos` (conceitos do momento, alternativa,
+  acertou, confiança, `contou_para_caixa`, `caixa_depois`). **Leitner:** acerto sobe uma caixa (máx. 3), erro volta
+  à 1; intervalos 1, 3 e 7 dias. Só conta para a caixa a 1ª resposta a um cartão que está para hoje (vencido ou
+  novo); as outras só são registradas. "Hoje" = dia em `America/Sao_Paulo`; as funções aceitam `hoje` (só testes).
+  `cartao_id` determinístico (md5 de aluno:atividade:questão): o baralho é só leitura e a linha nasce na 1ª
+  resposta. Alternativas na ordem fixa do cartão (`chave_alternativa` com o id do cartão).
+  `revisao_baralho` (vencidos primeiro; depois novos de conceitos em "revisar", então "em desenvolvimento", menor
+  domínio primeiro; limite 1..50, padrão 10), `revisao_responder` (LU403 cartão alheio/indisponível, LU400
+  alternativa inválida), `revisao_resumo`, `treino_turma`, `treino_aluno_conceito`. Contagens por conceito usam os
+  conceitos **atuais** da questão (seguem as fusões). RLS: o aluno lê só as próprias linhas; funções só service_role.
+- **aluno-api:** `revisao_baralho`, `revisao_responder` (cartão inválido → `nao_matriculado`; alternativa
+  inválida → `erro_interno` 400), `revisao_resumo`. **turma-api:** `treino_turma`; `estatisticas` ganhou `treino`
+  e `historico_conceito` ganhou `treino: {n_treinos, acertos}`.
+- **Desktop:** seção "Treino fora de sala (flashcards)" no fim da aba Estatísticas (`SecaoTreino`: alunos treinando,
+  treinos em 7 dias, acerto, mais treinados, tabela por aluno com as caixas; frase "O treino não altera o domínio
+  estimado: acontece fora de sala.") e no histórico do conceito do mapa do aluno a linha "Treinou N vezes (X acertos)"
+  (`textoTreinoConceito`). Servidor antigo (sem `treino`) → seção vazia, sem quebrar.
+- Testes: pgTAP `revisao_espacada.test.sql` (49; 13 arquivos, 251); desktop `EstatisticasTest` (+3; 54 no total);
+  capturas `estatisticas-treino-fora-de-sala` e `mapa-aluno-historico`; script de fluxo etapas 8/9/9b.
+  **Rodado contra a pilha local** (`npx supabase start` + `functions serve` com `SITE_URL`; geração do `teste.pdf`
+  posta no cache local `geracoes` a partir de `amostras/resultado.json`, sem Gemini): fase 4 inteira ok. As 2
+  verificações do Realtime (eventos ao vivo da projeção) **falham só na pilha local**: em produção passam.
+  Não use o script local para conferir a projeção ao vivo.
+- **Aplicado em produção em 27/11/2026:** migration `20261130120000` e deploy de `aluno-api` e `turma-api`.
+  Script de fluxo inteiro contra a produção: "Tudo certo" (Realtime incluído).
 
 Ainda não existe: correção das abertas, edição na Revisão, prazo/liberação na publicação, gerar a partir do
 grafo, aba Materiais, histórico semanal, "Ver alunos com dificuldade".
