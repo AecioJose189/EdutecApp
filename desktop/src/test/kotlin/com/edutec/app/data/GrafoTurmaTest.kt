@@ -76,3 +76,19 @@ class GrafoTurmaTest {
         assertEquals(listOf(true, true, false, false), candidatos.map { it.parecido })
     }
 }
+
+class PoucosDadosTest {
+    @org.junit.Test
+    fun `menos de 5 respostas sao poucos dados`() {
+        val c = ConceitoGrafo("A", respostas = 4, media = 0.98, estado = EstadoConceito.Consolidado)
+        org.junit.Assert.assertTrue(c.poucosDados)
+        org.junit.Assert.assertFalse(c.copy(respostas = 5).poucosDados)
+        org.junit.Assert.assertFalse(ConceitoGrafo("B").poucosDados) // sem dados não é "poucos dados"
+    }
+
+    @org.junit.Test
+    fun `texto da base singular e plural`() {
+        org.junit.Assert.assertEquals("baseado em 1 resposta", baseadoEm(1))
+        org.junit.Assert.assertEquals("baseado em 12 respostas", baseadoEm(12))
+    }
+}
