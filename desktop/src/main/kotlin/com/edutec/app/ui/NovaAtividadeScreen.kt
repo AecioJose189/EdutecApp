@@ -201,7 +201,12 @@ fun NovaAtividadeScreen(
             !arquivo.name.endsWith(".pdf", ignoreCase = true) -> avisar("Escolha um arquivo PDF")
             !arquivo.canRead() -> avisar("Não foi possível ler o PDF")
             tamanho > LimitePdfBytes -> avisar("O PDF passa de 20 MB")
-            else -> pdf = MaterialPdf(arquivo, arquivo.name, tamanho)
+            else -> {
+                // Título = nome do arquivo sem extensão, a menos que o professor já tenha escrito outro.
+                val tituloAnterior = pdf?.let { tituloDoArquivo(it.nome) }
+                if (titulo.isBlank() || titulo == tituloAnterior) titulo = tituloDoArquivo(arquivo.name)
+                pdf = MaterialPdf(arquivo, arquivo.name, tamanho)
+            }
         }
     }
 
@@ -453,7 +458,7 @@ private fun SeletorOrigem(origem: Origem, onOrigem: (Origem) -> Unit) {
     val curto = false
     Surface(shape = FormaPilula, color = MentaSuave) {
         Row(Modifier.padding(Espaco1)) {
-            OpcaoOrigem(if (curto) "Grafo" else "Conceitos do grafo", origem == Origem.Grafo, { onOrigem(Origem.Grafo) }) { cor ->
+            OpcaoOrigem(if (curto) "Mapa" else "Conceitos do mapa", origem == Origem.Grafo, { onOrigem(Origem.Grafo) }) { cor ->
                 Icon(Icons.Filled.Share, null, tint = cor, modifier = Modifier.size(18.dp))
             }
             OpcaoOrigem(if (curto) "PDF" else "Material em PDF", origem == Origem.Pdf, { onOrigem(Origem.Pdf) }) { cor ->
@@ -522,7 +527,7 @@ private fun ConteudoGrafo(
 
     if (conceitos.isEmpty()) {
         Text(
-            "Esta turma ainda não tem conceitos no grafo. Gere a primeira atividade a partir de um PDF.",
+            "Esta turma ainda não tem conceitos no mapa do conhecimento. Gere a primeira atividade a partir de um PDF.",
             color = TintaSuave, fontSize = 14.sp,
         )
         return
@@ -623,8 +628,11 @@ private fun ConteudoPdf(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Espaco3)) {
         Text(
-            "Envie a apostila, lista ou slides da aula. A IA vai usar o conteúdo do PDF como base para as questões.",
-            color = TintaSuave, fontSize = 14.sp,
+            buildAnnotatedString {
+                withStyle(SpanStyle(color = Tinta, fontWeight = FontWeight.SemiBold)) { append("Material da aula (PDF)") }
+                append(": a IA lê o material e cria as questões a partir dele.")
+            },
+            color = TintaSuave, fontSize = 15.sp,
         )
 
         if (pdf == null) {
@@ -736,6 +744,7 @@ private fun CartaoFormato(
                 onValueChange = onTitulo,
                 label = { Text("Título da atividade") },
                 placeholder = { Text("Em branco: os primeiros conceitos do material") },
+                supportingText = { Text("Vem do nome do PDF; pode mudar.") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -1002,3 +1011,6 @@ private fun PreviewNovaAtividadeCelular() {
         NovaAtividadeScreen(DadosExemplo.turmas.first(), onFechar = {}, conceitos = DadosTurmaExemplo.conceitos)
     }
 }
+
+/** "Probabilidade - aula 3.pdf" → "Probabilidade - aula 3" (o título da atividade, editável). */
+internal fun tituloDoArquivo(nome: String): String = nome.substringBeforeLast('.').trim().take(200)

@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -132,15 +133,18 @@ fun RevisaoConteudo(
             BarraPublicar(estado, onPublicar)
         }
     } else {
-        LazyColumn(modifier, verticalArrangement = Arrangement.spacedBy(Espaco)) {
-            item { AvisoRevisao(estado, onGerarNovas) }
-            item { CartaoConceitos(atividade.conceitos, emUmaLinha = false) }
-            itemsIndexed(atividade.questoes) { i, q ->
-                Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = Modifier.fillMaxWidth()) {
-                    Box(Modifier.padding(Espaco6)) { DetalheQuestao(i, q) }
+        // A barra de publicar fica fixa no rodapé, fora da lista que rola: sempre visível.
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(Espaco)) {
+            LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(Espaco)) {
+                item { AvisoRevisao(estado, onGerarNovas) }
+                item { CartaoConceitos(atividade.conceitos, emUmaLinha = false) }
+                itemsIndexed(atividade.questoes) { i, q ->
+                    Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = Modifier.fillMaxWidth()) {
+                        Box(Modifier.padding(Espaco6)) { DetalheQuestao(i, q) }
+                    }
                 }
             }
-            item { BarraPublicar(estado, onPublicar) }
+            BarraPublicar(estado, onPublicar)
         }
     }
 }
@@ -226,38 +230,54 @@ private fun BarraPublicar(estado: EstadoGeracao.Concluido, onPublicar: () -> Uni
         append(" · ")
         append(pedido.tempoMinutos?.let { "$it min por tentativa" } ?: "sem limite de tempo")
     }
-    Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(horizontal = Espaco6, vertical = Espaco4),
-            horizontalArrangement = Arrangement.spacedBy(Espaco4),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    "Publicar ${estado.resultado.questoes.size} questões para a turma",
-                    color = Tinta, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    "$configuracao · os conceitos entram no grafo da turma",
-                    color = TintaSuave, fontSize = 13.sp,
-                )
-                estado.erroPublicacao?.let {
-                    Text(it, color = Erro, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                }
+    val textos: @Composable (Modifier) -> Unit = { mod ->
+        Column(mod, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                "Publicar ${estado.resultado.questoes.size} questões para a turma",
+                color = Tinta, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "$configuracao · os conceitos entram no mapa do conhecimento da turma",
+                color = TintaSuave, fontSize = 13.sp,
+            )
+            estado.erroPublicacao?.let {
+                Text(it, color = Erro, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
-            Button(
-                onClick = onPublicar,
-                enabled = !estado.publicando,
-                shape = FormaMd,
-                colors = ButtonDefaults.buttonColors(containerColor = Primaria),
-                contentPadding = PaddingValues(horizontal = Espaco6, vertical = Espaco4),
-            ) {
-                if (estado.publicando) {
-                    CircularProgressIndicator(Modifier.size(18.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
-                    Spacer(Modifier.width(Espaco3))
-                    Text("Publicando…", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                } else {
-                    Text("Publicar para a turma", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+    val botao: @Composable (Modifier) -> Unit = { mod ->
+        Button(
+            onClick = onPublicar,
+            enabled = !estado.publicando,
+            shape = FormaMd,
+            colors = ButtonDefaults.buttonColors(containerColor = Primaria),
+            contentPadding = PaddingValues(horizontal = Espaco6, vertical = Espaco4),
+            modifier = mod.maoAoPassar(),
+        ) {
+            if (estado.publicando) {
+                CircularProgressIndicator(Modifier.size(18.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
+                Spacer(Modifier.width(Espaco3))
+                Text("Publicando…", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            } else {
+                Text("Publicar para a turma", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+    Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = Modifier.fillMaxWidth()) {
+        BoxWithConstraints {
+            if (maxWidth >= 600.dp) {
+                Row(
+                    modifier = Modifier.padding(horizontal = Espaco6, vertical = Espaco4),
+                    horizontalArrangement = Arrangement.spacedBy(Espaco4),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    textos(Modifier.weight(1f))
+                    botao(Modifier)
+                }
+            } else {
+                Column(Modifier.padding(Espaco4), verticalArrangement = Arrangement.spacedBy(Espaco3)) {
+                    textos(Modifier)
+                    botao(Modifier.fillMaxWidth())
                 }
             }
         }
