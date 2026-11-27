@@ -52,6 +52,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -87,7 +88,11 @@ import com.edutec.app.data.DadosTurmaExemplo
 import com.edutec.app.data.EstadoConceito
 import com.edutec.app.data.GrafoTurma
 import com.edutec.app.data.Membro
+import com.edutec.app.data.EstatisticasTurma
+import com.edutec.app.data.HistoricoConceito
+import com.edutec.app.data.MapaAluno
 import com.edutec.app.data.Passo
+import com.edutec.app.data.doAluno
 import com.edutec.app.data.Turma
 import com.edutec.app.data.baseadoEm
 import com.edutec.app.data.proximosPassos
@@ -130,7 +135,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 private val CantoCartao = FormaLg
 private val Espaco = Espaco4
 private val Abas = listOf(TurmaViewModel.ABA_GRAFO, "Atividades", "Materiais", "Estatísticas", "Turma")
-private val AbasProntas = setOf(TurmaViewModel.ABA_GRAFO, "Atividades", "Turma")
+private val AbasProntas = setOf(TurmaViewModel.ABA_GRAFO, "Atividades", TurmaViewModel.ABA_ESTATISTICAS, "Turma")
 
 /**
  * Tela de uma turma: grafo de conhecimento com o domínio estimado de cada conceito (dados reais da
@@ -169,6 +174,20 @@ fun TurmaScreen(
     onFecharAviso: () -> Unit = {},
     /** Conferindo se a turma tem alunos antes de abrir a sessão. */
     abrindoSessao: Boolean = false,
+    /** Aba Estatísticas (UC13). */
+    estatisticas: Carga<EstatisticasTurma> = Carga.Carregando,
+    incluirSimulacao: Boolean = false,
+    onIncluirSimulacao: (Boolean) -> Unit = {},
+    onAbrirConceitoNoMapa: (String) -> Unit = {},
+    /** Mapa de um aluno (UC11) e histórico num conceito (UC12). */
+    alunoSelecionado: Aluno? = null,
+    mapaDoAluno: Carga<MapaAluno> = Carga.Carregando,
+    onAluno: (Aluno?) -> Unit = {},
+    historico: Carga<HistoricoConceito>? = null,
+    onHistorico: (String) -> Unit = {},
+    /** Conceito a destacar ao abrir o mapa vindo das Estatísticas; [onFocoConsumido] zera. */
+    conceitoEmFoco: String? = null,
+    onFocoConsumido: () -> Unit = {},
 ) {
     val avisar = LocalAvisar.current
     var explicarDominio by remember { mutableStateOf(false) }
@@ -233,7 +252,9 @@ fun TurmaScreen(
             Column(colunaTablet, verticalArrangement = Arrangement.spacedBy(Espaco)) {
                 cabecalho()
                 val mod = Modifier.fillMaxWidth().weight(1f)
-                if (aba == "Atividades") {
+                if (aba == TurmaViewModel.ABA_ESTATISTICAS) {
+                    AbaEstatisticas(estatisticas, incluirSimulacao, onIncluirSimulacao, onAbrirConceitoNoMapa, onRecarregarAba, mod)
+                } else if (aba == "Atividades") {
                     AbaAtividades(
                         atividades, onAbrirSessao, { onNovaAtividade(emptySet()) }, onRecarregarAba, mod,
                         rascunho = rascunho, onContinuarRascunho = onContinuarRascunho, abrindoSessao = abrindoSessao,
@@ -275,6 +296,9 @@ fun TurmaScreen(
             ConteudoGrafo(
                 turma, dados, expandido, colunaTablet, colunaCelular, cabecalho, onNovaAtividade, simulando,
                 onJuntarConceitos, onMarcarDistintos, juntando, onExplicarDominio = { explicarDominio = true },
+                alunoSelecionado = alunoSelecionado, mapaDoAluno = mapaDoAluno, onAluno = onAluno,
+                historico = historico, onHistorico = onHistorico,
+                conceitoEmFoco = conceitoEmFoco, onFocoConsumido = onFocoConsumido,
             )
         }
     }
@@ -294,11 +318,24 @@ private fun ConteudoGrafo(
     onMarcarDistintos: (String, String) -> Unit,
     juntando: Boolean,
     onExplicarDominio: () -> Unit,
+    alunoSelecionado: Aluno?,
+    mapaDoAluno: Carga<MapaAluno>,
+    onAluno: (Aluno?) -> Unit,
+    historico: Carga<HistoricoConceito>?,
+    onHistorico: (String) -> Unit,
+    conceitoEmFoco: String?,
+    onFocoConsumido: () -> Unit,
 ) {
     val avisar = LocalAvisar.current
-    // Conceito selecionado: o tocado no grafo, ou o mais fraco da turma.
+    // Mapa de um aluno: mesmo layout e nós da turma, pintados com o domínio estimado dele.
+    val doAluno = alunoSelecionado?.let { (mapaDoAluno as? Carga.Pronto)?.valor?.let(dados::doAluno) }
+    val mapa = doAluno ?: dados
+    // Conceito selecionado: o tocado no mapa, ou o mais fraco (da turma ou do aluno).
     var selecionado by rememberSaveable(turma.id) { mutableStateOf<String?>(null) }
-    val conceito = selecionado?.let(dados::conceito) ?: dados.conceitoInicial()
+    LaunchedEffect(conceitoEmFoco) {
+        if (conceitoEmFoco != null) { selecionado = conceitoEmFoco; onFocoConsumido() }
+    }
+    val conceito = selecionado?.let(mapa::conceito) ?: mapa.conceitoInicial()
     // Diálogo "Juntar com outro conceito…": conceito de partida e, vindo do aviso, o parecido já escolhido.
     var juntarDe by rememberSaveable(turma.id) { mutableStateOf<String?>(null) }
     var juntarCom by rememberSaveable(turma.id) { mutableStateOf<String?>(null) }
@@ -332,13 +369,27 @@ private fun ConteudoGrafo(
     }
 
     val cartaoGrafo: @Composable (Modifier) -> Unit = { mod ->
-        CartaoGrafo(dados, conceito?.nome, onSelecionar = { selecionado = it }, onExplicarDominio, modifier = mod)
+        when {
+            alunoSelecionado != null && mapaDoAluno is Carga.Erro -> ErroGrafo(mapaDoAluno.mensagem, { onAluno(alunoSelecionado) }, mod)
+            alunoSelecionado != null && doAluno == null -> CarregandoGrafo(mod)
+            else -> CartaoGrafo(
+                mapa, conceito?.nome, onSelecionar = { selecionado = it }, onExplicarDominio, modifier = mod,
+                titulo = alunoSelecionado?.let { "Mapa do conhecimento de ${it.nome}" } ?: "Mapa do conhecimento da turma",
+            )
+        }
+    }
+    val faixaAluno: @Composable () -> Unit = {
+        alunoSelecionado?.let { FaixaMapaDoAluno(it, onVoltar = { onAluno(null) }, modifier = Modifier.fillMaxWidth()) }
     }
     val demonstracao: @Composable () -> Unit = {
         if (simulando) FaixaSimulando(Modifier.fillMaxWidth())
     }
     val painel: @Composable (Modifier) -> Unit = { mod ->
-        if (conceito != null) {
+        if (alunoSelecionado != null && conceito != null) {
+            LaunchedEffect(alunoSelecionado.chave, conceito.nome) { onHistorico(conceito.nome) }
+            PainelHistorico(alunoSelecionado, conceito.nome, historico, onTentarDeNovo = { onHistorico(conceito.nome) },
+                onExplicarDominio = onExplicarDominio, modifier = mod)
+        } else if (conceito != null) {
             PainelConceito(
                 conceito = conceito,
                 grafo = dados,
@@ -356,9 +407,11 @@ private fun ConteudoGrafo(
         Column(colunaTablet, verticalArrangement = Arrangement.spacedBy(Espaco)) {
             cabecalho()
             Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(Espaco)) {
-                ListaAlunos(dados.alunos, rolavel = true, modifier = Modifier.width(290.dp).fillMaxHeight())
+                ListaAlunos(dados.alunos, rolavel = true, modifier = Modifier.width(290.dp).fillMaxHeight(),
+                    selecionado = alunoSelecionado, onAluno = onAluno)
                 Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(Espaco)) {
-                    aviso()
+                    faixaAluno()
+                    if (alunoSelecionado == null) aviso()
                     cartaoGrafo(Modifier.fillMaxWidth().weight(1f))
                     demonstracao()
                 }
@@ -368,11 +421,13 @@ private fun ConteudoGrafo(
     } else {
         Column(colunaCelular, verticalArrangement = Arrangement.spacedBy(Espaco)) {
             cabecalho()
-            aviso()
+            faixaAluno()
+            if (alunoSelecionado == null) aviso()
             cartaoGrafo(Modifier.fillMaxWidth().height(460.dp))
             demonstracao()
             painel(Modifier.fillMaxWidth())
-            ListaAlunos(dados.alunos, rolavel = false, modifier = Modifier.fillMaxWidth())
+            ListaAlunos(dados.alunos, rolavel = false, modifier = Modifier.fillMaxWidth(),
+                selecionado = alunoSelecionado, onAluno = onAluno)
         }
     }
 }
@@ -478,7 +533,13 @@ private fun SeletorAbas(selecionada: String, onAba: (String) -> Unit) {
 private val PseudonimoSimulacao = Regex("""^Aluno (\d+)$""")
 
 @Composable
-private fun ListaAlunos(alunos: List<Aluno>, rolavel: Boolean, modifier: Modifier = Modifier) {
+private fun ListaAlunos(
+    alunos: List<Aluno>,
+    rolavel: Boolean,
+    modifier: Modifier = Modifier,
+    selecionado: Aluno? = null,
+    onAluno: (Aluno?) -> Unit = {},
+) {
     if (alunos.isEmpty()) {
         Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = modifier) {
             Column(Modifier.padding(Espaco6), verticalArrangement = Arrangement.spacedBy(Espaco2)) {
@@ -502,13 +563,18 @@ private fun ListaAlunos(alunos: List<Aluno>, rolavel: Boolean, modifier: Modifie
             }
             val temSimulados = alunos.any { PseudonimoSimulacao.matches(it.nome) }
             Text(
-                if (temSimulados) "Pior estado de cada aluno (simulação: pseudônimos)." else "Pior estado de cada aluno.",
+                (if (temSimulados) "Pior estado de cada aluno (simulação: pseudônimos)." else "Pior estado de cada aluno.") +
+                    " Clique num aluno para ver o mapa dele.",
                 color = TintaSuave, fontSize = 12.sp, modifier = Modifier.padding(start = Espaco1),
             )
             Spacer(Modifier.height(Espaco1))
 
-            // Linha "Turma toda" destacada: o grafo mostra a turma inteira.
-            Surface(shape = FormaMd, color = Menta, modifier = Modifier.fillMaxWidth()) {
+            // Linha "Turma toda": destacada quando o mapa mostra a turma inteira.
+            Surface(
+                onClick = { onAluno(null) },
+                shape = FormaMd, color = if (selecionado == null) Menta else Transparente,
+                modifier = Modifier.fillMaxWidth().maoAoPassar(),
+            ) {
                 Row(
                     modifier = Modifier.padding(horizontal = Espaco3, vertical = Espaco3),
                     verticalAlignment = Alignment.CenterVertically,
@@ -523,8 +589,16 @@ private fun ListaAlunos(alunos: List<Aluno>, rolavel: Boolean, modifier: Modifie
             }
 
             alunos.forEach { aluno ->
+                val ativo = selecionado != null && aluno.chave == selecionado.chave
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = Espaco3, vertical = Espaco2),
+                    modifier = Modifier.fillMaxWidth()
+                        .clip(FormaMd)
+                        .then(if (ativo) Modifier.background(Menta) else Modifier)
+                        .then(
+                            if (aluno.chave != null) Modifier.clickable(role = Role.Button) { onAluno(aluno) }.maoAoPassar()
+                            else Modifier
+                        )
+                        .padding(horizontal = Espaco3, vertical = Espaco2),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     // Pseudônimo da simulação ("Aluno 07") → número; aluno real → foto/iniciais.
@@ -538,7 +612,8 @@ private fun ListaAlunos(alunos: List<Aluno>, rolavel: Boolean, modifier: Modifie
                         FotoUsuario(aluno.nome, null, tamanho = 32.dp)
                     }
                     Spacer(Modifier.width(Espaco4))
-                    Text(aluno.nome, color = Tinta, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    Text(aluno.nome, color = Tinta, fontSize = 15.sp, fontWeight = if (ativo) FontWeight.Bold else FontWeight.Normal,
+                        modifier = Modifier.weight(1f))
                     SeloEstado(aluno.estado)
                 }
             }
@@ -568,11 +643,12 @@ private fun CartaoGrafo(
     onSelecionar: (String) -> Unit,
     onExplicarDominio: () -> Unit,
     modifier: Modifier = Modifier,
+    titulo: String = "Mapa do conhecimento da turma",
 ) {
     Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = modifier) {
         Column(Modifier.padding(Espaco6)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Mapa do conhecimento da turma", color = Tinta, fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                Text(titulo, color = Tinta, fontSize = 16.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f))
                 BotaoExplicarDominio(onExplicarDominio)
             }
@@ -1126,5 +1202,39 @@ private fun PreviewTurmaJuntarTablet() {
         val c = DadosTurmaExemplo.grafo.conceitos
         DialogoJuntarConceitos(c[3], DadosTurmaExemplo.grafo, juntando = false, onJuntar = { _, _ -> },
             onDistintos = { _, _ -> }, onFechar = {}, escolhidoInicial = c[4].nome)
+    }
+}
+
+/** UC11/UC12: mapa pintado com o domínio estimado de um aluno e o histórico dele num conceito. */
+@Preview
+@Composable
+private fun PreviewTurmaMapaDoAlunoTablet() {
+    val alunos = DadosTurmaExemplo.grafo.alunos.mapIndexed { i, a -> a.copy(chave = "sim-x-0${i + 1}") }
+    val grafo = DadosTurmaExemplo.grafo.copy(alunos = alunos)
+    val mapa = MapaAluno(grafo.conceitos.mapIndexed { i, c ->
+        com.edutec.app.data.DominioAlunoConceito(c.nome, if (i == grafo.conceitos.lastIndex) null else listOf(0.93, 0.85, 0.62, 0.83, 0.12, 0.55, 0.81)[i % 7],
+            if (i == grafo.conceitos.lastIndex) null else listOf("consolidado", "consolidado", "em_desenvolvimento", "consolidado", "revisar", "em_desenvolvimento", "consolidado")[i % 7],
+            if (i == grafo.conceitos.lastIndex) 0 else 2 + i)
+    })
+    val historico = HistoricoConceito("Derivada", 0.3, listOf(
+        com.edutec.app.data.RespostaHistorico("2026-10-21T12:00:00Z", com.edutec.app.data.AtividadeRef("a1", 1, "Derivadas"), false, "certeza", 0.13),
+        com.edutec.app.data.RespostaHistorico("2026-10-28T12:00:00Z", com.edutec.app.data.AtividadeRef("a2", 2, "Regra da cadeia"), true, "chute", 0.48),
+        com.edutec.app.data.RespostaHistorico("2026-11-04T12:00:00Z", com.edutec.app.data.AtividadeRef("a3", 3, "Otimização"), true, null, 0.83),
+    ), errosComCerteza = 1, acertosNoChute = 1)
+    EdutecTheme {
+        TurmaScreen(
+            TurmaComDados, EstadoGrafo.Pronto(grafo), onVoltar = {}, onNovaAtividade = {},
+            alunoSelecionado = alunos[1], mapaDoAluno = Carga.Pronto(mapa), historico = Carga.Pronto(historico),
+            conceitoEmFoco = "Derivada",
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun PreviewTurmaEstatisticasTablet() {
+    EdutecTheme {
+        TurmaScreen(TurmaComDados, GrafoExemplo, onVoltar = {}, onNovaAtividade = {}, aba = TurmaViewModel.ABA_ESTATISTICAS,
+            estatisticas = Carga.Pronto(EstatisticasExemplo))
     }
 }

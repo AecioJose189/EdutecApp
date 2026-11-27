@@ -5,7 +5,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.edutec.app.data.Aluno
 import com.edutec.app.data.AtividadePublicada
+import com.edutec.app.data.EstatisticasTurma
+import com.edutec.app.data.HistoricoConceito
+import com.edutec.app.data.MapaAluno
 import com.edutec.app.data.Convite
 import com.edutec.app.data.ErroTurmaApi
 import com.edutec.app.data.Membro
@@ -42,7 +46,34 @@ class TurmaViewModel(
     private val buscarConvite: suspend (String, Boolean) -> Convite = TurmaRepositorio::convite,
     private val fundirConceitos: suspend (String, String, String) -> ResultadoFusao = TurmaRepositorio::fundirConceitos,
     private val marcarDistintos: suspend (String, String, String) -> Unit = TurmaRepositorio::marcarDistintos,
+    private val buscarEstatisticas: suspend (String, Boolean) -> EstatisticasTurma = TurmaRepositorio::estatisticas,
+    private val buscarMapaAluno: suspend (String, String) -> MapaAluno = TurmaRepositorio::mapaAluno,
+    private val buscarHistorico: suspend (String, String, String) -> HistoricoConceito = TurmaRepositorio::historico,
 ) : ViewModel() {
+    /** Aba Estatísticas (UC13). */
+    var estatisticas by mutableStateOf<Carga<EstatisticasTurma>>(Carga.Carregando)
+        private set
+
+    /** Padrão: só alunos reais. */
+    var incluirSimulacao by mutableStateOf(false)
+        private set
+
+    /** Aluno cujo mapa está pintado (UC11); null = turma toda. */
+    var alunoSelecionado by mutableStateOf<Aluno?>(null)
+        private set
+
+    var mapaDoAluno by mutableStateOf<Carga<MapaAluno>>(Carga.Carregando)
+        private set
+
+    /** Histórico do aluno selecionado no conceito [historicoDe] (UC12). */
+    var historico by mutableStateOf<Carga<HistoricoConceito>?>(null)
+        private set
+    var historicoDe by mutableStateOf<String?>(null)
+        private set
+
+    /** Conceito a destacar no mapa (vindo da tabela das Estatísticas); a tela consome e zera. */
+    var conceitoEmFoco by mutableStateOf<String?>(null)
+
     var aba by mutableStateOf(ABA_GRAFO)
 
     var atividades by mutableStateOf<Carga<List<AtividadePublicada>>>(Carga.Carregando)
@@ -96,11 +127,20 @@ class TurmaViewModel(
             convite = null
             aviso = null
             sessaoSemAlunos = null
+            estatisticas = Carga.Carregando
+            incluirSimulacao = false
+            alunoSelecionado = null
+            historico = null
+            historicoDe = null
+            conceitoEmFoco = null
         }
         this.turmaId = turmaId
         // O painel "Próximos passos" precisa dos alunos e das atividades em qualquer aba.
         carregarAba(ABA_ATIVIDADES)
         carregarAba(ABA_TURMA)
+        // Recarregar (simulação, fusão, volta da projeção) atualiza também o que estiver na tela.
+        if (aba == ABA_ESTATISTICAS) carregarEstatisticas()
+        alunoSelecionado?.let { selecionarAluno(it) }
         carregamento?.cancel()
         // Recarregar a mesma turma mantém o grafo atual na tela até chegar o novo.
         if (outraTurma || _grafo.value !is EstadoGrafo.Pronto) _grafo.value = EstadoGrafo.Carregando
@@ -186,6 +226,7 @@ class TurmaViewModel(
                 if (atividades !is Carga.Pronto) atividades = Carga.Carregando
                 atividades = carregar("carregar as atividades") { buscarAtividades(turma) }
             }
+            ABA_ESTATISTICAS -> carregarEstatisticas()
             ABA_TURMA -> viewModelScope.launch {
                 if (membros !is Carga.Pronto) membros = Carga.Carregando
                 membros = carregar("carregar os alunos") { buscarMembros(turma) }
@@ -230,6 +271,56 @@ class TurmaViewModel(
         }
     }
 
+    fun carregarEstatisticas() {
+        val turma = turmaId ?: return
+        val incluir = incluirSimulacao
+        viewModelScope.launch {
+            if (estatisticas !is Carga.Pronto) estatisticas = Carga.Carregando
+            val r = carregar("carregar as estatísticas") { buscarEstatisticas(turma, incluir) }
+            if (this@TurmaViewModel.turmaId == turma && incluirSimulacao == incluir) estatisticas = r
+        }
+    }
+
+    fun mudarIncluirSimulacao(incluir: Boolean) {
+        if (incluir == incluirSimulacao) return
+        incluirSimulacao = incluir
+        carregarEstatisticas()
+    }
+
+    /** Estatísticas → mapa, com o conceito destacado (da turma toda). */
+    fun abrirConceitoNoMapa(conceito: String) {
+        selecionarAluno(null)
+        conceitoEmFoco = conceito
+        aba = ABA_GRAFO
+    }
+
+    /** UC11: pinta o mapa com o domínio estimado do aluno; null volta à turma toda. */
+    fun selecionarAluno(aluno: Aluno?) {
+        alunoSelecionado = aluno
+        historico = null
+        historicoDe = null
+        val turma = turmaId ?: return
+        val chave = aluno?.chave ?: return
+        mapaDoAluno = Carga.Carregando
+        viewModelScope.launch {
+            val r = carregar("carregar o mapa do aluno") { buscarMapaAluno(turma, chave) }
+            if (alunoSelecionado?.chave == chave) mapaDoAluno = r
+        }
+    }
+
+    /** UC12: histórico do aluno selecionado no conceito. */
+    fun carregarHistorico(conceito: String) {
+        val turma = turmaId ?: return
+        val chave = alunoSelecionado?.chave ?: return
+        if (historicoDe == conceito && historico is Carga.Pronto) return
+        historicoDe = conceito
+        historico = Carga.Carregando
+        viewModelScope.launch {
+            val r = carregar("carregar o histórico") { buscarHistorico(turma, chave, conceito) }
+            if (alunoSelecionado?.chave == chave && historicoDe == conceito) historico = r
+        }
+    }
+
     /** Abre o diálogo "Convidar alunos" ([novo] = trocar o código). */
     fun abrirConvite(novo: Boolean = false) {
         val turma = turmaId ?: return
@@ -254,5 +345,6 @@ class TurmaViewModel(
         const val TEXTO_PUBLICADA = "Atividade publicada. Para a turma responder, abra a sessão em sala."
         const val ABA_ATIVIDADES = "Atividades"
         const val ABA_TURMA = "Turma"
+        const val ABA_ESTATISTICAS = "Estatísticas"
     }
 }
