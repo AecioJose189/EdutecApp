@@ -167,7 +167,13 @@ function Respondendo({ tentativa }: { tentativa: Tentativa }) {
 
       {fase.tipo === 'enviada' ? (
         fase.resultado ? (
-          <Resultado resultado={fase.resultado} turmaId={turmaId} automatico={fase.automatico} />
+          <Resultado
+            resultado={fase.resultado}
+            questoes={questoes}
+            tentativaId={id}
+            turmaId={turmaId}
+            automatico={fase.automatico}
+          />
         ) : (
           <JaEnviada turmaId={turmaId} />
         )

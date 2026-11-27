@@ -1,4 +1,4 @@
-// Espelho de docs/contrato-api-mvp.md. Campos novos podem aparecer; renomear ou remover, não.
+// Espelho de docs/contrato-api-mvp.md e docs/contrato-api-fase2.md. Campos novos podem aparecer; renomear ou remover, não.
 
 export interface Turma {
   id: string
@@ -37,10 +37,82 @@ export interface Tentativa {
 
 export type Resposta = { questao_id: string; alternativa_id: string } | { questao_id: string; texto: string }
 
+/** Uma questão no resultado do envio. `acertou: null` = aberta, aguardando correção. */
+export interface QuestaoCorrigida {
+  questao_id: string
+  acertou: boolean | null
+}
+
 export interface ResultadoEnvio {
   acertos: number
   total_multipla_escolha: number
   abertas_aguardando_correcao: number
+  /** Fase 2 (docs/contrato-api-fase2.md), na ordem das questões. Opcional: o servidor do MVP não manda. */
+  questoes?: QuestaoCorrigida[]
+}
+
+// ---------- Fase 2: revisão do aluno (docs/contrato-api-fase2.md) ----------
+
+/** `numero` = ordem da atividade na turma (1, 2, 3…), a mesma que o professor vê. */
+export interface AtividadeNumerada {
+  id: string
+  numero: number
+  titulo: string
+}
+
+/** Item de `minhas_atividades`: uma tentativa já enviada. */
+export interface AtividadeFeita {
+  tentativa_id: string
+  atividade: AtividadeNumerada
+  turma: Turma
+  enviada_em: string
+  acertos: number
+  total_multipla_escolha: number
+  gabarito_liberado: boolean
+}
+
+/**
+ * Sem o gabarito liberado vem só `{ id, texto }`: `correta` e `feedback` não existem (não vêm como null).
+ * A lista vem na ordem que o aluno viu: rotular A, B, C… pela posição, nunca pelo id.
+ */
+export interface AlternativaRevisao {
+  id: string
+  texto: string
+  correta?: boolean
+  feedback?: string
+}
+
+/** `{}` quando o aluno deixou em branco. */
+export type MinhaResposta = { alternativa_id: string } | { texto: string } | Record<string, never>
+
+interface QuestaoRevisaoBase {
+  questao_id: string
+  enunciado: string
+  conceitos: string[]
+  minha_resposta: MinhaResposta
+}
+
+export interface QuestaoRevisaoMultipla extends QuestaoRevisaoBase {
+  tipo: 'multipla_escolha'
+  acertou: boolean
+  alternativas: AlternativaRevisao[]
+}
+
+export interface QuestaoRevisaoAberta extends QuestaoRevisaoBase {
+  tipo: 'aberta'
+  acertou: null
+  /** Só com o gabarito liberado. */
+  rubrica?: string
+}
+
+export type QuestaoRevisao = QuestaoRevisaoMultipla | QuestaoRevisaoAberta
+
+export interface RevisaoTentativa {
+  atividade: AtividadeNumerada
+  gabarito_liberado: boolean
+  acertos: number
+  total_multipla_escolha: number
+  questoes: QuestaoRevisao[]
 }
 
 export type EstadoConceito = 'consolidado' | 'em_desenvolvimento' | 'revisar' | 'sem_dados'
@@ -64,6 +136,10 @@ export interface AcoesAlunoApi {
   entrar_sessao: { entrada: { token: string; entrar_na_turma?: boolean }; saida: Tentativa }
   enviar_respostas: { entrada: { tentativa_id: string; respostas: Resposta[] }; saida: ResultadoEnvio }
   meu_grafo: { entrada: { turma_id: string }; saida: { conceitos: ConceitoAluno[] } }
+  /** Fase 2. Sem `turma_id`, todas as turmas do aluno; da mais recente para a mais antiga. */
+  minhas_atividades: { entrada: { turma_id?: string }; saida: { atividades: AtividadeFeita[] } }
+  /** Fase 2. Só tentativa enviada do próprio aluno; qualquer outra → `nao_matriculado`. */
+  revisao_tentativa: { entrada: { tentativa_id: string }; saida: RevisaoTentativa }
 }
 
 export type Acao = keyof AcoesAlunoApi
