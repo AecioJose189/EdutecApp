@@ -32,12 +32,13 @@ class TurmaViewModelTest {
     }
 
     @Test
-    fun `turma sem alunos nao abre a sessao e pede o convite`() {
+    fun `turma sem alunos avisa antes de abrir, com a atividade guardada`() {
         val vm = viewModel(membros = emptyList())
         vm.abrir("t1")
         var aberta: AtividadePublicada? = null
         vm.abrirSessao(atividade) { aberta = it }
-        esperar { vm.semAlunosParaSessao }
+        esperar { vm.sessaoSemAlunos != null }
+        assertEquals(atividade, vm.sessaoSemAlunos) // "Abrir mesmo assim" abre esta
         assertNull(aberta)
     }
 
@@ -48,7 +49,7 @@ class TurmaViewModelTest {
         var aberta: AtividadePublicada? = null
         vm.abrirSessao(atividade) { aberta = it }
         esperar { aberta != null }
-        assertFalse(vm.semAlunosParaSessao)
+        assertNull(vm.sessaoSemAlunos)
     }
 
     @Test
@@ -59,7 +60,7 @@ class TurmaViewModelTest {
         var aberta: AtividadePublicada? = null
         vm.abrirSessao(emAndamento) { aberta = it }
         assertEquals(emAndamento, aberta)
-        assertFalse(vm.semAlunosParaSessao)
+        assertNull(vm.sessaoSemAlunos)
     }
 
     @Test

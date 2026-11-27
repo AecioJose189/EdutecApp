@@ -373,8 +373,9 @@ Resposta aos testes de usabilidade de novembro (`docs/feedback-testes-nov.md`).
   some quando tudo está feito. O `TurmaViewModel` carrega atividades e membros ao abrir a turma.
 - **Publicar** → aba Atividades com o aviso "Atividade publicada. Para a turma responder, abra a sessão em
   sala." + "Abrir sessão em sala" (`TurmaViewModel.avisarPublicada`; `EstadoGeracao.Publicado` leva o
-  `atividadeId`). **Abrir sessão** confere os membros no servidor; sem alunos, `DialogoSemAlunos`
-  ("Ninguém entrou na turma ainda...", com "Convidar alunos"). **Encerrar sessão** → mapa com
+  `atividadeId`). **Abrir sessão** confere os membros no servidor; sem alunos, `DialogoSemAlunos` só
+  avisa ("Convidar alunos" / "Abrir mesmo assim" / "Cancelar"): **não bloqueia**, porque com
+  `entrar_na_turma` o aluno entra na turma pelo próprio QR da sessão. **Encerrar sessão** → mapa com
   "Sessão encerrada · N alunos enviaram".
 - **Atividades** numeradas com selo Rascunho / Publicada / Sessão aberta / Encerrada e nº de respostas
   (`AtividadePublicada.estado`). `listar_atividades` (turma-api) ganhou `numero`, `n_sessoes`, `n_enviadas`,

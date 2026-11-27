@@ -26,6 +26,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -212,21 +213,33 @@ private fun TextoComEnter(texto: String, onEnter: () -> Unit) {
     )
 }
 
-/** "Abrir sessão em sala" numa turma sem alunos. */
+/**
+ * "Abrir sessão em sala" numa turma sem alunos: só avisa. Não bloqueia, porque o aluno também entra
+ * na turma direto pelo QR da sessão (entrar_na_turma). Enter = "Convidar alunos".
+ */
 @Composable
-fun DialogoSemAlunos(onConvidar: () -> Unit, onFechar: () -> Unit) {
+fun DialogoSemAlunos(onConvidar: () -> Unit, onAbrirMesmoAssim: () -> Unit, onFechar: () -> Unit) {
     val convidar = { onFechar(); onConvidar() }
+    val abrir = { onFechar(); onAbrirMesmoAssim() }
     AlertDialog(
         onDismissRequest = onFechar,
         containerColor = Superficie,
-        title = { Text("Ninguém entrou na turma ainda", color = Tinta, fontFamily = Sora, fontWeight = FontWeight.Bold) },
-        text = { TextoComEnter("Convide os alunos antes de abrir a sessão. Eles entram pelo link ou pelo código do convite.", convidar) },
-        confirmButton = {
-            Button(onClick = convidar, colors = ButtonDefaults.buttonColors(containerColor = Primaria),
-                modifier = Modifier.maoAoPassar()) { Text("Convidar alunos") }
+        title = { Text("Abrir a sessão sem alunos?", color = Tinta, fontFamily = Sora, fontWeight = FontWeight.Bold) },
+        text = {
+            TextoComEnter(
+                "Ninguém entrou na turma ainda. Os alunos podem entrar pelo convite ou direto pelo QR da sessão.",
+                convidar,
+            )
         },
-        dismissButton = {
-            TextButton(onClick = onFechar, modifier = Modifier.maoAoPassar()) { Text("Agora não", color = Primaria) }
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(Espaco2), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onFechar, modifier = Modifier.maoAoPassar()) { Text("Cancelar", color = Primaria) }
+                OutlinedButton(onClick = abrir, border = BorderStroke(1.dp, Primaria), modifier = Modifier.maoAoPassar()) {
+                    Text("Abrir mesmo assim", color = Primaria)
+                }
+                Button(onClick = convidar, colors = ButtonDefaults.buttonColors(containerColor = Primaria),
+                    modifier = Modifier.maoAoPassar()) { Text("Convidar alunos") }
+            }
         },
     )
 }
@@ -324,5 +337,5 @@ private fun PreviewDominioEstimado() {
 @Preview
 @Composable
 private fun PreviewSemAlunos() {
-    EdutecTheme { DialogoSemAlunos(onConvidar = {}, onFechar = {}) }
+    EdutecTheme { DialogoSemAlunos(onConvidar = {}, onAbrirMesmoAssim = {}, onFechar = {}) }
 }

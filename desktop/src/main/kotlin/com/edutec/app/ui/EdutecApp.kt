@@ -160,10 +160,11 @@ private fun AppDoProfessor(usuario: Usuario, onSair: () -> Unit) {
                 },
                 juntando = dadosTurma.juntando,
             )
-            if (dadosTurma.semAlunosParaSessao) {
+            dadosTurma.sessaoSemAlunos?.let { atividade ->
                 DialogoSemAlunos(
                     onConvidar = { dadosTurma.abrirConvite() },
-                    onFechar = { dadosTurma.semAlunosParaSessao = false },
+                    onAbrirMesmoAssim = { dadosTurma.aviso = null; navegacao.abrirProjecao(atividade) },
+                    onFechar = { dadosTurma.sessaoSemAlunos = null },
                 )
             }
             dadosTurma.convite?.let { convite ->

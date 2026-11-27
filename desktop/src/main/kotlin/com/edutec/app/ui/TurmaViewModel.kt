@@ -62,8 +62,11 @@ class TurmaViewModel(
     /** Aviso no topo da turma; some ao fechar, ao trocar de turma ou com um novo aviso. */
     var aviso by mutableStateOf<AvisoTurma?>(null)
 
-    /** Abrir sessão numa turma sem alunos: diálogo pedindo para convidar antes. */
-    var semAlunosParaSessao by mutableStateOf(false)
+    /**
+     * Abrir sessão numa turma sem alunos: a atividade espera no aviso (convidar, abrir mesmo assim ou
+     * cancelar). Não bloqueia: com entrar_na_turma, o aluno entra na turma pelo próprio QR da sessão.
+     */
+    var sessaoSemAlunos by mutableStateOf<AtividadePublicada?>(null)
 
     /** Conferindo os membros antes de abrir a sessão. */
     var conferindoAlunos by mutableStateOf(false)
@@ -92,7 +95,7 @@ class TurmaViewModel(
             membros = Carga.Carregando
             convite = null
             aviso = null
-            semAlunosParaSessao = false
+            sessaoSemAlunos = null
         }
         this.turmaId = turmaId
         // O painel "Próximos passos" precisa dos alunos e das atividades em qualquer aba.
@@ -192,7 +195,7 @@ class TurmaViewModel(
 
     /**
      * "Abrir sessão em sala": confere (de novo, no servidor) se alguém já entrou na turma. Sem alunos,
-     * mostra o aviso em vez de abrir; sessão já aberta ("Voltar à sessão") abre direto.
+     * mostra o aviso antes (que deixa abrir mesmo assim); sessão já aberta ("Voltar à sessão") abre direto.
      */
     fun abrirSessao(atividade: AtividadePublicada, abrir: (AtividadePublicada) -> Unit) {
         val turma = turmaId ?: return
@@ -204,7 +207,7 @@ class TurmaViewModel(
             if (this@TurmaViewModel.turmaId == turma) membros = atual
             conferindoAlunos = false
             when {
-                atual is Carga.Pronto && atual.valor.isEmpty() -> semAlunosParaSessao = true
+                atual is Carga.Pronto && atual.valor.isEmpty() -> sessaoSemAlunos = atividade
                 // Sem conseguir conferir, não impede: o professor pode estar com a sala esperando.
                 else -> { aviso = null; abrir(atividade) }
             }
