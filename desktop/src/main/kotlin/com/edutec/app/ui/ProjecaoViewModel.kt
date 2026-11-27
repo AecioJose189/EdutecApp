@@ -83,13 +83,15 @@ class ProjecaoViewModel(
         viewModelScope.launch { tentar { fecharEntrada(id) }?.let { sessao = it; qr = null } }
     }
 
-    fun encerrarSessao() {
+    /** Encerra a sessão; [aoEncerrar] recebe quantos alunos enviaram (a tela vai para o mapa da turma). */
+    fun encerrarSessao(aoEncerrar: (enviaram: Int) -> Unit = {}) {
         val id = sessao?.id ?: return
         viewModelScope.launch {
             tentar { fecharSessao(id) }?.let {
                 sessao = it
                 qr = null
                 atualizarPainel(id)
+                aoEncerrar(participantes.count { p -> p.enviou })
             }
         }
     }

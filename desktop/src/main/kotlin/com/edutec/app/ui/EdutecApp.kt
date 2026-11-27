@@ -83,7 +83,20 @@ private fun AppDoProfessor(usuario: Usuario, onSair: () -> Unit) {
                 aoVivo = projecao.aoVivo,
                 erro = projecao.erro,
                 onEncerrarEntrada = projecao::encerrarEntrada,
-                onEncerrarSessao = projecao::encerrarSessao,
+                onEncerrarSessao = {
+                    // Encerrada: vai para o mapa da turma, que já tem as respostas da sessão.
+                    projecao.encerrarSessao { enviaram ->
+                        sair()
+                        dadosTurma.aba = TurmaViewModel.ABA_GRAFO
+                        dadosTurma.aviso = AvisoTurma(
+                            "Sessão encerrada · " + when (enviaram) {
+                                0 -> "nenhum aluno enviou"
+                                1 -> "1 aluno enviou"
+                                else -> "$enviaram alunos enviaram"
+                            },
+                        )
+                    }
+                },
                 onSair = sair,
             )
         }
@@ -111,13 +124,23 @@ private fun AppDoProfessor(usuario: Usuario, onSair: () -> Unit) {
                 simulando = dadosTurma.simulando,
                 onVoltar = navegacao::fecharTurma,
                 onNovaAtividade = {
-                    geracao.voltar() // não mostrar o resultado de uma sessão anterior
+                    geracao.voltar() // começa outra: descarta o rascunho e o resultado anterior
                     navegacao.abrirNovaAtividade(it)
                 },
                 aba = aba,
                 onAba = { dadosTurma.aba = it },
                 atividades = dadosTurma.atividades,
-                onAbrirSessao = navegacao::abrirProjecao,
+                onAbrirSessao = { dadosTurma.abrirSessao(it, navegacao::abrirProjecao) },
+                abrindoSessao = dadosTurma.conferindoAlunos,
+                rascunho = geracao.rascunhoDa(turma.id)?.let {
+                    RascunhoAtividade(it.pedido.titulo.ifBlank { tituloDoArquivo(it.pedido.nomeArquivo) }, it.resultado.questoes.size)
+                },
+                onContinuarRascunho = { navegacao.abrirNovaAtividade(emptySet()) },
+                aviso = dadosTurma.aviso,
+                onAcaoAviso = { aviso ->
+                    aviso.atividade?.let { dadosTurma.abrirSessao(it, navegacao::abrirProjecao) }
+                },
+                onFecharAviso = { dadosTurma.aviso = null },
                 membros = dadosTurma.membros,
                 onRecarregarAba = { dadosTurma.carregarAba() },
                 onConvidar = { dadosTurma.abrirConvite() },
@@ -137,6 +160,12 @@ private fun AppDoProfessor(usuario: Usuario, onSair: () -> Unit) {
                 },
                 juntando = dadosTurma.juntando,
             )
+            if (dadosTurma.semAlunosParaSessao) {
+                DialogoSemAlunos(
+                    onConvidar = { dadosTurma.abrirConvite() },
+                    onFechar = { dadosTurma.semAlunosParaSessao = false },
+                )
+            }
             dadosTurma.convite?.let { convite ->
                 ConviteDialogo(
                     convite = convite,
@@ -151,7 +180,8 @@ private fun AppDoProfessor(usuario: Usuario, onSair: () -> Unit) {
         else -> {
             val estado by geracao.estado.collectAsState()
             val fechar = {
-                geracao.voltar() // cancela uma geração em andamento
+                // Fechar a Revisão guarda o resultado como rascunho da turma; o resto é cancelado.
+                if (estado !is EstadoGeracao.Concluido) geracao.voltar()
                 navegacao.fecharNovaAtividade()
             }
             TeclaVoltar { if (estado == EstadoGeracao.Ocioso) fechar() else geracao.voltar() }
@@ -168,17 +198,16 @@ private fun AppDoProfessor(usuario: Usuario, onSair: () -> Unit) {
                 onVoltar = geracao::voltar,
                 onPublicar = { geracao.publicar(turma.id) },
             )
-            // Publicada: volta para a Turma, na aba Atividades, com os dados atualizados.
+            // Publicada: volta para a Turma, na aba Atividades, com o aviso de que falta abrir a sessão.
             LaunchedEffect(estado) {
                 val publicado = estado
                 if (publicado is EstadoGeracao.Publicado) {
-                    avisar("Atividade publicada. Abra a sessão em sala na aba Atividades.")
                     geracao.voltar()
                     navegacao.fecharNovaAtividade()
                     navegacao.recarregarTurmas(silencioso = true)
                     dadosTurma.abrir(publicado.turmaId, forcar = true)
                     dadosTurma.aba = TurmaViewModel.ABA_ATIVIDADES
-                    dadosTurma.carregarAba(TurmaViewModel.ABA_ATIVIDADES)
+                    dadosTurma.avisarPublicada(publicado.atividadeId)
                 }
             }
         }

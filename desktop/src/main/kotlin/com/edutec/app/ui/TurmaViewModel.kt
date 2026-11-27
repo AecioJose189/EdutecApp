@@ -20,6 +20,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** Aviso no topo da turma (depois de publicar ou de encerrar a sessão), com uma ação opcional. */
+data class AvisoTurma(val texto: String, val acao: String? = null, val atividade: AtividadePublicada? = null)
+
 /** Grafo da turma aberta, vindo da turma-api. */
 sealed interface EstadoGrafo {
     data object Carregando : EstadoGrafo
@@ -56,6 +59,16 @@ class TurmaViewModel(
     var juntando by mutableStateOf(false)
         private set
 
+    /** Aviso no topo da turma; some ao fechar, ao trocar de turma ou com um novo aviso. */
+    var aviso by mutableStateOf<AvisoTurma?>(null)
+
+    /** Abrir sessão numa turma sem alunos: diálogo pedindo para convidar antes. */
+    var semAlunosParaSessao by mutableStateOf(false)
+
+    /** Conferindo os membros antes de abrir a sessão. */
+    var conferindoAlunos by mutableStateOf(false)
+        private set
+
     /** Simulação de demonstração em andamento. */
     var simulando by mutableStateOf(false)
         private set
@@ -78,8 +91,13 @@ class TurmaViewModel(
             atividades = Carga.Carregando
             membros = Carga.Carregando
             convite = null
+            aviso = null
+            semAlunosParaSessao = false
         }
         this.turmaId = turmaId
+        // O painel "Próximos passos" precisa dos alunos e das atividades em qualquer aba.
+        carregarAba(ABA_ATIVIDADES)
+        carregarAba(ABA_TURMA)
         carregamento?.cancel()
         // Recarregar a mesma turma mantém o grafo atual na tela até chegar o novo.
         if (outraTurma || _grafo.value !is EstadoGrafo.Pronto) _grafo.value = EstadoGrafo.Carregando
@@ -89,7 +107,7 @@ class TurmaViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                EstadoGrafo.Erro((e as? ErroTurmaApi ?: e as? SessaoExpirada)?.message ?: "Não foi possível carregar o grafo da turma.")
+                EstadoGrafo.Erro((e as? ErroTurmaApi ?: e as? SessaoExpirada)?.message ?: "Não foi possível carregar o mapa do conhecimento da turma.")
             }
         }
     }
@@ -172,6 +190,43 @@ class TurmaViewModel(
         }
     }
 
+    /**
+     * "Abrir sessão em sala": confere (de novo, no servidor) se alguém já entrou na turma. Sem alunos,
+     * mostra o aviso em vez de abrir; sessão já aberta ("Voltar à sessão") abre direto.
+     */
+    fun abrirSessao(atividade: AtividadePublicada, abrir: (AtividadePublicada) -> Unit) {
+        val turma = turmaId ?: return
+        if (atividade.sessaoAberta != null) { abrir(atividade); return }
+        if (conferindoAlunos) return
+        conferindoAlunos = true
+        viewModelScope.launch {
+            val atual = carregar("carregar os alunos") { buscarMembros(turma) }
+            if (this@TurmaViewModel.turmaId == turma) membros = atual
+            conferindoAlunos = false
+            when {
+                atual is Carga.Pronto && atual.valor.isEmpty() -> semAlunosParaSessao = true
+                // Sem conseguir conferir, não impede: o professor pode estar com a sala esperando.
+                else -> { aviso = null; abrir(atividade) }
+            }
+        }
+    }
+
+    /**
+     * Depois de publicar: aviso "falta abrir a sessão" com o botão que abre a sessão desta atividade
+     * (a lista é recarregada para ter a atividade nova).
+     */
+    fun avisarPublicada(atividadeId: String) {
+        val turma = turmaId ?: return
+        aviso = AvisoTurma(TEXTO_PUBLICADA)
+        viewModelScope.launch {
+            val atual = carregar("carregar as atividades") { buscarAtividades(turma) }
+            if (this@TurmaViewModel.turmaId != turma) return@launch
+            atividades = atual
+            val nova = (atual as? Carga.Pronto)?.valor?.find { it.id == atividadeId }
+            if (aviso?.texto == TEXTO_PUBLICADA) aviso = AvisoTurma(TEXTO_PUBLICADA, nova?.let { "Abrir sessão em sala" }, nova)
+        }
+    }
+
     /** Abre o diálogo "Convidar alunos" ([novo] = trocar o código). */
     fun abrirConvite(novo: Boolean = false) {
         val turma = turmaId ?: return
@@ -192,7 +247,8 @@ class TurmaViewModel(
     }
 
     companion object {
-        const val ABA_GRAFO = "Grafo"
+        const val ABA_GRAFO = "Mapa do conhecimento"
+        const val TEXTO_PUBLICADA = "Atividade publicada. Para a turma responder, abra a sessão em sala."
         const val ABA_ATIVIDADES = "Atividades"
         const val ABA_TURMA = "Turma"
     }

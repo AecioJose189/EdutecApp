@@ -59,6 +59,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -86,8 +87,12 @@ import com.edutec.app.data.DadosTurmaExemplo
 import com.edutec.app.data.EstadoConceito
 import com.edutec.app.data.GrafoTurma
 import com.edutec.app.data.Membro
+import com.edutec.app.data.Passo
 import com.edutec.app.data.Turma
+import com.edutec.app.data.baseadoEm
+import com.edutec.app.data.proximosPassos
 import com.edutec.app.data.rotuloAlunos
+import com.edutec.app.data.tudoFeito
 import com.edutec.app.data.semAtividade
 import com.edutec.app.ui.theme.Borda
 import com.edutec.app.ui.theme.BordaControle
@@ -124,8 +129,8 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 private val CantoCartao = FormaLg
 private val Espaco = Espaco4
-private val Abas = listOf("Grafo", "Atividades", "Materiais", "Estatísticas", "Turma")
-private val AbasProntas = setOf("Grafo", "Atividades", "Turma")
+private val Abas = listOf(TurmaViewModel.ABA_GRAFO, "Atividades", "Materiais", "Estatísticas", "Turma")
+private val AbasProntas = setOf(TurmaViewModel.ABA_GRAFO, "Atividades", "Turma")
 
 /**
  * Tela de uma turma: grafo de conhecimento com o domínio estimado de cada conceito (dados reais da
@@ -155,8 +160,19 @@ fun TurmaScreen(
     onJuntarConceitos: (origem: String, destino: String, aoTerminar: (Boolean) -> Unit) -> Unit = { _, _, _ -> },
     onMarcarDistintos: (String, String) -> Unit = { _, _ -> },
     juntando: Boolean = false,
+    /** Atividade gerada e não publicada desta turma (Rascunho), e como voltar à revisão dela. */
+    rascunho: RascunhoAtividade? = null,
+    onContinuarRascunho: () -> Unit = {},
+    /** Aviso no topo (depois de publicar ou de encerrar a sessão). */
+    aviso: AvisoTurma? = null,
+    onAcaoAviso: (AvisoTurma) -> Unit = {},
+    onFecharAviso: () -> Unit = {},
+    /** Conferindo se a turma tem alunos antes de abrir a sessão. */
+    abrindoSessao: Boolean = false,
 ) {
     val avisar = LocalAvisar.current
+    var explicarDominio by remember { mutableStateOf(false) }
+    if (explicarDominio) DialogoDominioEstimado(onFechar = { explicarDominio = false })
 
     BoxWithConstraints(
         modifier = modifier
@@ -166,7 +182,26 @@ fun TurmaScreen(
         val expandido = maxWidth >= 1000.dp
         val margem = if (maxWidth >= 600.dp) Espaco6 else Espaco4
 
+        val dados = (grafo as? EstadoGrafo.Pronto)?.grafo
+        // Próximos passos: só com tudo carregado (sem "piscar" uma etapa errada) e enquanto falta alguma.
+        val listaAtividades = (atividades as? Carga.Pronto)?.valor
+        val nMembros = (membros as? Carga.Pronto)?.valor?.size
+        val passos = if (listaAtividades != null && nMembros != null && (dados != null || turma.semAtividade)) {
+            proximosPassos(nMembros, rascunho != null, listaAtividades, dados?.conceitos?.any { it.respostas > 0 } == true)
+                .takeUnless { it.tudoFeito() }
+        } else null
+        val aoPasso: (Passo) -> Unit = { passo ->
+            when (passo) {
+                Passo.Convidar -> onConvidar()
+                Passo.Criar -> onNovaAtividade(emptySet())
+                Passo.Publicar -> if (rascunho != null) onContinuarRascunho() else onAba("Atividades")
+                Passo.AbrirSessao -> listaAtividades?.lastOrNull()?.let(onAbrirSessao) ?: onAba("Atividades")
+                Passo.VerMapa -> onAba(TurmaViewModel.ABA_GRAFO)
+            }
+        }
+
         val cabecalho: @Composable () -> Unit = {
+          Column(verticalArrangement = Arrangement.spacedBy(Espaco3)) {
             Cabecalho(
                 turma = turma,
                 expandido = expandido,
@@ -180,6 +215,9 @@ fun TurmaScreen(
                 onSimular = onSimular,
                 simulando = simulando,
             )
+            passos?.let { PainelProximosPassos(it, aoPasso, Modifier.fillMaxWidth()) }
+            aviso?.let { FaixaAvisoTurma(it, { onAcaoAviso(it) }, onFecharAviso, Modifier.fillMaxWidth()) }
+          }
         }
         val colunaTablet = Modifier
             .fillMaxSize()
@@ -191,13 +229,15 @@ fun TurmaScreen(
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(horizontal = margem, vertical = Espaco3)
 
-        val dados = (grafo as? EstadoGrafo.Pronto)?.grafo
         if (aba != Abas.first()) {
             Column(colunaTablet, verticalArrangement = Arrangement.spacedBy(Espaco)) {
                 cabecalho()
                 val mod = Modifier.fillMaxWidth().weight(1f)
                 if (aba == "Atividades") {
-                    AbaAtividades(atividades, onAbrirSessao, { onNovaAtividade(emptySet()) }, onRecarregarAba, mod)
+                    AbaAtividades(
+                        atividades, onAbrirSessao, { onNovaAtividade(emptySet()) }, onRecarregarAba, mod,
+                        rascunho = rascunho, onContinuarRascunho = onContinuarRascunho, abrindoSessao = abrindoSessao,
+                    )
                 } else {
                     AbaMembros(membros, onConvidar, onRecarregarAba, mod)
                 }
@@ -234,7 +274,7 @@ fun TurmaScreen(
         } else {
             ConteudoGrafo(
                 turma, dados, expandido, colunaTablet, colunaCelular, cabecalho, onNovaAtividade, simulando,
-                onJuntarConceitos, onMarcarDistintos, juntando,
+                onJuntarConceitos, onMarcarDistintos, juntando, onExplicarDominio = { explicarDominio = true },
             )
         }
     }
@@ -253,6 +293,7 @@ private fun ConteudoGrafo(
     onJuntarConceitos: (origem: String, destino: String, aoTerminar: (Boolean) -> Unit) -> Unit,
     onMarcarDistintos: (String, String) -> Unit,
     juntando: Boolean,
+    onExplicarDominio: () -> Unit,
 ) {
     val avisar = LocalAvisar.current
     // Conceito selecionado: o tocado no grafo, ou o mais fraco da turma.
@@ -291,7 +332,7 @@ private fun ConteudoGrafo(
     }
 
     val cartaoGrafo: @Composable (Modifier) -> Unit = { mod ->
-        CartaoGrafo(dados, conceito?.nome, onSelecionar = { selecionado = it }, modifier = mod)
+        CartaoGrafo(dados, conceito?.nome, onSelecionar = { selecionado = it }, onExplicarDominio, modifier = mod)
     }
     val demonstracao: @Composable () -> Unit = {
         if (simulando) FaixaSimulando(Modifier.fillMaxWidth())
@@ -304,6 +345,7 @@ private fun ConteudoGrafo(
                 onReforco = { onNovaAtividade(setOf(conceito.nome)) },
                 onVerAlunos = { avisar("Lista de alunos com dificuldade (próxima versão)") },
                 onJuntar = { juntarDe = conceito.nome; juntarCom = null },
+                onExplicarDominio = onExplicarDominio,
                 preencherAltura = expandido,
                 modifier = mod,
             )
@@ -524,39 +566,38 @@ private fun CartaoGrafo(
     grafo: GrafoTurma,
     selecionado: String?,
     onSelecionar: (String) -> Unit,
+    onExplicarDominio: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(shape = CantoCartao, color = Superficie, border = BorderStroke(EspessuraBorda, Borda), modifier = modifier) {
         Column(Modifier.padding(Espaco6)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Grafo da turma", color = Tinta, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(Espaco4))
-                // Quebra de linha em vez de rolagem: a legenda inteira sempre aparece.
-                FlowRow(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(Espaco4),
-                    verticalArrangement = Arrangement.spacedBy(Espaco2),
-                ) {
-                    EstadoConceito.entries.reversed().forEach { estado ->
-                        Row(Modifier.align(Alignment.CenterVertically), verticalAlignment = Alignment.CenterVertically) {
-                            SeloEstado(estado, tamanho = 16.dp)
-                            Spacer(Modifier.width(Espaco2))
-                            Text(
-                                if (estado == EstadoConceito.Desenvolvimento) "Em desenv." else estado.rotulo,
-                                color = TintaSuave, fontSize = 13.sp,
-                            )
-                        }
-                    }
+                Text("Mapa do conhecimento da turma", color = Tinta, fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f))
+                BotaoExplicarDominio(onExplicarDominio)
+            }
+            // Legenda numa linha própria, sempre visível (cor + símbolo); quebra em vez de rolar.
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Espaco4),
+                verticalArrangement = Arrangement.spacedBy(Espaco2),
+            ) {
+                EstadoConceito.entries.reversed().forEach { estado ->
                     Row(Modifier.align(Alignment.CenterVertically), verticalAlignment = Alignment.CenterVertically) {
-                        SeloEstado(null, tamanho = 16.dp)
+                        SeloEstado(estado, tamanho = 16.dp)
                         Spacer(Modifier.width(Espaco2))
-                        Text("Sem dados", color = TintaSuave, fontSize = 13.sp)
+                        Text(estado.rotulo, color = TintaSuave, fontSize = 13.sp)
                     }
-                    Text(
-                        "Tamanho = nº de respostas", color = TintaSuave, fontSize = 13.sp,
-                        modifier = Modifier.align(Alignment.CenterVertically),
-                    )
                 }
+                Row(Modifier.align(Alignment.CenterVertically), verticalAlignment = Alignment.CenterVertically) {
+                    SeloEstado(null, tamanho = 16.dp)
+                    Spacer(Modifier.width(Espaco2))
+                    Text("Sem dados", color = TintaSuave, fontSize = 13.sp)
+                }
+                Text(
+                    "Tamanho = nº de respostas · apagado = poucos dados (menos de ${ConceitoGrafo.MINIMO_RESPOSTAS})",
+                    color = TintaSuave, fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterVertically),
+                )
             }
             DesenhoGrafo(grafo, selecionado, onSelecionar, Modifier.fillMaxWidth().weight(1f))
         }
@@ -644,7 +685,10 @@ private fun NoDoGrafo(conceito: ConceitoGrafo, diametro: Dp, selecionado: Boolea
     val descricao = buildString {
         append(conceito.nome).append(": ")
         if (estado == null || conceito.semDados) append("sem dados")
-        else append("${estado.rotulo}, domínio estimado ${porcento(conceito.media)}")
+        else {
+            append("${estado.rotulo}, domínio estimado ${porcento(conceito.media)}, ${baseadoEm(conceito.respostas)}")
+            if (conceito.poucosDados) append(", poucos dados")
+        }
     }
     Column(
         modifier = Modifier
@@ -663,7 +707,11 @@ private fun NoDoGrafo(conceito: ConceitoGrafo, diametro: Dp, selecionado: Boolea
             contentAlignment = Alignment.Center,
         ) {
             val interno = if (selecionado) diametro - 12.dp else diametro
-            SeloEstado(estado.takeUnless { conceito.semDados }, tamanho = interno)
+            // Poucos dados: o estado aparece com menos ênfase (o símbolo continua lá).
+            SeloEstado(
+                estado.takeUnless { conceito.semDados }, tamanho = interno,
+                modifier = if (conceito.poucosDados) Modifier.alpha(0.45f) else Modifier,
+            )
         }
         Spacer(Modifier.height(Espaco1))
         Text(
@@ -673,9 +721,24 @@ private fun NoDoGrafo(conceito: ConceitoGrafo, diametro: Dp, selecionado: Boolea
             lineHeight = 14.sp,
             fontWeight = if (selecionado) FontWeight.Bold else FontWeight.SemiBold,
             textAlign = TextAlign.Center,
-            maxLines = 3,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+        if (!conceito.semDados) {
+            Text(
+                "${conceito.respostas} resp." + if (conceito.poucosDados) " · poucos dados" else "",
+                color = TintaSuave, fontSize = 11.sp, lineHeight = 13.sp, maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BotaoExplicarDominio(onClick: () -> Unit) {
+    TextButton(onClick = onClick, contentPadding = PaddingValues(horizontal = Espaco2), modifier = Modifier.maoAoPassar()) {
+        Icon(Icons.Outlined.Info, null, tint = Primaria, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(Espaco1))
+        Text("O que é domínio estimado?", color = Primaria, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -688,7 +751,7 @@ private fun CarregandoGrafo(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(Espaco4, Alignment.CenterVertically),
         ) {
             CircularProgressIndicator(color = Primaria)
-            Text("Carregando o grafo da turma…", color = TintaSuave, fontSize = 15.sp)
+            Text("Carregando o mapa do conhecimento…", color = TintaSuave, fontSize = 15.sp)
         }
     }
 }
@@ -706,7 +769,7 @@ private fun ErroGrafo(mensagem: String, onTentarDeNovo: () -> Unit, modifier: Mo
                 contentAlignment = Alignment.Center,
             ) { Text("!", color = Erro, fontFamily = Sora, fontSize = 26.sp, fontWeight = FontWeight.Bold) }
             Text(
-                "Não foi possível carregar o grafo", color = Tinta, fontFamily = Sora, fontSize = 20.sp,
+                "Não foi possível carregar o mapa do conhecimento", color = Tinta, fontFamily = Sora, fontSize = 20.sp,
                 fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
             )
             Text(mensagem, color = TintaSuave, fontSize = 15.sp, textAlign = TextAlign.Center)
@@ -771,6 +834,7 @@ private fun PainelConceito(
     onReforco: () -> Unit,
     onVerAlunos: () -> Unit,
     onJuntar: () -> Unit,
+    onExplicarDominio: () -> Unit,
     preencherAltura: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -788,19 +852,29 @@ private fun PainelConceito(
                 Text("Conceito", color = TintaSuave, fontSize = 14.sp)
                 Text(conceito.nome, color = Tinta, fontFamily = Sora, fontSize = 24.sp, fontWeight = FontWeight.Bold)
 
-                ChipEstado(
-                    estado,
-                    texto = if (estado == null) "Sem dados · ainda sem respostas"
-                    else "${estado.rotulo} · domínio estimado ${porcento(conceito.media)}",
-                )
-                Row(verticalAlignment = Alignment.Top) {
-                    Icon(Icons.Outlined.Info, null, tint = TintaSuave, modifier = Modifier.size(14.dp).padding(top = 2.dp))
-                    Spacer(Modifier.width(Espaco2))
-                    Text(
-                        "Chance estimada de a turma saber o conceito; não é nota.",
-                        color = TintaSuave, fontSize = 12.sp,
-                    )
+                val textoEstado = if (estado == null) "Sem dados · ainda sem respostas"
+                else "${estado.rotulo} · domínio estimado ${porcento(conceito.media)}"
+                if (conceito.poucosDados && estado != null) {
+                    // Menos ênfase: só o selo pequeno e o texto, sem o fundo colorido do chip.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SeloEstado(estado, tamanho = 18.dp)
+                        Spacer(Modifier.width(Espaco2))
+                        Text(textoEstado, color = TintaSuave, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                } else {
+                    ChipEstado(estado, texto = textoEstado)
                 }
+                if (estado != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Espaco2)) {
+                        Text(baseadoEm(conceito.respostas).replaceFirstChar { it.uppercase() }, color = Tinta, fontSize = 13.sp)
+                        if (conceito.poucosDados) SeloPoucosDados()
+                    }
+                }
+                Text(
+                    "Chance estimada de a turma saber o conceito; não é nota.",
+                    color = TintaSuave, fontSize = 12.sp,
+                )
+                BotaoExplicarDominio(onExplicarDominio)
 
                 // Logo abaixo do estado: é a leitura principal do painel.
                 CausaRaiz(conceito, grafo)
@@ -927,7 +1001,7 @@ private fun EstadoVazio(onNovaAtividade: () -> Unit, rolavel: Boolean, modifier:
                     color = Tinta, fontFamily = Sora, fontSize = 21.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
                 )
                 Text(
-                    "O grafo de conhecimento aparece quando os alunos começarem a responder às atividades.",
+                    "O mapa do conhecimento aparece quando os alunos começarem a responder às atividades.",
                     color = TintaSuave, fontSize = 15.sp, textAlign = TextAlign.Center,
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(Espaco3)) {
@@ -1005,4 +1079,52 @@ private fun PreviewTurmaVaziaTablet() {
 @Composable
 private fun PreviewTurmaVaziaCelular() {
     EdutecTheme { TurmaScreen(TurmaNova, EstadoGrafo.Carregando, onVoltar = {}, onNovaAtividade = {}) }
+}
+
+private val AtividadesExemplo = listOf(
+    AtividadePublicada("a1", "Probabilidade", "2026-10-21T12:00:00Z", 5, 30, numero = 1, sessoes = 1, enviadas = 24,
+        ultimaEncerradaEm = "2026-10-21T13:00:00Z"),
+    AtividadePublicada("a2", "Probabilidade condicional", "2026-10-28T12:00:00Z", 5, null, numero = 2, sessoes = 1, enviadas = 12,
+        sessaoAberta = com.edutec.app.data.SessaoSala("s2", "a2", true, true, "2026-10-28T12:10:00Z")),
+    AtividadePublicada("a3", "Teorema de Bayes", "2026-11-04T12:00:00Z", 4, 20, numero = 3),
+)
+
+/** Turma recém-publicada, sem alunos: passos no 1 (convidar) e o aviso de abrir a sessão. */
+@Preview
+@Composable
+private fun PreviewTurmaPassosTablet() {
+    val semRespostas = GrafoTurma(DadosTurmaExemplo.grafo.conceitos.map { ConceitoGrafo(it.nome, it.prerequisitos) }, emptyList())
+    EdutecTheme {
+        TurmaScreen(
+            TurmaComDados.copy(alunos = 0), EstadoGrafo.Pronto(semRespostas), onVoltar = {}, onNovaAtividade = {},
+            atividades = Carga.Pronto(AtividadesExemplo.take(1).map { it.copy(sessoes = 0, enviadas = 0, ultimaEncerradaEm = null) }),
+            membros = Carga.Pronto(emptyList()),
+            aviso = AvisoTurma(TurmaViewModel.TEXTO_PUBLICADA, "Abrir sessão em sala", AtividadesExemplo.first()),
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun PreviewTurmaAtividadesTablet() {
+    EdutecTheme {
+        TurmaScreen(
+            TurmaComDados, GrafoExemplo, onVoltar = {}, onNovaAtividade = {}, aba = "Atividades",
+            atividades = Carga.Pronto(AtividadesExemplo),
+            membros = Carga.Pronto(listOf(Membro("Ana", null, "2026-10-28T12:00:00Z"))),
+            rascunho = RascunhoAtividade("Distribuição binomial", 5),
+        )
+    }
+}
+
+/** Mapa com o diálogo "Juntar" por cima: confere o véu translúcido (item 10 dos testes de novembro). */
+@Preview
+@Composable
+private fun PreviewTurmaJuntarTablet() {
+    EdutecTheme {
+        TurmaScreen(TurmaComDados, GrafoExemplo, onVoltar = {}, onNovaAtividade = {})
+        val c = DadosTurmaExemplo.grafo.conceitos
+        DialogoJuntarConceitos(c[3], DadosTurmaExemplo.grafo, juntando = false, onJuntar = { _, _ -> },
+            onDistintos = { _, _ -> }, onFechar = {}, escolhidoInicial = c[4].nome)
+    }
 }
