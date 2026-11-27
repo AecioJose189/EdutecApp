@@ -359,6 +359,7 @@ verificar(painel.corpo?.participantes?.some((p: { nome: string; enviada_em: stri
 const grafoTurma = await chamar("turma-api", prof.token, { acao: "grafo", turma_id: turmaId });
 verificar(grafoTurma.corpo?.conceitos?.some((c: { n_respostas: number }) => c.n_respostas > 0), "grafo da turma com respostas reais");
 const rotulos = (grafoTurma.corpo?.alunos ?? []).map((a: { rotulo: string }) => a.rotulo);
+const conceitosTurma = () => grafoTurma.corpo?.conceitos?.length ?? -1;
 verificar(rotulos.includes("Aluno Teste Lumini") && rotulos.includes("Aluna QR Teste Lumini"),
   "grafo lista os dois alunos pelo nome", rotulos);
 
@@ -376,6 +377,27 @@ verificar(conf.corpo?.conceitos?.length > 0 && conf.corpo.conceitos.every((c: { 
   `confiança por conceito (${conf.corpo?.conceitos?.length} conceitos)`);
 const confAlheia = await chamar("turma-api", aluno.token, { acao: "confianca", turma_id: turmaId });
 verificar(confAlheia.status === 404, "aluno não vê as estatísticas de confiança da turma", confAlheia);
+
+etapa("6b. Professor: estatísticas e mapa de cada aluno (fase 3)");
+const est = await chamar("turma-api", prof.token, { acao: "estatisticas", turma_id: turmaId });
+verificar(est.status === 200 && est.corpo?.resumo?.n_alunos === 2 && est.corpo?.conceitos?.length > 0 &&
+  Array.isArray(est.corpo?.evolucao) && est.corpo?.confianca?.turma,
+  `estatisticas: ${est.corpo?.resumo?.n_alunos} alunos, ${est.corpo?.conceitos?.length} conceitos, ` +
+  `domínio estimado médio ${est.corpo?.resumo?.media_dominio}`, est.corpo);
+const chave2 = grafoTurma.corpo?.alunos?.find((a: { rotulo: string }) => a.rotulo === "Aluna QR Teste Lumini")?.chave;
+verificar(chave2 === aluno2.id, "grafo devolve a chave de cada aluno", grafoTurma.corpo?.alunos);
+const mapa2 = await chamar("turma-api", prof.token, { acao: "mapa_aluno", turma_id: turmaId, aluno: chave2 });
+verificar(mapa2.status === 200 && mapa2.corpo?.conceitos?.length === conceitosTurma(),
+  `mapa_aluno: ${mapa2.corpo?.conceitos?.filter((c: { p_dominio: number | null }) => c.p_dominio !== null).length} conceitos com dados`, mapa2.corpo);
+const conceitoMc = mc[0]?.conceitos?.[0];
+const hist2 = await chamar("turma-api", prof.token, { acao: "historico_conceito", turma_id: turmaId, aluno: chave2, conceito: conceitoMc });
+verificar(hist2.status === 200 && hist2.corpo?.respostas?.length > 0 && hist2.corpo.respostas.every((r: { confianca: string }) => r.confianca === "chute"),
+  `historico_conceito ("${conceitoMc}"): ${hist2.corpo?.respostas?.length} resposta(s), confiança "chute"`, hist2.corpo);
+for (const [acao, extra] of [["estatisticas", {}], ["mapa_aluno", { aluno: chave2 }],
+                             ["historico_conceito", { aluno: chave2, conceito: conceitoMc }]] as const) {
+  const r = await chamar("turma-api", aluno2.token, { acao, turma_id: turmaId, ...extra });
+  verificar(r.status === 404, `${acao}: aluno → 404`, r);
+}
 
 etapa("7. Aluno: meu grafo");
 const meuGrafo = await chamar("aluno-api", aluno.token, { acao: "meu_grafo", turma_id: turmaId });

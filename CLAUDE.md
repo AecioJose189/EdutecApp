@@ -246,7 +246,7 @@ só depois de conferir o papel na turma):
 - Ao vivo no desktop: Realtime `postgres_changes` em `public.tentativas` com filtro `sessao_id=eq.<id>`
   e o JWT do professor (INSERT = entrou; UPDATE com `enviada_em` = enviou).
 
-Testes: pgTAP (11 arquivos, 172 testes, inclusive `rls.test.sql`, `tentativas.test.sql` e `conceitos.test.sql`) e o fluxo
+Testes: pgTAP (12 arquivos, 202 testes, inclusive `rls.test.sql`, `tentativas.test.sql` e `conceitos.test.sql`) e o fluxo
 inteiro com dois usuários de teste contra o projeto real:
 `SUPABASE_CHAVE_SECRETA=<service_role> npx deno run -A scripts/testar-fluxo-mvp.ts` (o comando
 que obtém a chave está no cabeçalho do script). Cada execução cria uma turma na conta
@@ -433,8 +433,37 @@ Ideias do grupo inspiradas no LearnHarness; só back-end e contrato (`docs/contr
   ordem trocada (gabarito lido pela chave secreta, só no script) e a confiança gravada, devolvida e nas estatísticas.
   jsonb não guarda a ordem das chaves: compare campo a campo.
 
+## Fase 3 — Estatísticas e mapa de cada aluno (29/11/2026, branch `fase3-estatisticas`, sai da `fase2b-confianca`)
+
+- **Banco** (migration `20261129120000_estatisticas`, só leitura, só service_role; a turma-api confere o dono):
+  `dominio_reprocessado(turma, ate, incluir_simulacao)` refaz o BKT pelas respostas até `ate` (agregado
+  `privado.bkt_refeito`, mesmos parâmetros e ordem `criado_em, id` do `registrar_resposta`; refeito até agora
+  bate com `dominio`, testado par a par). `estatisticas_turma` (resumo + tabela por conceito, piores primeiro,
+  alunos por estado com "sem dados" = membros sem resposta), `evolucao_turma` (por atividade encerrada: taxa de
+  acerto das tentativas, domínio médio logo depois = BKT refeito até a última sessão encerrada dela, e por
+  conceito a média e a anterior), `mapa_aluno`, `historico_aluno_conceito` (respostas em ordem com o domínio
+  depois de cada uma, confiança, erros com certeza e acertos no chute). Reais = `aluno_id`; simulação =
+  `sim-%` só com `incluir_simulacao` (a simulação não tem sessões: fica fora da taxa de acerto).
+- **turma-api:** `estatisticas` (junta as três + `confianca_turma`), `mapa_aluno`, `historico_conceito`; `grafo`
+  ganhou `alunos[].chave` (uuid do aluno real ou pseudônimo `sim-...`).
+- **Desktop:** aba **Estatísticas** (`ui/EstatisticasScreen.kt`): resumo, aviso "poucos dados" com o motivo
+  (< 5 alunos, < 2 atividades encerradas, < 5 respostas com confiança; `avisosPoucosDados`), tabela por conceito
+  (barra empilhada com cor + símbolo, colunas de confiança com dica ao passar o mouse via `TooltipArea`; clicar
+  abre o conceito no mapa), gráfico de evolução no Canvas (duas séries: forma, traço e legenda além da cor;
+  valores nos pontos) e destaques por atividade (`destaques`). "Incluir simulação" só aparece se houver.
+  **Mapa do aluno** (`ui/MapaAluno.kt`): clicar num aluno da lista pinta o mapa com o domínio dele
+  (`GrafoTurma.doAluno`, mesmo layout; "poucos dados" abaixo de 3 respostas dele no conceito, a turma segue com 5:
+  `ConceitoGrafo.minimoRespostas`), faixa "Mapa de X" + "Voltar à turma toda" (textos neutros, sem "dele/dela"),
+  e o painel vira o histórico
+  do conceito (gráfico do domínio resposta a resposta, ✓/✗, confiança). Estado em `TurmaViewModel`
+  (`estatisticas`, `incluirSimulacao`, `alunoSelecionado`, `mapaDoAluno`, `historico`, `conceitoEmFoco`).
+- Testes: pgTAP `estatisticas.test.sql` (30; 12 arquivos, 202); desktop `EstatisticasTest` e mais casos no
+  `TurmaViewModelTest` (50 testes no total); `ContrasteTest` ganhou "superficie sobre tinta" (a dica). Capturas
+  em `amostras/capturas/` (fora do git): `turma-estatisticas`, `estatisticas*`, `turma-mapa-do-aluno`,
+  `mapa-aluno-historico`.
+
 Ainda não existe: correção das abertas, edição na Revisão, prazo/liberação na publicação, gerar a partir do
-grafo, abas Materiais/Estatísticas, histórico semanal, "Ver alunos com dificuldade".
+grafo, aba Materiais, histórico semanal, "Ver alunos com dificuldade".
 
 ## Entrega anterior (21/10/2026) — atividade da 1ª VA (feita no Android, tag `demo-nivel2`)
 

@@ -25,7 +25,7 @@ import java.lang.reflect.Modifier
 class CapturasTelasTest {
     private val arquivos = listOf(
         "LoginScreen", "MinhasTurmasScreen", "TurmaScreen", "NovaAtividadeScreen", "GerandoAtividade",
-        "RevisaoAtividade", "ProjecaoScreen", "JuntarConceitos", "PassosTurma",
+        "RevisaoAtividade", "ProjecaoScreen", "JuntarConceitos", "PassosTurma", "EstatisticasScreen", "MapaAluno",
     )
 
     @Test

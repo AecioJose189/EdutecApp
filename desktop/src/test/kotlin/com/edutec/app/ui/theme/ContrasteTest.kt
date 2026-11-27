@@ -34,6 +34,7 @@ class ContrasteTest {
         add(Triple("sobre-consolidado sobre estado-consolidado", c.sobreConsolidado, c.estadoConsolidado))
         add(Triple("sobre-desenvolvimento sobre estado-desenvolvimento", c.sobreDesenvolvimento, c.estadoDesenvolvimento))
         add(Triple("sobre-revisar sobre estado-revisar", c.sobreRevisar, c.estadoRevisar))
+        add(Triple("superficie sobre tinta (dica ao passar o mouse)", c.superficie, c.tinta))
     }
 
     private fun paresDeControle(c: CoresLumini) = listOf(
