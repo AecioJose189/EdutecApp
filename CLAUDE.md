@@ -246,7 +246,7 @@ só depois de conferir o papel na turma):
 - Ao vivo no desktop: Realtime `postgres_changes` em `public.tentativas` com filtro `sessao_id=eq.<id>`
   e o JWT do professor (INSERT = entrou; UPDATE com `enviada_em` = enviou).
 
-Testes: pgTAP (7 arquivos, 108 testes, inclusive `rls.test.sql`, `tentativas.test.sql` e `conceitos.test.sql`) e o fluxo
+Testes: pgTAP (8 arquivos, 119 testes, inclusive `rls.test.sql`, `tentativas.test.sql` e `conceitos.test.sql`) e o fluxo
 inteiro com dois usuários de teste contra o projeto real:
 `SUPABASE_CHAVE_SECRETA=<service_role> npx deno run -A scripts/testar-fluxo-mvp.ts` (o comando
 que obtém a chave está no cabeçalho do script). Cada execução cria uma turma na conta
@@ -359,6 +359,47 @@ Problema: PDFs diferentes sobre o mesmo assunto davam o mesmo conceito com nomes
 - Conferido: `ContrasteTest` (todos os pares de texto ≥ 4,5:1 e controles ≥ 3:1 nos dois temas), capturas
   dos `@Preview` nos dois temas e o `.deb` rodando no Xvfb (logo e fontes carregados do pacote).
 - O `:app` Android congelado não foi tocado (continua com a paleta antiga).
+
+## Fase 1 — fluxo do professor (27/11/2026, branch `fase1-fluxo`)
+
+Resposta aos testes de usabilidade de novembro (`docs/feedback-testes-nov.md`).
+- **Login:** a espera diz "Continue no navegador. Quando terminar, o Lumini volta sozinho." (com Cancelar).
+  A página de `localhost:3737/callback` (`data/PaginaRetorno.kt`) usa o logo (em data URI: o servidor local
+  fecha logo depois) e as cores dos tokens, clara/escura por `prefers-color-scheme`. Ao concluir, a janela
+  vem para a frente (`trazerParaFrente` em `ui/Avisos.kt`: toFront/requestFocus; sem foco em 300 ms,
+  alwaysOnTop por um instante), via `LocalTrazerParaFrente` e `SessaoViewModel.voltasDoNavegador`.
+- **Próximos passos** no topo da turma (`data/ProximosPassos.kt` + `ui/PassosTurma.kt`): Convidar (quantos
+  entraram) → Criar → Publicar → Abrir sessão → Ver o mapa; atual em destaque com o botão, feitos com ✓;
+  some quando tudo está feito. O `TurmaViewModel` carrega atividades e membros ao abrir a turma.
+- **Publicar** → aba Atividades com o aviso "Atividade publicada. Para a turma responder, abra a sessão em
+  sala." + "Abrir sessão em sala" (`TurmaViewModel.avisarPublicada`; `EstadoGeracao.Publicado` leva o
+  `atividadeId`). **Abrir sessão** confere os membros no servidor; sem alunos, `DialogoSemAlunos` só
+  avisa ("Convidar alunos" / "Abrir mesmo assim" / "Cancelar"): **não bloqueia**, porque com
+  `entrar_na_turma` o aluno entra na turma pelo próprio QR da sessão. **Encerrar sessão** → mapa com
+  "Sessão encerrada · N alunos enviaram".
+- **Atividades** numeradas com selo Rascunho / Publicada / Sessão aberta / Encerrada e nº de respostas
+  (`AtividadePublicada.estado`). `listar_atividades` (turma-api) ganhou `numero`, `n_sessoes`, `n_enviadas`,
+  `ultima_encerrada_em`. **Rascunho** = geração concluída e não publicada da turma, só enquanto o app está
+  aberto: fechar a Revisão não a descarta ("Revisar e publicar"); "Nova atividade" descarta.
+- **Revisão:** barra "Publicar para a turma" fixa no rodapé. **Nova atividade:** "Material da aula (PDF): a IA
+  lê o material e cria as questões a partir dele."; título = nome do arquivo sem extensão (editável).
+- **"Mapa do conhecimento"** no lugar de "grafo" em todo texto visível (`ABA_GRAFO` = "Mapa do conhecimento";
+  nomes internos continuam `Grafo`).
+- **Domínio estimado:** cada conceito mostra "baseado em N respostas"; com menos de 5
+  (`ConceitoGrafo.poucosDados`) selo "poucos dados" e o estado apagado (nó com alpha, chip sem fundo).
+  Legenda em linha própria acima do mapa; "O que é domínio estimado?" abre `DialogoDominioEstimado`.
+- Diálogo "Juntar os dois conceitos": véu translúcido (conferido na captura `turma-juntar`).
+- `contornoTracejado` não quebra mais com tamanho zero (Skia recusava traço de comprimento 0).
+- **aluno-api, entrar na turma pelo QR** (`docs/contrato-api-fase2.md`): quem não é membro recebe
+  `nao_matriculado` com `turma: {id, nome, codigo}`; com `entrar_na_turma: true` é matriculado e entra
+  (token recente, sessão e entrada abertas) por `entrar_na_turma_pela_sessao` (migration `20261127120000`,
+  só service_role; LU410/LU403). O professor da turma recebe `nao_matriculado` sem `turma`.
+  pgTAP: `entrar_pela_sessao.test.sql` (8 arquivos, 119 testes). Testado de ponta a ponta com
+  `supabase start` + `functions serve` locais (17 verificações, incluindo os campos novos de listar_atividades).
+- **Ainda não aplicado em produção:** a migration `20261127120000` e o deploy de `aluno-api` e `turma-api`.
+  O desktop funciona com a turma-api antiga (campos novos têm padrão; sem `numero`, sem "Atividade N").
+- Testes: `ProximosPassosTest`, `PaginaRetornoTest`, `TurmaViewModelTest` (EDT do Swing, espera com prazo),
+  `PoucosDadosTest`; capturas novas `turma-passos`, `turma-atividades`, `turma-juntar`, `passos-turma-*`.
 
 Ainda não existe: correção das abertas, edição na Revisão, prazo/liberação na publicação, gerar a partir do
 grafo, abas Materiais/Estatísticas, histórico semanal, "Ver alunos com dificuldade".

@@ -187,7 +187,7 @@ fun ProjecaoScreen(
             },
             confirmButton = {
                 Button(onClick = { confirmarEncerrar = false; onEncerrarSessao() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Erro), modifier = Modifier.maoAoPassar()) { Text("Encerrar") }
+                    colors = ButtonDefaults.buttonColors(containerColor = Erro), modifier = Modifier.maoAoPassar()) { Text("Encerrar sessão") }
             },
             dismissButton = { TextButton(onClick = { confirmarEncerrar = false }, modifier = Modifier.maoAoPassar()) { Text("Continuar") } },
         )
@@ -205,7 +205,7 @@ private fun PainelQr(qr: TokenQr?, segundosParaTrocar: Int, sessao: SessaoSala?,
                 sessao == null -> CircularProgressIndicator(color = Primaria)
                 !sessao.aberta -> MensagemGrande(
                     "Sessão encerrada",
-                    if (enviaram > 0) "Obrigado! O grafo da turma já tem as respostas." else "Ninguém enviou respostas nesta sessão.",
+                    if (enviaram > 0) "Obrigado! O mapa do conhecimento da turma já tem as respostas." else "Ninguém enviou respostas nesta sessão.",
                 )
                 !sessao.entradaAberta -> MensagemGrande("Entrada encerrada", "Quem já entrou ainda pode enviar as respostas.")
                 qr == null -> CircularProgressIndicator(color = Primaria)

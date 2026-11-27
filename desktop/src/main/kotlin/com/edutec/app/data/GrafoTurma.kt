@@ -15,7 +15,17 @@ data class ConceitoGrafo(
     val alunosRevisar: Int = 0,
 ) {
     val semDados get() = estado == null || respostas == 0
+
+    /** Com menos de [MINIMO_RESPOSTAS] respostas o domínio estimado ainda oscila muito: mostrar com cautela. */
+    val poucosDados get() = !semDados && respostas < MINIMO_RESPOSTAS
+
+    companion object {
+        const val MINIMO_RESPOSTAS = 5
+    }
 }
+
+/** "baseado em 1 resposta" / "baseado em 12 respostas". */
+fun baseadoEm(respostas: Int): String = "baseado em $respostas ${if (respostas == 1) "resposta" else "respostas"}"
 
 /**
  * Dois conceitos da turma com nomes parecidos mas não iguais (turma-api, pg_trgm): podem ser o mesmo

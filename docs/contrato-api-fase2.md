@@ -83,3 +83,35 @@ Saída:
 ```
 - Com `gabarito_liberado: false`: `correta`, `feedback` e `rubrica` **não vêm** (o campo some, não vem `null`). `acertou` vem sempre.
 - `minha_resposta` vazia (`{}`) quando o aluno deixou em branco.
+
+## Mudança em `entrar_sessao`: entrar na turma pelo QR
+
+Problema dos testes de novembro: quem leu o QR da sessão sem ter aceitado o convite ficava sem saída.
+
+**Quem não é membro da turma** recebe `nao_matriculado` (403) com a turma da sessão, para o site oferecer
+"Entrar na turma e começar":
+```json
+{
+  "erro": "nao_matriculado",
+  "mensagem": "Você ainda não está nesta turma. Entre nela para responder a atividade.",
+  "turma": { "id": "uuid", "nome": "Inteligência Artificial", "codigo": "Turma A" }
+}
+```
+
+**Entrada nova** `entrar_na_turma: true`:
+```json
+{ "acao": "entrar_sessao", "token": "…", "entrar_na_turma": true }
+```
+Matricula o aluno na turma e entra na sessão na mesma chamada; a saída é a de sempre (a tentativa).
+Vale só com:
+- token válido e **recente** (o QR na tela agora; um token velho → `qr_expirado`);
+- sessão aberta e com a entrada aberta (senão `sessao_encerrada`, e o aluno **não** fica na turma).
+
+Para quem já é membro, `entrar_na_turma` é ignorado (nada muda).
+
+**O professor da turma nunca vira aluno dela**: com ou sem `entrar_na_turma`, recebe `nao_matriculado`
+**sem** o campo `turma` e a mensagem "Você é o professor desta turma. Para responder como aluno, use outra
+conta Google." (o site mostra o erro, sem oferecer a entrada).
+
+No banco: `entrar_na_turma_pela_sessao(sessao, aluno)` (migration `20261127120000`, só a `service_role`),
+testes em `supabase/tests/database/entrar_pela_sessao.test.sql`.

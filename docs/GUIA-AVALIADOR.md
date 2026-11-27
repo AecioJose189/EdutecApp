@@ -46,7 +46,7 @@ a resposta vem na hora. Um PDF seu também funciona, mas a IA pode levar **até 
 
 **De volta ao computador**
 
-10. Acompanhe "entraram/enviaram" ao vivo → **Encerrar sessão** → veja o **grafo da turma**
+10. Acompanhe "entraram/enviaram" ao vivo → **Encerrar sessão** → veja o **mapa do conhecimento** da turma
     (✓ consolidado, ~ em desenvolvimento, ! revisar, ? sem dados) e clique nos conceitos.
 
 ## 4. Limitações conhecidas

@@ -17,7 +17,29 @@ data class AtividadePublicada(
     @SerialName("n_questoes") val questoes: Int = 0,
     @SerialName("tempo_minutos") val tempoMinutos: Int? = null,
     @SerialName("sessao_aberta") val sessaoAberta: SessaoSala? = null,
-)
+    /** Ordem na turma (1, 2...), a mesma que o aluno vê; 0 = servidor antigo, sem o campo. */
+    val numero: Int = 0,
+    /** Sessões em sala já abertas para ela (abertas ou encerradas). */
+    @SerialName("n_sessoes") val sessoes: Int = 0,
+    /** Alunos que enviaram as respostas, somando todas as sessões. */
+    @SerialName("n_enviadas") val enviadas: Int = 0,
+    @SerialName("ultima_encerrada_em") val ultimaEncerradaEm: String? = null,
+) {
+    val estado: EstadoAtividade
+        get() = when {
+            sessaoAberta != null -> EstadoAtividade.SessaoAberta
+            sessoes > 0 -> EstadoAtividade.Encerrada
+            else -> EstadoAtividade.Publicada
+        }
+}
+
+/** Selo da atividade na lista. Rascunho = gerada e ainda não publicada (só existe no app aberto). */
+enum class EstadoAtividade(val rotulo: String) {
+    Rascunho("Rascunho"),
+    Publicada("Publicada"),
+    SessaoAberta("Sessão aberta"),
+    Encerrada("Encerrada"),
+}
 
 @Serializable
 data class SessaoSala(

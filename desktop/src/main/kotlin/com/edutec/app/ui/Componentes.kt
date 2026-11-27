@@ -126,6 +126,8 @@ fun SeloEstado(estado: EstadoConceito?, modifier: Modifier = Modifier, tamanho: 
 /** Círculo tracejado na borda da área desenhada (nó e selo "sem dados"). */
 fun DrawScope.contornoTracejado(cor: Color, espessura: Float) {
     val raio = (size.minDimension - espessura) / 2
+    // Área ainda sem tamanho (primeiro quadro, animação): o Skia não cria traço de comprimento zero.
+    if (raio <= 0f) return
     val circunferencia = 2 * PI.toFloat() * raio
     // Traços e vãos que fecham o círculo certinho (sem um traço cortado no fim).
     val passo = (espessura * 4.5f).coerceAtLeast(6f)

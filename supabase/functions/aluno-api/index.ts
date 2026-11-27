@@ -4,7 +4,9 @@
 // Entrada: POST { "acao": "...", ...parâmetros } com o JWT do aluno (verify_jwt = true).
 //   minhas_turmas    {}                          → { turmas: [Turma] }
 //   aceitar_convite  { codigo }                  → { turma: Turma, ja_era_membro }
-//   entrar_sessao    { token }                   → { tentativa_id, iniciada_em, prazo_em, ja_enviada, atividade }
+//   entrar_sessao    { token, entrar_na_turma? } → { tentativa_id, iniciada_em, prazo_em, ja_enviada, atividade }
+//                    (fase 2: quem não é da turma recebe nao_matriculado com { turma: {id, nome, codigo} };
+//                     com entrar_na_turma: true é matriculado e entra — docs/contrato-api-fase2.md)
 //   enviar_respostas { tentativa_id, respostas } → { acertos, total_multipla_escolha, abertas_aguardando_correcao }
 //   meu_grafo        { turma_id }                → { conceitos: [{ nome, prerequisitos, dominio, estado, n_respostas }] }
 // Turma: { id, nome, codigo, professor_nome }
@@ -28,7 +30,13 @@ type CodigoErro =
   | "tentativa_ja_enviada" | "tempo_esgotado" | "erro_interno";
 
 class ErroAluno extends Error {
-  constructor(readonly codigo: CodigoErro, message: string, readonly status: number) {
+  /** `detalhes`: campos extras no corpo do erro (ex.: `turma` no nao_matriculado de entrar_sessao). */
+  constructor(
+    readonly codigo: CodigoErro,
+    message: string,
+    readonly status: number,
+    readonly detalhes: Record<string, unknown> = {},
+  ) {
     super(message);
   }
 }
@@ -60,7 +68,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     if (e instanceof ErroAluno) {
       if (e.status >= 500) console.error(e.message);
-      return json({ erro: e.codigo, mensagem: e.message }, e.status);
+      return json({ ...e.detalhes, erro: e.codigo, mensagem: e.message }, e.status);
     }
     console.error("Erro inesperado:", e);
     return json({ erro: "erro_interno", mensagem: "Algo deu errado no servidor. Tente de novo em instantes." }, 500);
@@ -178,8 +186,23 @@ async function entrarSessao(u: Usuario, corpo: Corpo) {
     .from("membros_turma").select("aluno_id").eq("turma_id", turma.id).eq("aluno_id", u.id).maybeSingle();
   if (erroMembro) throw falhaBanco("conferir a matrícula", erroMembro);
   if (!membro) {
-    throw new ErroAluno("nao_matriculado",
-      "Você ainda não está nesta turma. Abra o link de convite que o professor compartilhou.", 403);
+    // Fase 2: o erro leva a turma, para o site oferecer "Entrar na turma e começar"; com
+    // entrar_na_turma: true, matricula aqui mesmo (token recente, sessão e entrada abertas).
+    if (corpo.entrar_na_turma !== true) {
+      throw new ErroAluno("nao_matriculado",
+        "Você ainda não está nesta turma. Entre nela para responder a atividade.", 403,
+        { turma: { id: turma.id, nome: turma.nome, codigo: turma.codigo } });
+    }
+    if (!tokenRecente(lido)) throw expirado;
+    const { error: erroEntrada } = await servico.rpc("entrar_na_turma_pela_sessao", { sessao: sessao.id, aluno: u.id });
+    if (erroEntrada) {
+      if (erroEntrada.code === "LU410") throw new ErroAluno("sessao_encerrada", erroEntrada.message, 410);
+      if (erroEntrada.code === "LU403") {
+        throw new ErroAluno("nao_matriculado",
+          "Você é o professor desta turma. Para responder como aluno, use outra conta Google.", 403);
+      }
+      throw falhaBanco("entrar na turma", erroEntrada);
+    }
   }
 
   // Ler o QR de novo (ou recarregar a página com um token velho) devolve a mesma tentativa.

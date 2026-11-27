@@ -31,7 +31,7 @@ sealed interface EstadoGeracao {
     ) : EstadoGeracao
 
     /** Publicada na turma: a tela volta para a Turma. */
-    data class Publicado(val turmaId: String) : EstadoGeracao
+    data class Publicado(val turmaId: String, val atividadeId: String) : EstadoGeracao
     data class Erro(val pedido: PedidoGeracao, val tipo: TipoErro, val detalhe: String? = null) : EstadoGeracao
 }
 
@@ -95,8 +95,10 @@ class NovaAtividadeViewModel(
         _estado.value = atual.copy(publicando = true, erroPublicacao = null)
         trabalho = viewModelScope.launch {
             _estado.value = try {
-                publicarAtividade(turmaId, geracaoId, atual.pedido.permitirRefazer, atual.pedido.tempoMinutos, atual.pedido.titulo)
-                EstadoGeracao.Publicado(turmaId)
+                val atividadeId = publicarAtividade(
+                    turmaId, geracaoId, atual.pedido.permitirRefazer, atual.pedido.tempoMinutos, atual.pedido.titulo,
+                )
+                EstadoGeracao.Publicado(turmaId, atividadeId)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -104,6 +106,13 @@ class NovaAtividadeViewModel(
             }
         }
     }
+
+    /**
+     * Rascunho da turma: atividade gerada e ainda não publicada (fechar a Revisão não a descarta).
+     * Só vive enquanto o app está aberto; "Nova atividade" começa outra e descarta esta.
+     */
+    fun rascunhoDa(turmaId: String): EstadoGeracao.Concluido? =
+        (_estado.value as? EstadoGeracao.Concluido)?.takeIf { it.pedido.turmaId == turmaId }
 
     fun tentarDeNovo() {
         (_estado.value as? EstadoGeracao.Erro)?.let { gerar(it.pedido) }
