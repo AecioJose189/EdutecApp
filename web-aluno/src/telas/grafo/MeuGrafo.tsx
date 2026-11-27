@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { chamarAlunoApi } from '../../api/alunoApi'
 import type { ConceitoAluno, EstadoConceito, Turma } from '../../api/tipos'
 import { AvisoErro } from '../../componentes/AvisoErro'
@@ -55,6 +55,11 @@ export function MeuGrafo() {
             aoFechar={() => setSelecionado(null)}
           />
         ))}
+      {estado.tipo === 'ok' && (
+        <Link to={`/atividades?turma=${turmaId}`} state={{ turma }} className="botao largo secundario-btn">
+          Atividades desta turma
+        </Link>
+      )}
     </main>
   )
 }

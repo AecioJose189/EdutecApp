@@ -50,6 +50,12 @@ export function MinhasTurmas() {
           </ul>
         ))}
 
+      {estado.tipo === 'ok' && estado.dados.turmas.length > 0 && (
+        <Link to="/atividades" className="botao largo secundario-btn">
+          Minhas atividades
+        </Link>
+      )}
+
       <div className="cartao dica">
         <p>
           <strong>Na aula:</strong> quando o professor projetar o QR code, aponte a câmera do celular para ele.
