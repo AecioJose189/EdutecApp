@@ -180,3 +180,172 @@ Só acréscimos: o site atual continua funcionando sem mudar nada.
 No banco: migrations `20261128120000_alternativas_embaralhadas` (`chave_alternativa`, `questoes_da_tentativa`)
 e `20261128130000_confianca` (`respostas.confianca`, `confianca_turma`); testes em
 `supabase/tests/database/embaralhar.test.sql` e `confianca.test.sql`.
+
+## Fase 4: revisão espaçada (flashcards)
+
+Treino fora de sala, no celular, com as **próprias questões que o professor publicou**. Só acréscimos: o
+site atual continua funcionando sem mudar nada. Três ações novas na `aluno-api`.
+
+### Regras
+
+- **De onde vêm os cartões:** só questões de **múltipla escolha** publicadas pelo professor (RN04), de
+  atividades das turmas do aluno com o **gabarito liberado**: a atividade teve pelo menos uma sessão
+  **encerrada** e não tem nenhuma aberta agora. Se o professor reabrir a atividade em sala, os cartões dela
+  somem até ele encerrar de novo (nada vaza para quem está respondendo). Questões abertas não viram cartão.
+- **Nada é gerado:** nenhuma chamada à IA. Um cartão é uma questão (aluno × atividade × questão).
+- **Fora do domínio estimado:** o treino **não** entra no BKT nem no mapa do aluno ou da turma. Fica num
+  registro próprio (só inserção). O professor vê só quantos treinos e o acerto no treino.
+- **Caixas de Leitner (1, 2, 3):** acerto sobe uma caixa (máximo 3); erro volta para a 1. A próxima revisão
+  fica para daqui a **1, 3 ou 7 dias** (caixa 1, 2, 3). Cartão novo começa na caixa 1.
+- **"Hoje"** é o dia no fuso de Brasília (`America/Sao_Paulo`).
+- **Só conta para a caixa** a primeira resposta a um cartão que está para hoje (vencido ou novo). Responder de
+  novo no mesmo dia (ou um cartão que ainda não venceu) registra o treino, mas a caixa não muda
+  (`contou_para_caixa: false`).
+- **O baralho**, na ordem:
+  1. cartões **vencidos** (próxima revisão hoje ou antes; o mais atrasado primeiro, depois a caixa menor);
+  2. cartões **novos** das questões ligadas a conceitos em que o domínio estimado do aluno está em
+     **"revisar"** (primeiro) ou **"em desenvolvimento"** (do menor domínio para o maior). Conceitos
+     consolidados ou sem dados não geram cartões novos.
+- **Alternativas embaralhadas, ordem fixa por cartão** (como nas tentativas): o mesmo cartão vem sempre na
+  mesma ordem. Os **ids são os originais**; o site rotula A, B, C **pela posição**.
+
+### `revisao_baralho`
+
+Entrada: `{ "acao": "revisao_baralho", "turma_id": "uuid", "limite": 10 }`
+- `turma_id` opcional (sem ele: todas as turmas do aluno); fora do formato → `nao_matriculado`.
+- `limite` opcional, padrão 10, de 1 a 50.
+
+Saída (sem `correta`, `feedback` nem `rubrica`: o gabarito só vem depois de responder):
+```json
+{
+  "cartoes": [
+    {
+      "cartao_id": "6f1c2a3b-4d5e-6f70-8192-a3b4c5d6e7f8",
+      "turma": { "id": "2b8c1e4a-0f3d-4c7b-9a61-5e2d8f7c3b10", "nome": "Inteligência Artificial", "codigo": "Turma A" },
+      "atividade": { "id": "9d4e7a21-3c5b-4f86-a2d0-1b7e6c9f8a35", "numero": 2, "titulo": "Probabilidade condicional" },
+      "questao_id": "3",
+      "enunciado": "Num baralho comum, qual a probabilidade de tirar um rei sabendo que a carta é de copas?",
+      "conceitos": ["Probabilidade condicional"],
+      "alternativas": [
+        { "id": "c", "texto": "1/13" },
+        { "id": "a", "texto": "1/52" },
+        { "id": "d", "texto": "4/13" },
+        { "id": "b", "texto": "1/4" }
+      ],
+      "caixa": 2,
+      "novo": false
+    },
+    {
+      "cartao_id": "0a9b8c7d-6e5f-4a3b-2c1d-0e9f8a7b6c5d",
+      "turma": { "id": "2b8c1e4a-0f3d-4c7b-9a61-5e2d8f7c3b10", "nome": "Inteligência Artificial", "codigo": "Turma A" },
+      "atividade": { "id": "4c3b2a19-8d7e-4f6a-b5c4-d3e2f1a0b9c8", "numero": 1, "titulo": "Espaço amostral e eventos" },
+      "questao_id": "1",
+      "enunciado": "Qual destes é o evento complementar de \"sair número par\" num dado?",
+      "conceitos": ["Evento complementar"],
+      "alternativas": [
+        { "id": "b", "texto": "Sair número ímpar" },
+        { "id": "a", "texto": "Sair 6" },
+        { "id": "c", "texto": "Sair número primo" }
+      ],
+      "caixa": 1,
+      "novo": true
+    }
+  ],
+  "pendentes_hoje": 7,
+  "total_cartoes": 12
+}
+```
+- `pendentes_hoje`: vencidos + novos disponíveis hoje (sem o limite). Com 0, o site mostra "Nada para revisar hoje".
+- `total_cartoes`: cartões que o aluno já respondeu ao menos uma vez (nas atividades que podem ser treinadas).
+- `novo: true` = o aluno ainda não respondeu este cartão (`caixa` é 1).
+- `cartao_id` é estável: o mesmo cartão tem sempre o mesmo id.
+- Turma sem atividades encerradas, ou aluno sem conceitos em "revisar"/"em desenvolvimento" e sem vencidos →
+  `{ "cartoes": [], "pendentes_hoje": 0, "total_cartoes": ... }`.
+
+### `revisao_responder`
+
+Entrada:
+```json
+{ "acao": "revisao_responder", "cartao_id": "6f1c2a3b-4d5e-6f70-8192-a3b4c5d6e7f8", "alternativa_id": "c", "confianca": "acho" }
+```
+- `confianca` opcional (`"certeza"` | `"acho"` | `"chute"`; outro valor = não informado), como em `enviar_respostas`.
+
+Saída (gabarito e feedback de todas as alternativas, na mesma ordem do baralho):
+```json
+{
+  "acertou": true,
+  "alternativa_correta": "c",
+  "alternativas": [
+    { "id": "c", "texto": "1/13", "correta": true,  "feedback": "Isso: são 13 cartas de copas e uma delas é o rei." },
+    { "id": "a", "texto": "1/52", "correta": false, "feedback": "Essa é a probabilidade sem a condição \"é de copas\"." },
+    { "id": "d", "texto": "4/13", "correta": false, "feedback": "Há só um rei de copas, não quatro." },
+    { "id": "b", "texto": "1/4",  "correta": false, "feedback": "1/4 é a chance de a carta ser de copas." }
+  ],
+  "nova_caixa": 3,
+  "proxima_revisao": "2026-12-08",
+  "contou_para_caixa": true
+}
+```
+- `proxima_revisao`: data (`AAAA-MM-DD`, dia de Brasília) em que o cartão volta ao baralho.
+- `contou_para_caixa: false` (segunda resposta no mesmo dia, ou cartão ainda não vencido): `nova_caixa` e
+  `proxima_revisao` são os de antes; o treino fica registrado.
+
+Erros:
+
+| Situação | Código | Status |
+|---|---|---|
+| `cartao_id` fora do formato, de outra pessoa, inexistente, ou de atividade que não pode ser treinada agora (reaberta em sala, aluno saiu da turma) | `nao_matriculado` | 403 |
+| `alternativa_id` ausente ou que não existe na questão | `erro_interno` | 400 |
+| Sem login (qualquer 401) | `nao_autenticado` | 401 |
+
+### `revisao_resumo`
+
+Entrada: `{ "acao": "revisao_resumo", "turma_id": "uuid" }` (opcional; sem ele, todas as turmas do aluno, na
+ordem em que entrou nelas).
+
+Saída:
+```json
+{
+  "turmas": [
+    {
+      "turma": { "id": "2b8c1e4a-0f3d-4c7b-9a61-5e2d8f7c3b10", "nome": "Inteligência Artificial", "codigo": "Turma A" },
+      "pendentes_hoje": 7,
+      "total_cartoes": 12,
+      "cartoes_por_caixa": { "1": 5, "2": 4, "3": 3 },
+      "treinos_7_dias": 18,
+      "acertos_7_dias": 13,
+      "conceitos_com_mais_cartoes": [
+        { "conceito": "Probabilidade condicional", "n_cartoes": 5 },
+        { "conceito": "Evento complementar", "n_cartoes": 4 }
+      ]
+    }
+  ]
+}
+```
+- `cartoes_por_caixa` e `total_cartoes`: só cartões já respondidos. `pendentes_hoje` é o mesmo do baralho.
+- `treinos_7_dias`: respostas a cartões nos últimos 7 dias (incluindo as que não contaram para a caixa).
+- `conceitos_com_mais_cartoes`: até 5, do maior para o menor (uma questão com dois conceitos conta nos dois).
+- Turma em que o aluno não está → lista vazia.
+
+### Professor (turma-api, só o dono da turma)
+
+`{ "acao": "treino_turma", "turma_id": "uuid" }` →
+```json
+{
+  "resumo": { "n_alunos": 25, "n_alunos_treinando": 9, "treinos_7_dias": 140, "n_treinos": 310, "taxa_acerto": 0.7129 },
+  "alunos": [
+    { "aluno_id": "uuid", "nome": "Ana", "treinos_7_dias": 18, "n_treinos": 40, "acertos": 31, "taxa_acerto": 0.775,
+      "cartoes_por_caixa": { "1": 2, "2": 4, "3": 6 }, "ultimo_treino_em": "2026-12-01T22:10:03.120Z" }
+  ],
+  "conceitos": [{ "conceito": "Probabilidade condicional", "n_alunos_treinando": 6, "treinos_7_dias": 52 }]
+}
+```
+- `n_alunos_treinando` = alunos com ao menos um treino nos últimos 7 dias; `taxa_acerto` sobre todos os
+  treinos (null sem treinos). Todos os membros aparecem em `alunos`, com zeros se não treinaram.
+- `historico_conceito` ganha `treino: { "n_treinos": 6, "acertos": 4 }` (o aluno naquele conceito).
+- Os conceitos contados são os **atuais** da questão (acompanham a fusão de conceitos); o registro de cada
+  treino guarda os nomes do momento.
+
+No banco: migration `20261130120000_revisao_espacada` (`cartoes`, `treinos`, `revisao_baralho`,
+`revisao_responder`, `revisao_resumo`, `treino_turma`, `treino_aluno_conceito`); testes em
+`supabase/tests/database/revisao_espacada.test.sql`.

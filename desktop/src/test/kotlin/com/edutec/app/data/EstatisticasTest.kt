@@ -105,6 +105,49 @@ class EstatisticasTest {
         """)
         assertNull(h.respostas[0].atividade)
         assertEquals("Certeza", rotuloConfianca(h.respostas[0].confianca))
+        // Servidor anterior à fase 4 (sem "treino"): vazio, sem quebrar.
+        assertEquals(0, e.treino.resumo.treinos)
+        assertEquals(0, h.treino.treinos)
+    }
+
+    @Test
+    fun `json do treino fora de sala (fase 4)`() {
+        val json = Json { ignoreUnknownKeys = true }
+        val t = json.decodeFromString<TreinoTurma>("""
+            {"resumo": {"n_alunos": 2, "n_alunos_treinando": 1, "treinos_7_dias": 8, "n_treinos": 8, "taxa_acerto": 0.5},
+             "alunos": [
+               {"aluno_id": "a", "nome": "Ana", "treinos_7_dias": 8, "n_treinos": 8, "acertos": 4, "taxa_acerto": 0.5,
+                "cartoes_por_caixa": {"1": 2, "2": 1, "3": 0}, "ultimo_treino_em": "2026-11-30T12:00:00.000Z"},
+               {"aluno_id": "b", "nome": "Bia", "treinos_7_dias": 0, "n_treinos": 0, "acertos": 0, "taxa_acerto": null,
+                "cartoes_por_caixa": {"1": 0, "2": 0, "3": 0}, "ultimo_treino_em": null}],
+             "conceitos": [{"conceito": "Base", "n_alunos_treinando": 1, "treinos_7_dias": 6}]}
+        """)
+        assertEquals(0.5, t.resumo.taxaAcerto!!, 1e-9)
+        assertEquals(CartoesPorCaixa(2, 1, 0), t.alunos[0].caixas)
+        assertNull(t.alunos[1].taxaAcerto)
+        assertEquals(listOf("Ana"), t.alunosQueTreinaram().map { it.nome })
+        assertEquals(1, t.conceitos[0].alunosTreinando)
+        val h = json.decodeFromString<HistoricoConceito>("""{"conceito": "Base", "respostas": [], "treino": {"n_treinos": 6, "acertos": 4}}""")
+        assertEquals(TreinoConceito(6, 4), h.treino)
+    }
+
+    @Test
+    fun `quem treinou - mais treinos nos ultimos 7 dias primeiro`() {
+        val t = TreinoTurma(alunos = listOf(
+            TreinoAluno("1", "Caio", treinos7Dias = 0, treinos = 30),
+            TreinoAluno("2", "Bia", treinos7Dias = 5, treinos = 5),
+            TreinoAluno("3", "Ana", treinos7Dias = 5, treinos = 9),
+            TreinoAluno("4", "Davi"),
+        ))
+        assertEquals(listOf("Ana", "Bia", "Caio"), t.alunosQueTreinaram().map { it.nome })
+    }
+
+    @Test
+    fun `linha do treino no historico do conceito`() {
+        assertEquals("Treinou 6 vezes (4 acertos)", textoTreinoConceito(TreinoConceito(6, 4)))
+        assertEquals("Treinou 1 vez (1 acerto)", textoTreinoConceito(TreinoConceito(1, 1)))
+        assertEquals("Treinou 2 vezes (nenhum acerto)", textoTreinoConceito(TreinoConceito(2, 0)))
+        assertEquals("Ainda não treinou este conceito com flashcards.", textoTreinoConceito(TreinoConceito()))
     }
 
     @Test

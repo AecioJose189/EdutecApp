@@ -17,6 +17,14 @@
 //                                                     acertos, total_multipla_escolha, gabarito_liberado }] }
 //   revisao_tentativa { tentativa_id }           → { atividade, gabarito_liberado, acertos, total_multipla_escolha,
 //                                                     questoes }  (gabarito só com a sessão encerrada)
+//   (fase 4, revisão espaçada com flashcards — docs/contrato-api-fase2.md; fora do BKT)
+//   revisao_baralho   { turma_id?, limite? }     → { cartoes: [Cartao], pendentes_hoje, total_cartoes }  (sem gabarito)
+//   revisao_responder { cartao_id, alternativa_id, confianca? }
+//                                                → { acertou, alternativa_correta, alternativas, nova_caixa,
+//                                                    proxima_revisao, contou_para_caixa }
+//   revisao_resumo    { turma_id? }              → { turmas: [{ turma, pendentes_hoje, total_cartoes,
+//                                                    cartoes_por_caixa, treinos_7_dias, acertos_7_dias,
+//                                                    conceitos_com_mais_cartoes }] }
 // Turma: { id, nome, codigo, professor_nome }
 // Erro: { erro: <código>, mensagem: <texto para o aluno> } com status 4xx/5xx.
 //
@@ -58,6 +66,9 @@ const ACOES: Record<string, (u: Usuario, corpo: Corpo) => Promise<unknown>> = {
   meu_grafo: meuGrafo,
   minhas_atividades: minhasAtividades,
   revisao_tentativa: revisaoTentativa,
+  revisao_baralho: revisaoBaralho,
+  revisao_responder: revisaoResponder,
+  revisao_resumo: revisaoResumo,
 };
 
 Deno.serve(async (req) => {
@@ -343,6 +354,51 @@ async function revisaoTentativa(u: Usuario, corpo: Corpo) {
     if (error.code === "LU403") throw naoEncontrada;
     throw falhaBanco("carregar a revisão", error);
   }
+  return data;
+}
+
+// ---------- revisão espaçada (fase 4) ----------
+// Regras no Postgres (migration 20261130120000): só múltipla escolha de atividades com a sessão encerrada
+// (e nenhuma aberta), caixas de Leitner 1..3, treino fora do BKT (tabela treinos, só inserção).
+
+/** turma_id opcional: ausente/vazio = todas as turmas; fora do formato = nao_matriculado. */
+function turmaOpcional(corpo: Corpo): string | null {
+  const turma = corpo.turma_id == null || corpo.turma_id === "" ? null : String(corpo.turma_id);
+  if (turma !== null && !UUID.test(turma)) throw new ErroAluno("nao_matriculado", "Você não está nesta turma.", 403);
+  return turma;
+}
+
+async function revisaoBaralho(u: Usuario, corpo: Corpo) {
+  const turma = turmaOpcional(corpo);
+  const n = Number(corpo.limite ?? 10);
+  const limite = Number.isFinite(n) ? Math.min(50, Math.max(1, Math.trunc(n))) : 10;
+  const { data, error } = await clienteServico().rpc("revisao_baralho", { aluno: u.id, turma, limite });
+  if (error) throw falhaBanco("montar o baralho", error);
+  return data;
+}
+
+async function revisaoResponder(u: Usuario, corpo: Corpo) {
+  const cartao = String(corpo.cartao_id ?? "");
+  const naoEncontrado = new ErroAluno("nao_matriculado",
+    "Este cartão não está disponível. Atualize a lista de revisão.", 403);
+  if (!UUID.test(cartao)) throw naoEncontrado;
+  const alternativa = typeof corpo.alternativa_id === "string" ? corpo.alternativa_id.slice(0, 5) : "";
+  if (!alternativa) throw new ErroAluno("erro_interno", "Escolha uma alternativa.", 400);
+  const confianca = typeof corpo.confianca === "string" ? corpo.confianca.slice(0, 20) : null;
+
+  const { data, error } = await clienteServico().rpc("revisao_responder", { aluno: u.id, cartao, alternativa, confianca });
+  if (error) {
+    if (error.code === "LU403") throw naoEncontrado;
+    if (error.code === "LU400") throw new ErroAluno("erro_interno", "Alternativa inválida.", 400);
+    throw falhaBanco("registrar o treino", error);
+  }
+  return data;
+}
+
+async function revisaoResumo(u: Usuario, corpo: Corpo) {
+  const turma = turmaOpcional(corpo);
+  const { data, error } = await clienteServico().rpc("revisao_resumo", { aluno: u.id, turma });
+  if (error) throw falhaBanco("carregar o resumo da revisão", error);
   return data;
 }
 

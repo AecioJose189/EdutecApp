@@ -6,6 +6,9 @@
 //   aluno:     revê a atividade (fase 2): sem gabarito com a sessão aberta, gabarito completo depois de encerrar
 //   fase 2b:   alternativas embaralhadas por tentativa (estável ao recarregar, diferente entre alunos,
 //              correção pelo id) e confiança na resposta (gravada, devolvida na revisão, estatísticas)
+//   fase 3:    estatísticas, mapa de cada aluno e histórico do conceito (professor)
+//   fase 4:    revisão espaçada com flashcards: sem baralho com a sessão aberta → encerrar → baralho aparece
+//              (sem gabarito) → responder → caixa muda → domínio intacto → professor vê o treino
 // Também confere os erros do contrato (docs/contrato-api-mvp.md) e que o aluno não recebe gabarito.
 //
 // Uso (na raiz do repositório):
@@ -413,6 +416,9 @@ const profGrafo = await chamar("aluno-api", prof.token, { acao: "meu_grafo", tur
 verificar(profGrafo.corpo?.erro === "nao_matriculado", "professor não tem 'meu grafo' na própria turma", profGrafo);
 
 etapa("8. Professor: entrada fechada e sessão encerrada");
+const baralhoAberta = await chamar("aluno-api", aluno.token, { acao: "revisao_baralho", turma_id: turmaId });
+verificar(baralhoAberta.status === 200 && baralhoAberta.corpo?.pendentes_hoje === 0 && baralhoAberta.corpo?.cartoes?.length === 0,
+  "flashcards: com a sessão aberta, baralho vazio", baralhoAberta);
 const fim = await chamar("turma-api", prof.token, { acao: "encerrar_sessao", sessao_id: sessaoId });
 verificar(fim.corpo?.sessao?.aberta === false, "encerrar_sessao", fim);
 const qrFechado = await chamar("turma-api", prof.token, { acao: "token_qr", sessao_id: sessaoId });
@@ -444,7 +450,77 @@ const fechada = await chamar("turma-api", prof.token, { acao: "encerrar_entrada"
 verificar(fechada.corpo?.sessao?.entrada_aberta === false && fechada.corpo?.sessao?.aberta === true, "encerrar_entrada", fechada);
 const barrado = await chamar("aluno-api", aluno.token, { acao: "entrar_sessao", token: token2 });
 verificar(barrado.corpo?.erro === "sessao_encerrada", "entrada fechada barra quem ainda não entrou", barrado);
+const baralhoReaberta = await chamar("aluno-api", aluno.token, { acao: "revisao_baralho", turma_id: turmaId });
+verificar(baralhoReaberta.corpo?.pendentes_hoje === 0, "flashcards: atividade reaberta em sala → cartões somem", baralhoReaberta);
 await chamar("turma-api", prof.token, { acao: "encerrar_sessao", sessao_id: sessao2.corpo?.sessao?.id });
+
+etapa("9. Aluno: revisão espaçada com flashcards (fase 4)");
+const grafoAntes = (await chamar("aluno-api", aluno.token, { acao: "meu_grafo", turma_id: turmaId })).corpo?.conceitos;
+const aTreinar = (grafoAntes ?? []).filter((c: { estado: string }) => ["revisar", "em_desenvolvimento"].includes(c.estado));
+const baralho = await chamar("aluno-api", aluno.token, { acao: "revisao_baralho", turma_id: turmaId });
+// deno-lint-ignore no-explicit-any
+const cartoes: any[] = baralho.corpo?.cartoes ?? [];
+verificar(baralho.status === 200 && (aTreinar.length === 0 || cartoes.length > 0),
+  `baralho depois de encerrar: ${cartoes.length} cartão(ões), ${baralho.corpo?.pendentes_hoje} pendente(s) hoje ` +
+  `(${aTreinar.length} conceito(s) em revisar/em desenvolvimento)`, baralho);
+verificar(!/"(correta|feedback|rubrica)"/.test(JSON.stringify(baralho.corpo)), "baralho sem gabarito (correta/feedback/rubrica)");
+verificar(cartoes.every((c) => c.turma?.id === turmaId && c.atividade?.id === atividadeId && c.caixa === 1 && c.novo === true &&
+    c.alternativas?.length >= 2 && new Set(c.alternativas.map((a: { id: string }) => a.id)).size === c.alternativas.length),
+  "cartões novos da atividade, caixa 1, alternativas com ids distintos", cartoes);
+const baralhoDeNovo = await chamar("aluno-api", aluno.token, { acao: "revisao_baralho", turma_id: turmaId });
+verificar(JSON.stringify(baralhoDeNovo.corpo) === JSON.stringify(baralho.corpo), "baralho estável (mesmos ids e mesma ordem das alternativas)");
+const limitado = await chamar("aluno-api", aluno.token, { acao: "revisao_baralho", turma_id: turmaId, limite: 1 });
+verificar(limitado.corpo?.cartoes?.length === Math.min(1, cartoes.length) && limitado.corpo?.pendentes_hoje === baralho.corpo?.pendentes_hoje,
+  "limite: 1 cartão, pendentes_hoje igual", limitado.corpo);
+
+if (cartoes.length > 0) {
+  const c0 = cartoes[0];
+  const escolha = c0.alternativas[0].id;
+  const r1 = await chamar("aluno-api", aluno.token, { acao: "revisao_responder", cartao_id: c0.cartao_id, alternativa_id: escolha, confianca: "acho" });
+  verificar(r1.status === 200 && typeof r1.corpo?.acertou === "boolean" && r1.corpo?.contou_para_caixa === true &&
+      r1.corpo?.nova_caixa === (r1.corpo?.acertou ? 2 : 1) && /^\d{4}-\d{2}-\d{2}$/.test(r1.corpo?.proxima_revisao ?? ""),
+    `revisao_responder: ${r1.corpo?.acertou ? "acertou → caixa 2" : "errou → caixa 1"}, volta em ${r1.corpo?.proxima_revisao}`, r1);
+  verificar(JSON.stringify(r1.corpo?.alternativas?.map((a: { id: string }) => a.id)) === JSON.stringify(c0.alternativas.map((a: { id: string }) => a.id)) &&
+      r1.corpo.alternativas.every((a: { correta: unknown; feedback: unknown }) => typeof a.correta === "boolean" && typeof a.feedback === "string"),
+    "resposta: feedback de cada alternativa, na ordem do baralho");
+  const gabarito = qFim.find((q) => q.questao_id === c0.questao_id)?.alternativas?.find((a: { correta: boolean }) => a.correta)?.id;
+  verificar(gabarito === undefined || r1.corpo?.alternativa_correta === gabarito, "alternativa_correta confere com a revisão da tentativa");
+  const r2 = await chamar("aluno-api", aluno.token, { acao: "revisao_responder", cartao_id: c0.cartao_id, alternativa_id: escolha });
+  verificar(r2.corpo?.contou_para_caixa === false && r2.corpo?.nova_caixa === r1.corpo?.nova_caixa &&
+      r2.corpo?.proxima_revisao === r1.corpo?.proxima_revisao, "mesmo cartão de novo hoje: registra, não mexe na caixa", r2.corpo);
+  const depois = await chamar("aluno-api", aluno.token, { acao: "revisao_baralho", turma_id: turmaId });
+  verificar(!depois.corpo?.cartoes?.some((c: { cartao_id: string }) => c.cartao_id === c0.cartao_id) &&
+      depois.corpo?.pendentes_hoje === baralho.corpo.pendentes_hoje - 1 && depois.corpo?.total_cartoes === 1,
+    "cartão respondido sai do baralho de hoje (total_cartoes 1)", depois.corpo);
+  const grafoDepois = (await chamar("aluno-api", aluno.token, { acao: "meu_grafo", turma_id: turmaId })).corpo?.conceitos;
+  verificar(JSON.stringify(grafoDepois) === JSON.stringify(grafoAntes), "domínio estimado intacto depois do treino");
+  const resumo = await chamar("aluno-api", aluno.token, { acao: "revisao_resumo", turma_id: turmaId });
+  const rt = resumo.corpo?.turmas?.[0];
+  verificar(resumo.corpo?.turmas?.length === 1 && rt?.turma?.id === turmaId && rt.total_cartoes === 1 && rt.treinos_7_dias === 2 &&
+      rt.cartoes_por_caixa?.[String(r1.corpo?.nova_caixa)] === 1 && rt.pendentes_hoje === depois.corpo?.pendentes_hoje &&
+      rt.conceitos_com_mais_cartoes?.length > 0, "revisao_resumo", resumo.corpo);
+
+  const alheio = await chamar("aluno-api", aluno2.token, { acao: "revisao_responder", cartao_id: c0.cartao_id, alternativa_id: escolha });
+  verificar(alheio.status === 403 && alheio.corpo?.erro === "nao_matriculado", "cartão de outro aluno → nao_matriculado", alheio);
+  const ruim = await chamar("aluno-api", aluno.token, { acao: "revisao_responder", cartao_id: "x", alternativa_id: "a" });
+  verificar(ruim.corpo?.erro === "nao_matriculado", "cartao_id fora do formato → nao_matriculado", ruim);
+  const altRuim = await chamar("aluno-api", aluno.token, { acao: "revisao_responder", cartao_id: c0.cartao_id, alternativa_id: "z" });
+  verificar(altRuim.status === 400 && altRuim.corpo?.erro === "erro_interno", "alternativa inexistente → erro_interno 400", altRuim);
+
+  etapa("9b. Professor: treino da turma (fase 4)");
+  const treino = await chamar("turma-api", prof.token, { acao: "treino_turma", turma_id: turmaId });
+  const ta = treino.corpo?.alunos?.find((a: { aluno_id: string }) => a.aluno_id === aluno.id);
+  verificar(treino.status === 200 && treino.corpo?.resumo?.n_alunos === 2 && treino.corpo?.resumo?.n_alunos_treinando === 1 &&
+      ta?.n_treinos === 2 && ta?.treinos_7_dias === 2 && ta?.cartoes_por_caixa?.[String(r1.corpo?.nova_caixa)] === 1 &&
+      treino.corpo?.conceitos?.length > 0, `treino_turma: ${ta?.n_treinos} treinos, acerto ${ta?.taxa_acerto}`, treino.corpo);
+  const estTreino = await chamar("turma-api", prof.token, { acao: "estatisticas", turma_id: turmaId });
+  verificar(estTreino.corpo?.treino?.resumo?.n_treinos === 2, "estatisticas traz o treino", estTreino.corpo?.treino);
+  const histTreino = await chamar("turma-api", prof.token,
+    { acao: "historico_conceito", turma_id: turmaId, aluno: aluno.id, conceito: c0.conceitos[0] });
+  verificar(histTreino.corpo?.treino?.n_treinos === 2, `historico_conceito ("${c0.conceitos[0]}"): treino ${JSON.stringify(histTreino.corpo?.treino)}`);
+  const treinoAluno = await chamar("turma-api", aluno.token, { acao: "treino_turma", turma_id: turmaId });
+  verificar(treinoAluno.status === 404, "treino_turma: aluno → 404", treinoAluno);
+}
 
 console.log(falhas === 0 ? "\nTudo certo." : `\n${falhas} verificação(ões) falharam.`);
 Deno.exit(falhas === 0 ? 0 : 1);
