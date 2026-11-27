@@ -29,6 +29,9 @@
 //                                       pré-requisitos e respostas vão para o destino e o BKT dele é refeito.
 //                                       404 conceito/turma, 400 iguais, 409 se formar ciclo
 //   marcar_distintos { turma_id, conceito_a, conceito_b } → { ok: true }   o par sai das possíveis duplicatas
+//   confianca     { turma_id }        → { turma: Confianca, conceitos: [Confianca + conceito],
+//                                         alunos: [Confianca + aluno_id, nome] }   (fase 2b; só múltipla escolha)
+//                                       Confianca = { n_respostas, n_com_confianca, erros_com_certeza, acertos_no_chute }
 //   simular       { turma_id }        → { n_alunos, n_respostas }   DEMONSTRAÇÃO: 25 pseudônimos
 //                                       respondendo às questões publicadas (substitui a anterior)
 //
@@ -81,6 +84,7 @@ const ACOES: Record<string, (ctx: Contexto, corpo: Corpo) => Promise<unknown>> =
   sessao: verSessao,
   grafo,
   simular,
+  confianca,
   fundir_conceitos: fundirConceitos,
   marcar_distintos: marcarDistintos,
 };
@@ -545,6 +549,15 @@ function estadoDominio(p: number): string {
  * Tudo roda em simular_respostas no Postgres (semente fixa, resultado reproduzível): uma chamada só,
  * sem gastar a CPU da Edge Function com centenas de respostas.
  */
+/** Estatísticas de confiança da turma (erros com certeza, acertos no chute), só para o dono. */
+async function confianca(ctx: Contexto, corpo: Corpo) {
+  const turma = uuid(corpo.turma_id, "turma_id");
+  await exigirTurma(ctx, turma);
+  const { data, error } = await ctx.servico.rpc("confianca_turma", { turma });
+  if (error) throw falhaBanco("carregar as estatísticas de confiança", error);
+  return data;
+}
+
 async function simular(ctx: Contexto, corpo: Corpo) {
   const turma = uuid(corpo.turma_id, "turma_id");
   await exigirTurma(ctx, turma);
