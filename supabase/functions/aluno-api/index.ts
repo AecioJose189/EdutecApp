@@ -5,9 +5,11 @@
 //   minhas_turmas    {}                          → { turmas: [Turma] }
 //   aceitar_convite  { codigo }                  → { turma: Turma, ja_era_membro }
 //   entrar_sessao    { token, entrar_na_turma? } → { tentativa_id, iniciada_em, prazo_em, ja_enviada, atividade }
+//                    (fase 2b: alternativas na ordem da tentativa; o site rotula A, B, C pela posição)
 //                    (fase 2: quem não é da turma recebe nao_matriculado com { turma: {id, nome, codigo} };
 //                     com entrar_na_turma: true é matriculado e entra — docs/contrato-api-fase2.md)
 //   enviar_respostas { tentativa_id, respostas } → { acertos, total_multipla_escolha, abertas_aguardando_correcao }
+//                    (fase 2b: cada resposta pode ter confianca "certeza" | "acho" | "chute"; o BKT não muda)
 //   meu_grafo        { turma_id }                → { conceitos: [{ nome, prerequisitos, dominio, estado, n_respostas }] }
 //   (fase 2, docs/contrato-api-fase2.md)
 //   enviar_respostas também devolve questoes: [{ questao_id, acertou: true | false | null }] (null = aberta)
@@ -22,7 +24,8 @@
 // token ausente ou ilegível → qr_expirado; código de convite fora do formato → convite_invalido;
 // turma_id ou tentativa_id inválidos ou de outra pessoa → nao_matriculado; ação desconhecida → erro_interno (400).
 //
-// O gabarito nunca sai daqui: as questões vêm de atividades.questoes_aluno e a correção é feita no
+// O gabarito nunca sai daqui: as questões vêm de atividades.questoes_aluno (por questoes_da_tentativa,
+// com as alternativas na ordem da tentativa) e a correção é feita no
 // Postgres (enviar_tentativa), que também chama o BKT. RN13: no BKT o aluno é só o uuid.
 
 import { type Cliente, clienteServico, type Usuario, usuarioDoPedido } from "../_shared/auth.ts";
@@ -152,7 +155,6 @@ interface SessaoLinha {
     id: string;
     titulo: string;
     tempo_minutos: number | null;
-    questoes_aluno: unknown[];
     turma: { id: string; nome: string; codigo: string; professor_id: string };
   };
 }
@@ -175,7 +177,7 @@ async function entrarSessao(u: Usuario, corpo: Corpo) {
   const { data, error } = await servico
     .from("sessoes")
     .select(`id, aberta, entrada_aberta, segredo,
-      atividade:atividades(id, titulo, tempo_minutos, questoes_aluno, turma:turmas(id, nome, codigo, professor_id))`)
+      atividade:atividades(id, titulo, tempo_minutos, turma:turmas(id, nome, codigo, professor_id))`)
     .eq("id", lido.sessaoId)
     .maybeSingle();
   if (error) throw falhaBanco("abrir a sessão", error);
@@ -223,6 +225,10 @@ async function entrarSessao(u: Usuario, corpo: Corpo) {
     tentativa = await criarTentativa(servico, sessao, u.id);
   }
 
+  // Fase 2b: alternativas na ordem própria desta tentativa (estável ao recarregar; ids originais).
+  const { data: questoes, error: erroQuestoes } = await servico.rpc("questoes_da_tentativa", { tentativa: tentativa.id });
+  if (erroQuestoes || !questoes) throw falhaBanco("carregar as questões", erroQuestoes ?? { message: "sem questões" });
+
   return {
     tentativa_id: tentativa.id,
     iniciada_em: iso(tentativa.iniciada_em),
@@ -232,7 +238,7 @@ async function entrarSessao(u: Usuario, corpo: Corpo) {
       id: sessao.atividade.id,
       titulo: sessao.atividade.titulo,
       turma: { id: turma.id, nome: turma.nome, codigo: turma.codigo },
-      questoes: sessao.atividade.questoes_aluno,
+      questoes,
     },
   };
 }
@@ -279,6 +285,8 @@ async function enviarRespostas(u: Usuario, corpo: Corpo) {
       questao_id: String(item.questao_id ?? ""),
       ...(typeof item.alternativa_id === "string" ? { alternativa_id: item.alternativa_id } : {}),
       ...(typeof item.texto === "string" ? { texto: item.texto.slice(0, 10_000) } : {}),
+      // Fase 2b: "certeza" | "acho" | "chute"; outro valor o Postgres trata como não informado.
+      ...(typeof item.confianca === "string" ? { confianca: item.confianca.slice(0, 20) } : {}),
     };
   });
 

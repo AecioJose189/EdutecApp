@@ -4,6 +4,8 @@
 //   aluno 2:   NÃO aceita o convite → lê o QR → nao_matriculado com a turma → entrar_na_turma → responde
 //   professor: acompanha a sessão ao vivo (Realtime) → vê o grafo da turma → encerra
 //   aluno:     revê a atividade (fase 2): sem gabarito com a sessão aberta, gabarito completo depois de encerrar
+//   fase 2b:   alternativas embaralhadas por tentativa (estável ao recarregar, diferente entre alunos,
+//              correção pelo id) e confiança na resposta (gravada, devolvida na revisão, estatísticas)
 // Também confere os erros do contrato (docs/contrato-api-mvp.md) e que o aluno não recebe gabarito.
 //
 // Uso (na raiz do repositório):
@@ -231,17 +233,36 @@ verificar(!/correta|feedback|rubrica|pagina_origem/.test(JSON.stringify(entrou.c
 const questoes: any[] = ativ?.questoes ?? [];
 const mc = questoes.filter((q) => q.tipo === "multipla_escolha");
 const abertas = questoes.filter((q) => q.tipo === "aberta");
-verificar(questoes.length > 0 && mc.every((q) => q.alternativas?.[0]?.id === "a") && abertas.every((q) => q.alternativas === null),
-  `${mc.length} de múltipla escolha (alternativas a, b, ...) e ${abertas.length} abertas (alternativas null)`);
+// A primeira alternativa não é mais sempre "a": a ordem é a da tentativa (fase 2b; ids conferidos abaixo).
+verificar(questoes.length > 0 && mc.every((q) => q.alternativas?.length >= 2) && abertas.every((q) => q.alternativas === null),
+  `${mc.length} de múltipla escolha (com alternativas) e ${abertas.length} abertas (alternativas null)`);
 const deNovo = await chamar("aluno-api", aluno.token, { acao: "entrar_sessao", token });
 verificar(deNovo.corpo?.tentativa_id === entrou.corpo?.tentativa_id, "ler o QR de novo devolve a mesma tentativa");
+// deno-lint-ignore no-explicit-any
+const ordemDe = (qs: any[]) => qs.map((q) => (q.alternativas ?? []).map((a: { id: string }) => a.id).join("")).join("|");
+verificar(ordemDe(deNovo.corpo?.atividade?.questoes ?? []) === ordemDe(questoes),
+  `alternativas na mesma ordem ao recarregar (${ordemDe(questoes)})`);
+verificar(mc.every((q) => [...q.alternativas.map((a: { id: string }) => a.id)].sort().join("") ===
+    "abcdefgh".slice(0, q.alternativas.length)), "ids das alternativas são os originais (a, b, ...), só a ordem muda");
+
+// Gabarito pela chave secreta (só o script; o aluno nunca recebe): id da alternativa certa de cada questão.
+const { data: atividadeBanco } = await admin.from("atividades").select("questoes").eq("id", atividadeId).single();
+const certa: Record<string, string> = {};
+// deno-lint-ignore no-explicit-any
+(atividadeBanco?.questoes ?? []).forEach((q: any, i: number) => {
+  const j = (q.alternativas ?? []).findIndex((a: { correta: boolean }) => a.correta);
+  if (j >= 0) certa[String(i + 1)] = String.fromCharCode(97 + j);
+});
 
 const enviado = await chamar("aluno-api", aluno.token, {
   acao: "enviar_respostas",
   tentativa_id: entrou.corpo?.tentativa_id,
-  respostas: questoes.map((q) => q.tipo === "aberta" ? { questao_id: q.id, texto: "Resposta aberta do teste." }
-    : { questao_id: q.id, alternativa_id: "a" }),
+  respostas: questoes.map((q) => q.tipo === "aberta" ? { questao_id: q.id, texto: "Resposta aberta do teste.", confianca: "acho" }
+    : { questao_id: q.id, alternativa_id: "a", confianca: "certeza" }),
 });
+const acertosEsperados1 = mc.filter((q) => certa[q.id] === "a").length;
+verificar(enviado.corpo?.acertos === acertosEsperados1,
+  `correção pelo id: "a" é a certa em ${acertosEsperados1} de ${mc.length}, onde quer que apareça`, enviado.corpo);
 verificar(enviado.status === 200 && enviado.corpo?.total_multipla_escolha === mc.length &&
   enviado.corpo?.abertas_aguardando_correcao === abertas.length,
   `enviar_respostas: acertou ${enviado.corpo?.acertos} de ${enviado.corpo?.total_multipla_escolha}`, enviado);
@@ -272,14 +293,23 @@ verificar(entrou2.status === 200 && entrou2.corpo?.tentativa_id && entrou2.corpo
   entrou2.corpo?.atividade?.turma?.id === turmaId, "entrar_na_turma: true → tentativa", entrou2);
 const turmasDepois = await chamar("aluno-api", aluno2.token, { acao: "minhas_turmas" });
 verificar(turmasDepois.corpo?.turmas?.some((t: { id: string }) => t.id === turmaId), "agora é aluno da turma (minhas_turmas)");
+// deno-lint-ignore no-explicit-any
+const questoes2: any[] = entrou2.corpo?.atividade?.questoes ?? [];
+// Probabilidade de coincidir em todas as questões de múltipla escolha: 1 em milhares (só por azar).
+verificar(ordemDe(questoes2) !== ordemDe(questoes),
+  `dois alunos, ordens diferentes (${ordemDe(questoes)} × ${ordemDe(questoes2)})`);
+const posicoes = mc.map((q) => questoes2.find((x) => x.id === q.id).alternativas
+  .findIndex((a: { id: string }) => a.id === certa[q.id]));
+// Aluno 2 marca a alternativa certa pelo id, na posição em que ela apareceu para ele, e diz "chute".
 const enviado2 = await chamar("aluno-api", aluno2.token, {
   acao: "enviar_respostas",
   tentativa_id: entrou2.corpo?.tentativa_id,
-  respostas: questoes.map((q) => q.tipo === "aberta" ? { questao_id: q.id, texto: "Outra resposta." }
-    : { questao_id: q.id, alternativa_id: "b" }),
+  respostas: questoes2.map((q) => q.tipo === "aberta" ? { questao_id: q.id, texto: "Outra resposta." }
+    : { questao_id: q.id, alternativa_id: q.alternativas[posicoes[mc.findIndex((m) => m.id === q.id)]].id, confianca: "chute" }),
 });
-verificar(enviado2.status === 200 && enviado2.corpo?.total_multipla_escolha === mc.length,
-  `aluno 2 respondeu: acertou ${enviado2.corpo?.acertos} de ${enviado2.corpo?.total_multipla_escolha}`, enviado2);
+verificar(enviado2.status === 200 && enviado2.corpo?.acertos === mc.length && enviado2.corpo?.total_multipla_escolha === mc.length,
+  `correção certa com a ordem trocada: a certa estava nas posições ${posicoes.map((p) => "ABCDEFGH"[p]).join(", ")} → ` +
+  `${enviado2.corpo?.acertos} de ${mc.length}`, enviado2);
 
 etapa("5c. Aluno: revisão com a sessão ainda aberta (anti-cola)");
 const tentativaId: string = entrou.corpo?.tentativa_id;
@@ -300,6 +330,10 @@ verificar(revAberta.status === 200 && revAberta.corpo?.gabarito_liberado === fal
   "revisao_tentativa com a sessão aberta", revAberta);
 verificar(!/"(correta|feedback|rubrica)"/.test(JSON.stringify(revAberta.corpo)),
   "sessão aberta: nenhum correta, feedback ou rubrica (os campos somem)", revAberta.corpo);
+verificar(JSON.stringify(qRev.map((q) => q.confianca)) ===
+    JSON.stringify(questoes.map((q) => q.tipo === "aberta" ? "acho" : "certeza")),
+  "revisao_tentativa devolve a confiança de cada questão", qRev.map((q) => q.confianca));
+verificar(ordemDe(qRev) === ordemDe(questoes), "revisão com as alternativas na ordem que o aluno viu");
 verificar(qRev.every((q, i) => q.acertou === porQuestao[i].acertou && q.minha_resposta &&
     (q.tipo === "aberta" ? q.minha_resposta.texto : q.minha_resposta.alternativa_id === "a")),
   "acertou e minha_resposta batem com o envio");
@@ -327,6 +361,21 @@ verificar(grafoTurma.corpo?.conceitos?.some((c: { n_respostas: number }) => c.n_
 const rotulos = (grafoTurma.corpo?.alunos ?? []).map((a: { rotulo: string }) => a.rotulo);
 verificar(rotulos.includes("Aluno Teste Lumini") && rotulos.includes("Aluna QR Teste Lumini"),
   "grafo lista os dois alunos pelo nome", rotulos);
+
+const conf = await chamar("turma-api", prof.token, { acao: "confianca", turma_id: turmaId });
+const esperadoConf: Record<string, number> = {
+  n_respostas: 2 * mc.length, n_com_confianca: 2 * mc.length,
+  erros_com_certeza: mc.length - acertosEsperados1, acertos_no_chute: mc.length,
+};
+// Compara campo a campo (o jsonb do Postgres não guarda a ordem das chaves).
+verificar(conf.status === 200 && Object.entries(esperadoConf).every(([k, v]) => conf.corpo?.turma?.[k] === v),
+  `confiança da turma: ${JSON.stringify(conf.corpo?.turma)}`, conf.corpo);
+const confAluno2 = conf.corpo?.alunos?.find((a: { nome: string }) => a.nome === "Aluna QR Teste Lumini");
+verificar(confAluno2?.acertos_no_chute === mc.length && confAluno2?.erros_com_certeza === 0, "confiança por aluno", conf.corpo?.alunos);
+verificar(conf.corpo?.conceitos?.length > 0 && conf.corpo.conceitos.every((c: { n_respostas: number }) => c.n_respostas > 0),
+  `confiança por conceito (${conf.corpo?.conceitos?.length} conceitos)`);
+const confAlheia = await chamar("turma-api", aluno.token, { acao: "confianca", turma_id: turmaId });
+verificar(confAlheia.status === 404, "aluno não vê as estatísticas de confiança da turma", confAlheia);
 
 etapa("7. Aluno: meu grafo");
 const meuGrafo = await chamar("aluno-api", aluno.token, { acao: "meu_grafo", turma_id: turmaId });

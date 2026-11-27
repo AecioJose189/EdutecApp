@@ -129,3 +129,54 @@ conta Google." (o site mostra o erro, sem oferecer a entrada).
 
 No banco: `entrar_na_turma_pela_sessao(sessao, aluno)` (migration `20261127120000`, só a `service_role`),
 testes em `supabase/tests/database/entrar_pela_sessao.test.sql`.
+
+## Fase 2b: alternativas embaralhadas e confiança na resposta
+
+Só acréscimos: o site atual continua funcionando sem mudar nada.
+
+### Alternativas embaralhadas por tentativa (anti-cola em sala)
+
+- Em `entrar_sessao`, as alternativas de cada questão vêm numa **ordem própria da tentativa**: sorteio
+  determinístico a partir do `tentativa_id`. Recarregar a página (ou ler o QR de novo) mostra a mesma ordem;
+  dois alunos quase sempre veem ordens diferentes. A ordem das **questões** não muda.
+- Os **ids continuam os originais** (`"a"`, `"b"`...): uma alternativa `{ "id": "c", ... }` pode vir em
+  primeiro lugar. `enviar_respostas` continua recebendo o `alternativa_id` (o id), e a correção não muda.
+- **O site deve rotular A, B, C... pela POSIÇÃO na lista, nunca pelo id.** Exemplo: se vierem
+  `[{ "id": "c" }, { "id": "a" }, { "id": "b" }]`, os rótulos na tela são A, B, C, e quem toca em "A" envia
+  `alternativa_id: "c"`.
+- `revisao_tentativa` devolve as alternativas na mesma ordem que o aluno viu (com o gabarito, quando liberado).
+
+### Confiança na resposta
+
+`enviar_respostas` aceita, em cada resposta, `confianca` opcional:
+```json
+{ "questao_id": "2", "alternativa_id": "c", "confianca": "certeza" }
+```
+- Valores: `"certeza"` | `"acho"` | `"chute"` (maiúsculas e espaços nas pontas são aceitos). Sem o campo,
+  ou com outro valor, fica `null` (não é erro). Vale também para as abertas.
+- O domínio estimado (BKT) **não muda** com a confiança: ela só é guardada e lida.
+- `revisao_tentativa` ganha `confianca` em cada questão (`"certeza"`, `"acho"`, `"chute"` ou `null`); o
+  campo vem sempre, mesmo com o gabarito ainda não liberado (é a resposta do próprio aluno).
+- A resposta de `enviar_respostas` não muda.
+
+### Estatísticas de confiança (turma-api, só o professor da turma)
+
+`{ "acao": "confianca", "turma_id": "uuid" }` →
+```json
+{
+  "turma": { "n_respostas": 40, "n_com_confianca": 32, "erros_com_certeza": 5, "acertos_no_chute": 3 },
+  "conceitos": [{ "conceito": "Probabilidade condicional", "n_respostas": 12, "n_com_confianca": 10,
+                  "erros_com_certeza": 3, "acertos_no_chute": 1 }],
+  "alunos": [{ "aluno_id": "uuid", "nome": "Ana", "n_respostas": 4, "n_com_confianca": 4,
+               "erros_com_certeza": 1, "acertos_no_chute": 0 }]
+}
+```
+- Só múltipla escolha respondida. Cada questão conta uma vez na turma e no aluno, e uma vez em cada
+  conceito dela.
+- `erros_com_certeza`: errou dizendo "certeza" (equívoco: o aluno acha que sabe). `acertos_no_chute`: acertou
+  dizendo "chute" (o acerto não indica domínio).
+- Turma de outro professor → 404, como as outras ações da turma-api.
+
+No banco: migrations `20261128120000_alternativas_embaralhadas` (`chave_alternativa`, `questoes_da_tentativa`)
+e `20261128130000_confianca` (`respostas.confianca`, `confianca_turma`); testes em
+`supabase/tests/database/embaralhar.test.sql` e `confianca.test.sql`.

@@ -246,7 +246,7 @@ só depois de conferir o papel na turma):
 - Ao vivo no desktop: Realtime `postgres_changes` em `public.tentativas` com filtro `sessao_id=eq.<id>`
   e o JWT do professor (INSERT = entrou; UPDATE com `enviada_em` = enviou).
 
-Testes: pgTAP (9 arquivos, 145 testes, inclusive `rls.test.sql`, `tentativas.test.sql` e `conceitos.test.sql`) e o fluxo
+Testes: pgTAP (11 arquivos, 172 testes, inclusive `rls.test.sql`, `tentativas.test.sql` e `conceitos.test.sql`) e o fluxo
 inteiro com dois usuários de teste contra o projeto real:
 `SUPABASE_CHAVE_SECRETA=<service_role> npx deno run -A scripts/testar-fluxo-mvp.ts` (o comando
 que obtém a chave está no cabeçalho do script). Cada execução cria uma turma na conta
@@ -413,6 +413,25 @@ Contrato: `docs/contrato-api-fase2.md` (só acréscimos; o modo simulado do site
   abertas); ações `minhas_atividades` e `revisao_tentativa` (LU403 → `nao_matriculado`).
 - Testes: pgTAP `revisao.test.sql` (26; total 9 arquivos, 145), `scripts/testar-fluxo-mvp.ts` com o aluno 2
   (`aluno2.teste@lumini-teste.example.com`, entra pelo QR sem convite) e a revisão antes/depois de encerrar.
+
+## Fase 2b — alternativas embaralhadas e confiança (28/11/2026, branch `fase2b-confianca`, sai da `fase2-backend`)
+
+Ideias do grupo inspiradas no LearnHarness; só back-end e contrato (`docs/contrato-api-fase2.md`, seção "Fase 2b").
+- **Embaralhar** (migration `20261128120000`): `chave_alternativa(tentativa, questao, alternativa)` = md5 dos três;
+  ordenar por ela dá a ordem da tentativa (estável ao recarregar, diferente entre alunos; as 24 ordens de 4
+  alternativas aparecem por igual no teste). `questoes_da_tentativa(tentativa)` = `questoes_aluno` com as
+  alternativas nessa ordem; a `aluno-api` (`entrar_sessao`) usa ela. **Ids originais**: a correção não muda, e
+  o site rotula A, B, C pela POSIÇÃO. `revisao_tentativa` usa a mesma ordem. Questões na ordem original.
+- **Confiança** (migration `20261128130000`): `confianca` opcional ("certeza" | "acho" | "chute"; outro valor =
+  null) em cada resposta de `enviar_respostas`; vai para `tentativas.respostas` (também nas abertas) e para
+  `respostas.confianca` (`registrar_resposta` ganhou o 7º parâmetro opcional; chamadas antigas valem).
+  **BKT igual** (testado: mesmas respostas com e sem confiança dão o mesmo domínio). `revisao_tentativa` devolve
+  `confianca` por questão. `confianca_turma(turma)` (turma-api `confianca`, só o dono): total, por conceito e
+  por aluno — n_respostas, n_com_confianca, erros_com_certeza, acertos_no_chute (só múltipla escolha respondida).
+- Testes: pgTAP `embaralhar.test.sql` (12) e `confianca.test.sql` (15) (11 arquivos, 172); script de fluxo confere
+  ordem estável, ordens diferentes entre os dois alunos (falha só por azar, ~1 em milhares), correção certa com a
+  ordem trocada (gabarito lido pela chave secreta, só no script) e a confiança gravada, devolvida e nas estatísticas.
+  jsonb não guarda a ordem das chaves: compare campo a campo.
 
 Ainda não existe: correção das abertas, edição na Revisão, prazo/liberação na publicação, gerar a partir do
 grafo, abas Materiais/Estatísticas, histórico semanal, "Ver alunos com dificuldade".
