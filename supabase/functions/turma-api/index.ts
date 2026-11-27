@@ -310,7 +310,8 @@ async function listarAtividades(ctx: Contexto, corpo: Corpo) {
     .select(`id, titulo, publicada_em, tempo_minutos, permitir_refazer, questoes_aluno,
              sessoes(${COLUNAS_SESSAO}, tentativas(enviada_em))`)
     .eq("turma_id", turma)
-    .order("publicada_em");
+    .order("publicada_em")
+    .order("id"); // mesmo desempate de numero_da_atividade (o número que o aluno vê)
   if (error) throw falhaBanco("listar as atividades", error);
   type Linha = Record<string, unknown> & {
     questoes_aluno: unknown[];

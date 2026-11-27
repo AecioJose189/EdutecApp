@@ -83,6 +83,20 @@ Saída:
 ```
 - Com `gabarito_liberado: false`: `correta`, `feedback` e `rubrica` **não vêm** (o campo some, não vem `null`). `acertou` vem sempre.
 - `minha_resposta` vazia (`{}`) quando o aluno deixou em branco.
+- Sem o gabarito, cada alternativa vem só com `{ "id", "texto" }`; com ele, `{ "id", "texto", "correta", "feedback" }`.
+- Só tentativas **enviadas** têm revisão: tentativa de outra pessoa, ainda não enviada, inexistente ou com
+  `tentativa_id` fora do formato → `nao_matriculado`.
+
+## Detalhes de implementação (servidor no ar desde a fase 2)
+
+- `gabarito_liberado` = a **sessão daquela tentativa** foi encerrada (`sessoes.aberta = false`). A regra fica no
+  Postgres (`revisao_tentativa`, `minhas_atividades`, migration `20261127130000`), não na Edge Function;
+  testes em `supabase/tests/database/revisao.test.sql`.
+- `numero`: ordem de publicação na turma (`publicada_em`, desempate pelo id), igual à `listar_atividades` da
+  turma-api que o professor vê.
+- `enviada_em` em ISO 8601 UTC com milissegundos (`2026-11-04T21:40:00.000Z`).
+- `minhas_atividades` com `turma_id` fora do formato → `nao_matriculado`; turma sem tentativas → lista vazia.
+- `enviar_respostas.questoes` vem na ordem das questões; múltipla escolha em branco conta como `acertou: false`.
 
 ## Mudança em `entrar_sessao`: entrar na turma pelo QR
 
