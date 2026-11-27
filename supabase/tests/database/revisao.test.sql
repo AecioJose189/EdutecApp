@@ -105,7 +105,8 @@ update sessoes set aberta = false, entrada_aberta = false, encerrada_em = now() 
 create temp table rev2 as select revisao_tentativa('00000000-0000-4000-8000-00000000f001',
   '00000000-0000-4000-8000-000000000c01') as j;
 select is((select j -> 'gabarito_liberado' from rev2), 'true'::jsonb, 'encerrada: gabarito_liberado true');
-select is((select j -> 'questoes' -> 0 -> 'alternativas' -> 2 from rev2),
+-- A ordem das alternativas é a da tentativa (embaralhada): procura pelo id.
+select is((select alt from rev2, jsonb_array_elements(j -> 'questoes' -> 0 -> 'alternativas') alt where alt ->> 'id' = 'c'),
   '{"id": "c", "texto": "z", "correta": true, "feedback": "FB-1c"}'::jsonb, 'encerrada: correta e feedback por alternativa');
 select is((select j -> 'questoes' -> 2 ->> 'rubrica' from rev2), 'RUBRICA-SECRETA', 'encerrada: rubrica da aberta');
 select is((select jsonb_agg(q -> 'acertou') from rev2, jsonb_array_elements(j -> 'questoes') q),
