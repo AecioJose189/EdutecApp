@@ -8,6 +8,7 @@ import { NaoEncontrada } from './telas/NaoEncontrada'
 import { Privacidade } from './telas/Privacidade'
 import { Atividade } from './telas/atividade/Atividade'
 import { MinhasAtividades } from './telas/atividades/MinhasAtividades'
+import { RevisaoTentativa } from './telas/atividades/RevisaoTentativa'
 import { MeuGrafo } from './telas/grafo/MeuGrafo'
 
 export function App() {
@@ -23,6 +24,7 @@ export function App() {
             <Route path="/s/:token" element={<Atividade />} />
             <Route path="/turmas/:turmaId/grafo" element={<MeuGrafo />} />
             <Route path="/atividades" element={<MinhasAtividades />} />
+            <Route path="/atividades/:tentativaId" element={<RevisaoTentativa />} />
           </Route>
           <Route path="*" element={<NaoEncontrada />} />
         </Routes>

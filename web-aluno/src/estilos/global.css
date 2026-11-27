@@ -671,6 +671,11 @@ a.cartao:active {
   color: var(--tinta-suave);
 }
 
+.lista-simples {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
 .questao-revisao-topo {
   display: flex;
   align-items: center;
