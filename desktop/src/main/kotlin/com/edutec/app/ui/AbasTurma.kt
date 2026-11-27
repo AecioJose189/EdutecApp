@@ -19,6 +19,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,11 +27,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.edutec.app.data.AtividadePublicada
+import com.edutec.app.data.EstadoAtividade
 import com.edutec.app.data.Membro
 import com.edutec.app.ui.theme.Borda
+import com.edutec.app.ui.theme.BordaControle
+import com.edutec.app.ui.theme.FormaPilula
+import com.edutec.app.ui.theme.Fundo
+import com.edutec.app.ui.theme.SobrePrimaria
 import com.edutec.app.ui.theme.Erro
 import com.edutec.app.ui.theme.Espaco1
 import com.edutec.app.ui.theme.Espaco2
@@ -55,6 +62,9 @@ import java.time.format.DateTimeFormatter
 // Aba Atividades: as publicadas, cada uma com "Abrir sessão em sala"
 // ---------------------------------------------------------------------------
 
+/** Atividade gerada e ainda não publicada (só existe com o app aberto). */
+data class RascunhoAtividade(val titulo: String, val questoes: Int)
+
 @Composable
 fun AbaAtividades(
     atividades: Carga<List<AtividadePublicada>>,
@@ -62,12 +72,16 @@ fun AbaAtividades(
     onNovaAtividade: () -> Unit,
     onTentarDeNovo: () -> Unit,
     modifier: Modifier = Modifier,
+    rascunho: RascunhoAtividade? = null,
+    onContinuarRascunho: () -> Unit = {},
+    /** Conferindo se a turma tem alunos antes de abrir a sessão. */
+    abrindoSessao: Boolean = false,
 ) {
-    CartaoAba("Atividades publicadas", modifier) {
+    CartaoAba("Atividades", modifier) {
         when (atividades) {
             Carga.Carregando -> CarregandoAba()
             is Carga.Erro -> ErroAba(atividades.mensagem, onTentarDeNovo)
-            is Carga.Pronto -> if (atividades.valor.isEmpty()) {
+            is Carga.Pronto -> if (atividades.valor.isEmpty() && rascunho == null) {
                 VazioAba(
                     "Nenhuma atividade publicada ainda.",
                     "Gere uma atividade a partir de um PDF, revise e publique para abrir a sessão em sala.",
@@ -77,45 +91,125 @@ fun AbaAtividades(
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(Espaco3)) {
-                    items(atividades.valor.asReversed(), key = { it.id }) { ItemAtividade(it, onAbrirSessao) }
+                    if (rascunho != null) {
+                        item(key = "rascunho") {
+                            ItemRascunho(atividades.valor.size + 1, rascunho, onContinuarRascunho)
+                        }
+                    }
+                    items(atividades.valor.asReversed(), key = { it.id }) { ItemAtividade(it, onAbrirSessao, abrindoSessao) }
                 }
             }
         }
     }
 }
 
+/** "Atividade 2 · Probabilidade" (sem número, se o servidor ainda não manda). */
+private fun tituloNumerado(numero: Int, titulo: String) = if (numero > 0) "Atividade $numero · $titulo" else titulo
+
 @Composable
-private fun ItemAtividade(atividade: AtividadePublicada, onAbrirSessao: (AtividadePublicada) -> Unit) {
-    val emAndamento = atividade.sessaoAberta != null
-    Surface(
-        shape = FormaLg,
-        color = if (emAndamento) MentaSuave else Superficie,
-        border = BorderStroke(if (emAndamento) 2.dp else 1.dp, if (emAndamento) Primaria else Borda),
-    ) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = Espaco6, vertical = Espaco4), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Espaco1)) {
-                Text(atividade.titulo, color = Tinta, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                Text(
-                    buildString {
-                        append("${atividade.questoes} questões")
-                        append(" · ${atividade.tempoMinutos?.let { "$it min" } ?: "sem limite de tempo"}")
-                        append(" · publicada em ${dataCurta(atividade.publicadaEm)}")
-                    },
-                    color = TintaSuave, fontSize = 14.sp,
-                )
-                if (emAndamento) {
-                    Text("Sessão em andamento", color = Tinta, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                }
+private fun ItemAtividade(atividade: AtividadePublicada, onAbrirSessao: (AtividadePublicada) -> Unit, abrindoSessao: Boolean) {
+    val estado = atividade.estado
+    val emAndamento = estado == EstadoAtividade.SessaoAberta
+    LinhaAtividade(
+        titulo = tituloNumerado(atividade.numero, atividade.titulo),
+        detalhe = buildString {
+            append("publicada em ${diaMes(atividade.publicadaEm)}")
+            append(" · ${atividade.enviadas} ${if (atividade.enviadas == 1) "resposta" else "respostas"}")
+            append(" · ${atividade.questoes} questões")
+            append(" · ${atividade.tempoMinutos?.let { "$it min" } ?: "sem limite de tempo"}")
+            atividade.ultimaEncerradaEm?.takeIf { estado == EstadoAtividade.Encerrada }?.let {
+                append(" · encerrada em ${diaMes(it)}")
             }
-            Spacer(Modifier.width(Espaco4))
+        },
+        estado = estado,
+        destaque = emAndamento,
+    ) {
+        val texto = when (estado) {
+            EstadoAtividade.SessaoAberta -> "Voltar à sessão"
+            EstadoAtividade.Encerrada -> "Abrir outra sessão"
+            else -> "Abrir sessão em sala"
+        }
+        if (estado == EstadoAtividade.Encerrada) {
+            OutlinedButton(
+                onClick = { onAbrirSessao(atividade) }, enabled = !abrindoSessao, shape = FormaMd,
+                border = BorderStroke(1.dp, Primaria),
+                contentPadding = PaddingValues(horizontal = Espaco6, vertical = Espaco3),
+                modifier = Modifier.maoAoPassar(),
+            ) { Text(texto, color = Primaria, fontWeight = FontWeight.SemiBold) }
+        } else {
             Button(
-                onClick = { onAbrirSessao(atividade) },
-                shape = FormaMd,
+                onClick = { onAbrirSessao(atividade) }, enabled = !abrindoSessao, shape = FormaMd,
                 colors = ButtonDefaults.buttonColors(containerColor = Primaria),
                 contentPadding = PaddingValues(horizontal = Espaco6, vertical = Espaco3),
                 modifier = Modifier.maoAoPassar(),
-            ) { Text(if (emAndamento) "Voltar à sessão" else "Abrir sessão em sala", fontWeight = FontWeight.SemiBold) }
+            ) { Text(texto, fontWeight = FontWeight.SemiBold) }
         }
+    }
+}
+
+@Composable
+private fun ItemRascunho(numero: Int, rascunho: RascunhoAtividade, onContinuar: () -> Unit) {
+    LinhaAtividade(
+        titulo = tituloNumerado(numero, rascunho.titulo),
+        detalhe = "${rascunho.questoes} questões geradas · ainda não publicada: os alunos não veem",
+        estado = EstadoAtividade.Rascunho,
+        destaque = false,
+    ) {
+        Button(
+            onClick = onContinuar, shape = FormaMd,
+            colors = ButtonDefaults.buttonColors(containerColor = Primaria),
+            contentPadding = PaddingValues(horizontal = Espaco6, vertical = Espaco3),
+            modifier = Modifier.maoAoPassar(),
+        ) { Text("Revisar e publicar", fontWeight = FontWeight.SemiBold) }
+    }
+}
+
+@Composable
+private fun LinhaAtividade(
+    titulo: String,
+    detalhe: String,
+    estado: EstadoAtividade,
+    destaque: Boolean,
+    botao: @Composable () -> Unit,
+) {
+    Surface(
+        shape = FormaLg,
+        color = if (destaque) MentaSuave else Superficie,
+        border = BorderStroke(if (destaque) 2.dp else 1.dp, if (destaque) Primaria else Borda),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = Espaco6, vertical = Espaco4), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Espaco1)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        titulo, color = Tinta, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(Modifier.width(Espaco3))
+                    SeloAtividade(estado)
+                }
+                Text(detalhe, color = TintaSuave, fontSize = 14.sp)
+            }
+            Spacer(Modifier.width(Espaco4))
+            botao()
+        }
+    }
+}
+
+/** Selo de estado da atividade: texto sempre (não só cor). */
+@Composable
+fun SeloAtividade(estado: EstadoAtividade, modifier: Modifier = Modifier) {
+    val (fundo, texto, borda) = when (estado) {
+        EstadoAtividade.Rascunho -> Triple(Fundo, TintaSuave, BordaControle)
+        EstadoAtividade.Publicada -> Triple(MentaSuave, Tinta, Primaria)
+        EstadoAtividade.SessaoAberta -> Triple(Primaria, SobrePrimaria, Primaria)
+        EstadoAtividade.Encerrada -> Triple(Fundo, TintaSuave, Borda)
+    }
+    Surface(shape = FormaPilula, color = fundo, border = BorderStroke(1.dp, borda), modifier = modifier) {
+        Text(
+            (if (estado == EstadoAtividade.SessaoAberta) "● " else "") + estado.rotulo,
+            color = texto, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = Espaco3, vertical = 2.dp),
+        )
     }
 }
 
@@ -211,6 +305,11 @@ private fun VazioAba(titulo: String, texto: String, acao: @Composable () -> Unit
 }
 
 private val FormatoData = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+private val FormatoDiaMes = DateTimeFormatter.ofPattern("dd/MM")
+
+/** "28/10" no fuso do computador. */
+fun diaMes(iso: String): String =
+    runCatching { OffsetDateTime.parse(iso).atZoneSameInstant(ZoneId.systemDefault()).format(FormatoDiaMes) }.getOrDefault(iso.take(10))
 
 /** "28/10/2026" no fuso do computador (o servidor manda ISO 8601). */
 fun dataCurta(iso: String): String =
