@@ -16,6 +16,8 @@ data class Conceito(
 data class Aluno(
     val nome: String,
     val estado: EstadoConceito,
+    /** Chave para o mapa e o histórico do aluno (uuid do aluno real; "sim-..." na simulação). */
+    val chave: String? = null,
 )
 
 object DadosTurmaExemplo {

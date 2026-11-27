@@ -108,6 +108,18 @@ object TurmaRepositorio {
         chamar<JsonObject>("marcar_distintos", "turma_id" to turmaId, "conceito_a" to conceitoA, "conceito_b" to conceitoB)
     }
 
+    /** UC13: resumo, tabela por conceito, evolução por atividade e confiança (só reais, salvo [incluirSimulacao]). */
+    suspend fun estatisticas(turmaId: String, incluirSimulacao: Boolean): EstatisticasTurma =
+        chamar("estatisticas", "turma_id" to turmaId, "incluir_simulacao" to incluirSimulacao)
+
+    /** UC11: domínio estimado de um aluno em cada conceito ([chave] = Aluno.chave). */
+    suspend fun mapaAluno(turmaId: String, chave: String): MapaAluno =
+        chamar("mapa_aluno", "turma_id" to turmaId, "aluno" to chave)
+
+    /** UC12: histórico de um aluno num conceito, resposta a resposta. */
+    suspend fun historico(turmaId: String, chave: String, conceito: String): HistoricoConceito =
+        chamar("historico_conceito", "turma_id" to turmaId, "aluno" to chave, "conceito" to conceito)
+
     /** DEMONSTRAÇÃO: simula 25 alunos (pseudônimos) respondendo; substitui a simulação anterior da turma. */
     suspend fun simular(turmaId: String) {
         chamar<RespostaSimular>("simular", "turma_id" to turmaId)
@@ -222,7 +234,7 @@ private data class RespostaGrafo(
                 alunosRevisar = it.alunosRevisar,
             )
         },
-        alunos = alunos.mapNotNull { a -> estadoDoServidor(a.piorEstado)?.let { Aluno(a.rotulo, it) } },
+        alunos = alunos.mapNotNull { a -> estadoDoServidor(a.piorEstado)?.let { Aluno(a.rotulo, it, a.chave) } },
         possiveisDuplicatas = possiveisDuplicatas.map { PossivelDuplicata(it.conceitoA, it.conceitoB, it.similaridade) },
     )
 }
@@ -243,6 +255,7 @@ private data class ConceitoApi(
 private data class AlunoApi(
     val rotulo: String,
     @SerialName("pior_estado") val piorEstado: String,
+    val chave: String? = null,
 )
 
 @Serializable
