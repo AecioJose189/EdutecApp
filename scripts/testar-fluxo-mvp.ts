@@ -233,8 +233,9 @@ verificar(!/correta|feedback|rubrica|pagina_origem/.test(JSON.stringify(entrou.c
 const questoes: any[] = ativ?.questoes ?? [];
 const mc = questoes.filter((q) => q.tipo === "multipla_escolha");
 const abertas = questoes.filter((q) => q.tipo === "aberta");
-verificar(questoes.length > 0 && mc.every((q) => q.alternativas?.[0]?.id === "a") && abertas.every((q) => q.alternativas === null),
-  `${mc.length} de múltipla escolha (alternativas a, b, ...) e ${abertas.length} abertas (alternativas null)`);
+// A primeira alternativa não é mais sempre "a": a ordem é a da tentativa (fase 2b; ids conferidos abaixo).
+verificar(questoes.length > 0 && mc.every((q) => q.alternativas?.length >= 2) && abertas.every((q) => q.alternativas === null),
+  `${mc.length} de múltipla escolha (com alternativas) e ${abertas.length} abertas (alternativas null)`);
 const deNovo = await chamar("aluno-api", aluno.token, { acao: "entrar_sessao", token });
 verificar(deNovo.corpo?.tentativa_id === entrou.corpo?.tentativa_id, "ler o QR de novo devolve a mesma tentativa");
 // deno-lint-ignore no-explicit-any
