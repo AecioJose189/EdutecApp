@@ -3,7 +3,8 @@ package com.edutec.app.data
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// Espelho do JSON da turma-api: estatisticas (UC13), mapa_aluno (UC11) e historico_conceito (UC12).
+// Espelho do JSON da turma-api: estatisticas (UC13), mapa_aluno (UC11), historico_conceito (UC12) e,
+// na fase 4, o treino com flashcards fora de sala (treino_turma; vem também dentro de estatisticas).
 // Domínio estimado sempre de 0 a 1: chance estimada de saber o conceito; não é nota.
 
 @Serializable
@@ -14,7 +15,75 @@ data class EstatisticasTurma(
     val conceitos: List<EstatisticaConceito> = emptyList(),
     val evolucao: List<PontoEvolucao> = emptyList(),
     val confianca: ConfiancaTurma = ConfiancaTurma(),
+    /** Fase 4. Servidor anterior não manda: fica vazio (seção mostra "ninguém treinou"). */
+    val treino: TreinoTurma = TreinoTurma(),
 )
+
+// ---------------------------------------------------------------------------
+// Treino fora de sala (flashcards, fase 4). NÃO altera o domínio estimado.
+// ---------------------------------------------------------------------------
+
+@Serializable
+data class ResumoTreino(
+    @SerialName("n_alunos") val alunos: Int = 0,
+    /** Alunos com ao menos um treino nos últimos 7 dias. */
+    @SerialName("n_alunos_treinando") val alunosTreinando: Int = 0,
+    @SerialName("treinos_7_dias") val treinos7Dias: Int = 0,
+    @SerialName("n_treinos") val treinos: Int = 0,
+    /** Acerto em todos os treinos (0–1); null sem treinos. */
+    @SerialName("taxa_acerto") val taxaAcerto: Double? = null,
+)
+
+@Serializable
+data class CartoesPorCaixa(
+    @SerialName("1") val caixa1: Int = 0,
+    @SerialName("2") val caixa2: Int = 0,
+    @SerialName("3") val caixa3: Int = 0,
+)
+
+@Serializable
+data class TreinoAluno(
+    @SerialName("aluno_id") val alunoId: String,
+    val nome: String = "",
+    @SerialName("treinos_7_dias") val treinos7Dias: Int = 0,
+    @SerialName("n_treinos") val treinos: Int = 0,
+    val acertos: Int = 0,
+    @SerialName("taxa_acerto") val taxaAcerto: Double? = null,
+    @SerialName("cartoes_por_caixa") val caixas: CartoesPorCaixa = CartoesPorCaixa(),
+    @SerialName("ultimo_treino_em") val ultimoTreinoEm: String? = null,
+)
+
+@Serializable
+data class TreinoConceitoTurma(
+    val conceito: String,
+    @SerialName("n_alunos_treinando") val alunosTreinando: Int = 0,
+    @SerialName("treinos_7_dias") val treinos7Dias: Int = 0,
+)
+
+@Serializable
+data class TreinoTurma(
+    val resumo: ResumoTreino = ResumoTreino(),
+    val alunos: List<TreinoAluno> = emptyList(),
+    val conceitos: List<TreinoConceitoTurma> = emptyList(),
+)
+
+/** Treinos de um aluno num conceito (no histórico do mapa do aluno). */
+@Serializable
+data class TreinoConceito(
+    @SerialName("n_treinos") val treinos: Int = 0,
+    val acertos: Int = 0,
+)
+
+/** Só quem já treinou, de quem treinou mais nos últimos 7 dias para quem treinou menos. */
+fun TreinoTurma.alunosQueTreinaram(): List<TreinoAluno> =
+    alunos.filter { it.treinos > 0 }.sortedWith(compareByDescending<TreinoAluno> { it.treinos7Dias }.thenByDescending { it.treinos }.thenBy { it.nome })
+
+/** "Treinou 6 vezes (4 acertos)"; sem treinos, avisa que ainda não treinou. */
+fun textoTreinoConceito(t: TreinoConceito): String = when {
+    t.treinos == 0 -> "Ainda não treinou este conceito com flashcards."
+    else -> "Treinou ${t.treinos} ${if (t.treinos == 1) "vez" else "vezes"} (" +
+        when (t.acertos) { 0 -> "nenhum acerto"; 1 -> "1 acerto"; else -> "${t.acertos} acertos" } + ")"
+}
 
 @Serializable
 data class ResumoTurma(
@@ -120,6 +189,8 @@ data class HistoricoConceito(
     val respostas: List<RespostaHistorico> = emptyList(),
     @SerialName("erros_com_certeza") val errosComCerteza: Int = 0,
     @SerialName("acertos_no_chute") val acertosNoChute: Int = 0,
+    /** Fase 4: flashcards deste aluno neste conceito (servidor anterior: zeros). */
+    val treino: TreinoConceito = TreinoConceito(),
 )
 
 // ---------------------------------------------------------------------------

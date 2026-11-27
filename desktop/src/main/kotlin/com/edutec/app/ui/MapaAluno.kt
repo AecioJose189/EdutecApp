@@ -41,6 +41,7 @@ import com.edutec.app.data.HistoricoConceito
 import com.edutec.app.data.RespostaHistorico
 import com.edutec.app.data.estadoDominioLocal
 import com.edutec.app.data.rotuloConfianca
+import com.edutec.app.data.textoTreinoConceito
 import com.edutec.app.ui.theme.Borda
 import com.edutec.app.ui.theme.EdutecTheme
 import com.edutec.app.ui.theme.Erro
@@ -124,6 +125,7 @@ private fun ConteudoHistorico(h: HistoricoConceito, onExplicarDominio: () -> Uni
     if (h.respostas.isEmpty()) {
         ChipEstado(null, texto = "Sem dados · nenhuma resposta neste conceito")
         Text("O domínio estimado aparece quando o aluno responder a questões deste conceito.", color = TintaSuave, fontSize = 14.sp)
+        if (h.treino.treinos > 0) LinhaTreino(h)
         return
     }
     val ultimo = h.respostas.last().dominio
@@ -136,10 +138,20 @@ private fun ConteudoHistorico(h: HistoricoConceito, onExplicarDominio: () -> Uni
         Contador("${h.errosComCerteza}", "erros com certeza", "aprendeu errado? vale reexplicar", Modifier.weight(1f))
         Contador("${h.acertosNoChute}", "acertos no chute", "domínio ainda frágil", Modifier.weight(1f))
     }
+    LinhaTreino(h)
     Text("Domínio estimado a cada resposta", color = Tinta, style = EstiloTitulo3.copy(fontSize = 15.sp))
     GraficoDominio(h, Modifier.fillMaxWidth().height(120.dp))
     HorizontalDivider(color = Borda)
     h.respostas.forEachIndexed { i, r -> LinhaResposta(i + 1, r) }
+}
+
+/** Fase 4: treino com flashcards fora de sala, que não entra no domínio estimado. */
+@Composable
+private fun LinhaTreino(h: HistoricoConceito) {
+    Column {
+        Text(textoTreinoConceito(h.treino), color = Tinta, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text("Flashcards fora de sala; não altera o domínio estimado.", color = TintaSuave, fontSize = 12.sp)
+    }
 }
 
 @Composable
@@ -221,6 +233,7 @@ private val HistoricoExemplo = HistoricoConceito(
         RespostaHistorico("2026-10-28T12:00:01Z", com.edutec.app.data.AtividadeRef("a2", 2, "Regra da cadeia"), true, null, 0.96),
     ),
     errosComCerteza = 1, acertosNoChute = 1,
+    treino = com.edutec.app.data.TreinoConceito(treinos = 6, acertos = 4),
 )
 
 @Preview

@@ -58,6 +58,12 @@ import com.edutec.app.data.AtividadeRef
 import com.edutec.app.data.ConceitoEvolucao
 import com.edutec.app.data.ConfiancaTurma
 import com.edutec.app.data.ContagemConfianca
+import com.edutec.app.data.CartoesPorCaixa
+import com.edutec.app.data.ResumoTreino
+import com.edutec.app.data.TreinoAluno
+import com.edutec.app.data.TreinoConceitoTurma
+import com.edutec.app.data.TreinoTurma
+import com.edutec.app.data.alunosQueTreinaram
 import com.edutec.app.data.EstadoConceito
 import com.edutec.app.data.EstatisticaConceito
 import com.edutec.app.data.EstatisticasTurma
@@ -184,6 +190,83 @@ private fun ConteudoEstatisticas(
                 Spacer(Modifier.height(Espaco4))
                 e.evolucao.forEach { DestaquesDaAtividade(it) }
             }
+        }
+
+        Secao("Treino fora de sala (flashcards)", FRASE_TREINO) {
+            SecaoTreino(e.treino)
+        }
+    }
+}
+
+const val FRASE_TREINO = "O treino não altera o domínio estimado: acontece fora de sala."
+
+// ---------------------------------------------------------------------------
+// Treino fora de sala (fase 4)
+// ---------------------------------------------------------------------------
+
+private val ColNome = 220.dp
+private val ColCaixa = 72.dp
+
+@Composable
+private fun SecaoTreino(t: TreinoTurma) {
+    val r = t.resumo
+    if (r.treinos == 0) {
+        Text(
+            "Nenhum aluno treinou ainda. No site, cada aluno revisa as questões de múltipla escolha das atividades " +
+                "com a sessão encerrada, começando pelos conceitos em que está pior.",
+            color = TintaSuave, fontSize = 14.sp,
+        )
+        return
+    }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(Espaco3), verticalArrangement = Arrangement.spacedBy(Espaco3)) {
+        Numero("${r.alunosTreinando} de ${r.alunos}", "alunos treinaram nos últimos 7 dias")
+        Numero("${r.treinos7Dias}", if (r.treinos7Dias == 1) "treino nos últimos 7 dias" else "treinos nos últimos 7 dias")
+        ComDica("Respostas certas em todos os treinos com flashcards (${r.treinos}).") {
+            Numero(pct(r.taxaAcerto), "acerto no treino", info = true)
+        }
+    }
+    if (t.conceitos.isNotEmpty()) {
+        Text(
+            "Mais treinados (7 dias): " + t.conceitos.take(5).joinToString(" · ") {
+                "${it.conceito} (${it.alunosTreinando} ${if (it.alunosTreinando == 1) "aluno" else "alunos"})"
+            },
+            color = Tinta, fontSize = 13.sp,
+        )
+    }
+    val alunos = t.alunosQueTreinaram()
+    Column {
+        Row(Modifier.padding(vertical = Espaco2), verticalAlignment = Alignment.CenterVertically) {
+            Cabecalho("Aluno", ColNome)
+            Cabecalho("7 dias", ColNumero)
+            Cabecalho("Treinos", ColNumero)
+            Cabecalho("Acerto", ColNumero)
+            ComDica("Caixa 1: revê amanhã; caixa 2: em 3 dias; caixa 3: em 7 dias. Acerto sobe uma caixa; erro volta para a 1.") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Cabecalho("Caixa 1", ColCaixa)
+                    Cabecalho("Caixa 2", ColCaixa)
+                    Cabecalho("Caixa 3", ColCaixa, info = true)
+                }
+            }
+        }
+        HorizontalDivider(color = Borda)
+        alunos.forEach { a ->
+            Row(Modifier.padding(vertical = Espaco2), verticalAlignment = Alignment.CenterVertically) {
+                Text(a.nome, color = Tinta, fontSize = 14.sp, maxLines = 1, modifier = Modifier.width(ColNome))
+                Celula("${a.treinos7Dias}", ColNumero)
+                Celula("${a.treinos}", ColNumero)
+                Celula(pct(a.taxaAcerto), ColNumero)
+                Celula("${a.caixas.caixa1}", ColCaixa)
+                Celula("${a.caixas.caixa2}", ColCaixa)
+                Celula("${a.caixas.caixa3}", ColCaixa)
+            }
+            HorizontalDivider(color = Borda)
+        }
+        val semTreino = t.alunos.size - alunos.size
+        if (semTreino > 0) {
+            Text(
+                "$semTreino ${if (semTreino == 1) "aluno ainda não treinou" else "alunos ainda não treinaram"}.",
+                color = TintaSuave, fontSize = 13.sp, modifier = Modifier.padding(top = Espaco2),
+            )
         }
     }
 }
@@ -544,6 +627,17 @@ internal val EstatisticasExemplo = EstatisticasTurma(
         conceitos = listOf(ContagemConfianca(conceito = "Regra da cadeia", errosComCerteza = 9, acertosNoChute = 3),
             ContagemConfianca(conceito = "Derivada", errosComCerteza = 4, acertosNoChute = 6)),
     ),
+    treino = TreinoTurma(
+        resumo = ResumoTreino(alunos = 24, alunosTreinando = 9, treinos7Dias = 140, treinos = 310, taxaAcerto = 0.71),
+        alunos = listOf(
+            TreinoAluno("1", "Ana Souza", treinos7Dias = 32, treinos = 61, acertos = 48, taxaAcerto = 0.79, caixas = CartoesPorCaixa(2, 5, 8)),
+            TreinoAluno("2", "Bruno Lima", treinos7Dias = 21, treinos = 40, acertos = 25, taxaAcerto = 0.63, caixas = CartoesPorCaixa(6, 4, 2)),
+            TreinoAluno("3", "Carla Mendes", treinos7Dias = 0, treinos = 12, acertos = 7, taxaAcerto = 0.58, caixas = CartoesPorCaixa(5, 2, 0)),
+            TreinoAluno("4", "Diego Rocha"),
+        ),
+        conceitos = listOf(TreinoConceitoTurma("Regra da cadeia", 7, 64), TreinoConceitoTurma("Derivada implícita", 5, 41),
+            TreinoConceitoTurma("Otimização", 3, 35)),
+    ),
 )
 
 @Preview
@@ -564,6 +658,7 @@ private fun PreviewEstatisticasPoucosDados() {
         resumo = ResumoTurma(alunos = 3, atividades = 1, atividadesEncerradas = 1, respostas = 18, media = 0.52, mediana = 0.5, estadoModa = "em_desenvolvimento"),
         evolucao = EstatisticasExemplo.evolucao.take(1),
         confianca = ConfiancaTurma(turma = ContagemConfianca(respostas = 9, comConfianca = 3, errosComCerteza = 1, acertosNoChute = 0)),
+        treino = TreinoTurma(),
     )
     EdutecTheme {
         Box(Modifier.fillMaxSize().padding(Espaco6)) {
@@ -580,6 +675,19 @@ private fun PreviewEvolucao() {
             Column(Modifier.padding(Espaco6), verticalArrangement = Arrangement.spacedBy(Espaco2)) {
                 GraficoEvolucao(EstatisticasExemplo.evolucao, Modifier.fillMaxWidth().height(260.dp))
                 EstatisticasExemplo.evolucao.forEach { DestaquesDaAtividade(it) }
+            }
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun PreviewTreinoForaDeSala() {
+    EdutecTheme {
+        Surface(color = Superficie, modifier = Modifier.fillMaxSize()) {
+            Column(Modifier.padding(Espaco6), verticalArrangement = Arrangement.spacedBy(Espaco8)) {
+                Secao("Treino fora de sala (flashcards)", FRASE_TREINO) { SecaoTreino(EstatisticasExemplo.treino) }
+                Secao("Treino fora de sala (flashcards)", FRASE_TREINO) { SecaoTreino(TreinoTurma()) }
             }
         }
     }
