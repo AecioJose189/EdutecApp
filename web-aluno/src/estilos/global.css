@@ -585,6 +585,159 @@ a.cartao:active {
   padding: 28px 20px;
 }
 
+/* ---------- Acertou / errou (símbolo + palavra; errar não usa a cor de erro) ---------- */
+.marca-acerto {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: var(--apoio-tamanho);
+  line-height: var(--apoio-altura);
+  font-weight: var(--corpo-forte-peso);
+  color: var(--tinta);
+  white-space: nowrap;
+}
+.marca-acerto-simbolo {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+}
+.marca-acerto.acertou .marca-acerto-simbolo {
+  background: var(--primaria);
+  color: var(--sobre-primaria);
+}
+.marca-acerto.errou .marca-acerto-simbolo {
+  background: var(--superficie);
+  border: 2px solid var(--tinta);
+  color: var(--tinta);
+}
+.marca-acerto.aguarda .marca-acerto-simbolo {
+  border: 2px dashed var(--estado-sem-dados);
+  color: var(--tinta-suave);
+}
+.marca-acerto.aguarda {
+  color: var(--tinta-suave);
+}
+
+/* Lista do resultado logo após enviar. */
+.corrigida {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-3);
+  min-height: 56px;
+  border-radius: var(--raio-md);
+  background: var(--fundo);
+}
+.corrigida.errada {
+  box-shadow: inset 4px 0 0 var(--tinta);
+}
+
+/* ---------- Minhas atividades e revisão da tentativa ---------- */
+.cartao-atividade h2 {
+  overflow-wrap: anywhere;
+}
+.linha-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-3);
+}
+.placar {
+  font-family: var(--fonte-display);
+  font-weight: var(--numero-peso);
+  font-variant-numeric: tabular-nums;
+}
+.selo-gabarito {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  border-radius: var(--raio-pilula);
+  padding: 0 var(--espaco-2);
+  font-size: var(--apoio-tamanho);
+  line-height: var(--apoio-altura);
+  white-space: nowrap;
+}
+.selo-gabarito.liberado {
+  background: var(--menta);
+  color: var(--tinta);
+  font-weight: var(--corpo-forte-peso);
+}
+.selo-gabarito.aguardando {
+  border: 1px dashed var(--borda-controle);
+  color: var(--tinta-suave);
+}
+
+.questao-revisao-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+}
+.alternativa.revisada {
+  cursor: default;
+  align-items: flex-start;
+}
+.alternativa.revisada.escolhida {
+  border-color: var(--tinta);
+}
+.alternativa.revisada.correta {
+  border-color: var(--primaria);
+  background: var(--menta-suave);
+}
+.alternativa.revisada .alternativa-letra {
+  margin-top: -2px;
+}
+.alternativa.revisada.correta .alternativa-letra {
+  background: var(--primaria);
+  color: var(--sobre-primaria);
+}
+.alternativa-corpo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+}
+.alternativa-rotulos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-1) var(--espaco-2);
+}
+.rotulo-alternativa {
+  border-radius: var(--raio-pilula);
+  padding: 0 var(--espaco-2);
+  font-size: var(--apoio-tamanho);
+  line-height: var(--apoio-altura);
+  font-weight: var(--corpo-forte-peso);
+  border: 1px solid var(--tinta);
+  color: var(--tinta);
+}
+.rotulo-alternativa.certa {
+  background: var(--primaria);
+  border-color: var(--primaria);
+  color: var(--sobre-primaria);
+}
+.feedback {
+  color: var(--tinta-suave);
+  font-size: var(--apoio-tamanho);
+  line-height: var(--apoio-altura);
+}
+.resposta-aberta {
+  background: var(--fundo);
+  border-radius: var(--raio-md);
+  padding: var(--espaco-3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.rubrica {
+  border-left: 4px solid var(--primaria);
+  padding: var(--espaco-1) 0 var(--espaco-1) var(--espaco-3);
+}
+
 /* ---------- Entrar na turma pelo QR ---------- */
 .entrar-turma {
   gap: var(--espaco-4);
