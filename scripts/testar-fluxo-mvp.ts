@@ -1,6 +1,7 @@
 // Simula o fluxo inteiro do MVP contra o Supabase de verdade, com dois usuários de teste:
 //   professor: cria turma → convite → gera atividade (PDF) → publica → abre sessão → token do QR
 //   aluno:     aceita convite → lê o QR → responde → vê o próprio grafo
+//   aluno 2:   NÃO aceita o convite → lê o QR → nao_matriculado com a turma → entrar_na_turma → responde
 //   professor: acompanha a sessão ao vivo (Realtime) → vê o grafo da turma → encerra
 // Também confere os erros do contrato (docs/contrato-api-mvp.md) e que o aluno não recebe gabarito.
 //
@@ -123,7 +124,10 @@ const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 etapa("0. Usuários de teste e acesso sem login");
 const prof = await entrarComo("professor.teste@lumini-teste.example.com", "Professora Teste Lumini");
 const aluno = await entrarComo("aluno.teste@lumini-teste.example.com", "Aluno Teste Lumini");
-verificar(prof.id && aluno.id && prof.id !== aluno.id, "professor e aluno logados");
+// Aluno 2 nunca aceita convite: entra na turma (nova a cada execução) pelo QR da sessão.
+const aluno2 = await entrarComo("aluno2.teste@lumini-teste.example.com", "Aluna QR Teste Lumini");
+verificar(prof.id && aluno.id && aluno2.id && new Set([prof.id, aluno.id, aluno2.id]).size === 3,
+  "professor e dois alunos logados");
 for (const f of ["turma-api", "aluno-api", "gerar-atividade"]) {
   const r = await chamar(f, null, { acao: "minhas_turmas" });
   verificar(r.status === 401, `${f} sem JWT → 401`, r);
@@ -208,7 +212,12 @@ const adulterado = await chamar("aluno-api", aluno.token, {
 });
 verificar(adulterado.corpo?.erro === "qr_expirado", "token adulterado → qr_expirado", adulterado);
 const profEntra = await chamar("aluno-api", prof.token, { acao: "entrar_sessao", token });
-verificar(profEntra.corpo?.erro === "nao_matriculado", "professor não entra como aluno → nao_matriculado", profEntra);
+verificar(profEntra.corpo?.erro === "nao_matriculado" && profEntra.corpo?.turma === undefined,
+  "professor não entra como aluno → nao_matriculado, sem oferecer a turma", profEntra);
+const profForca = await chamar("aluno-api", prof.token, { acao: "entrar_sessao", token, entrar_na_turma: true });
+verificar(profForca.status === 403 && profForca.corpo?.erro === "nao_matriculado" && profForca.corpo?.turma === undefined &&
+  /professor desta turma/.test(profForca.corpo?.mensagem ?? ""),
+  `professor lendo o próprio QR com entrar_na_turma → erro claro ("${profForca.corpo?.mensagem}")`, profForca);
 
 const entrou = await chamar("aluno-api", aluno.token, { acao: "entrar_sessao", token });
 verificar(entrou.status === 200 && entrou.corpo?.ja_enviada === false, "entrar_sessao", entrou);
@@ -242,6 +251,27 @@ verificar(repetido.status === 409 && repetido.corpo?.erro === "tentativa_ja_envi
 const depois = await chamar("aluno-api", aluno.token, { acao: "entrar_sessao", token });
 verificar(depois.corpo?.ja_enviada === true, "depois do envio, entrar_sessao diz ja_enviada");
 
+etapa("5b. Aluno 2 (sem convite): entra na turma pelo QR da sessão");
+const fora = await chamar("aluno-api", aluno2.token, { acao: "entrar_sessao", token });
+verificar(fora.status === 403 && fora.corpo?.erro === "nao_matriculado" && fora.corpo?.turma?.id === turmaId &&
+  fora.corpo?.turma?.nome === "Inteligência Artificial" && typeof fora.corpo?.turma?.codigo === "string",
+  "sem convite: nao_matriculado com { turma: {id, nome, codigo} }", fora);
+const turmasAntes = await chamar("aluno-api", aluno2.token, { acao: "minhas_turmas" });
+verificar(!turmasAntes.corpo?.turmas?.some((t: { id: string }) => t.id === turmaId), "ler o QR sozinho não matricula");
+const entrou2 = await chamar("aluno-api", aluno2.token, { acao: "entrar_sessao", token, entrar_na_turma: true });
+verificar(entrou2.status === 200 && entrou2.corpo?.tentativa_id && entrou2.corpo?.ja_enviada === false &&
+  entrou2.corpo?.atividade?.turma?.id === turmaId, "entrar_na_turma: true → tentativa", entrou2);
+const turmasDepois = await chamar("aluno-api", aluno2.token, { acao: "minhas_turmas" });
+verificar(turmasDepois.corpo?.turmas?.some((t: { id: string }) => t.id === turmaId), "agora é aluno da turma (minhas_turmas)");
+const enviado2 = await chamar("aluno-api", aluno2.token, {
+  acao: "enviar_respostas",
+  tentativa_id: entrou2.corpo?.tentativa_id,
+  respostas: questoes.map((q) => q.tipo === "aberta" ? { questao_id: q.id, texto: "Outra resposta." }
+    : { questao_id: q.id, alternativa_id: "b" }),
+});
+verificar(enviado2.status === 200 && enviado2.corpo?.total_multipla_escolha === mc.length,
+  `aluno 2 respondeu: acertou ${enviado2.corpo?.acertos} de ${enviado2.corpo?.total_multipla_escolha}`, enviado2);
+
 etapa("6. Professor: ao vivo e grafo");
 for (let i = 0; i < 20 && eventos.length < 2; i++) await esperar(250);
 verificar(eventos.some((e) => e.eventType === "INSERT" && e.new?.aluno_nome === "Aluno Teste Lumini"),
@@ -252,9 +282,13 @@ await prof.cliente.removeChannel(canal);
 const painel = await chamar("turma-api", prof.token, { acao: "sessao", sessao_id: sessaoId });
 verificar(painel.corpo?.participantes?.[0]?.nome === "Aluno Teste Lumini" && painel.corpo.participantes[0].enviada_em,
   "sessao: participante com envio", painel);
+verificar(painel.corpo?.participantes?.some((p: { nome: string; enviada_em: string | null }) =>
+  p.nome === "Aluna QR Teste Lumini" && p.enviada_em), "sessao: aluno 2 (entrou pelo QR) também enviou");
 const grafoTurma = await chamar("turma-api", prof.token, { acao: "grafo", turma_id: turmaId });
 verificar(grafoTurma.corpo?.conceitos?.some((c: { n_respostas: number }) => c.n_respostas > 0), "grafo da turma com respostas reais");
-verificar(grafoTurma.corpo?.alunos?.[0]?.rotulo === "Aluno Teste Lumini", "grafo lista o aluno pelo nome", grafoTurma.corpo?.alunos);
+const rotulos = (grafoTurma.corpo?.alunos ?? []).map((a: { rotulo: string }) => a.rotulo);
+verificar(rotulos.includes("Aluno Teste Lumini") && rotulos.includes("Aluna QR Teste Lumini"),
+  "grafo lista os dois alunos pelo nome", rotulos);
 
 etapa("7. Aluno: meu grafo");
 const meuGrafo = await chamar("aluno-api", aluno.token, { acao: "meu_grafo", turma_id: turmaId });
