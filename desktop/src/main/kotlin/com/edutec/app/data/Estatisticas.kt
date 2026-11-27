@@ -179,6 +179,7 @@ fun GrafoTurma.doAluno(mapa: MapaAluno): GrafoTurma {
                 mediana = d?.dominio,
                 estado = estadoDoServidor(d?.estado),
                 alunosRevisar = if (d?.estado == "revisar") 1 else 0,
+                minimoRespostas = ConceitoGrafo.MINIMO_RESPOSTAS_ALUNO,
             )
         },
         possiveisDuplicatas = emptyList(),

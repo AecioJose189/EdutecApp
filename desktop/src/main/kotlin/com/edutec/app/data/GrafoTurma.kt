@@ -13,14 +13,19 @@ data class ConceitoGrafo(
     val estado: EstadoConceito? = null,
     /** Alunos com o conceito em "revisar". */
     val alunosRevisar: Int = 0,
+    /** Abaixo disto, "poucos dados": [MINIMO_RESPOSTAS] na turma, [MINIMO_RESPOSTAS_ALUNO] no mapa de um aluno. */
+    val minimoRespostas: Int = MINIMO_RESPOSTAS,
 ) {
     val semDados get() = estado == null || respostas == 0
 
-    /** Com menos de [MINIMO_RESPOSTAS] respostas o domínio estimado ainda oscila muito: mostrar com cautela. */
-    val poucosDados get() = !semDados && respostas < MINIMO_RESPOSTAS
+    /** Com menos de [minimoRespostas] respostas o domínio estimado ainda oscila muito: mostrar com cautela. */
+    val poucosDados get() = !semDados && respostas < minimoRespostas
 
     companion object {
+        /** Turma: soma das respostas de todos os alunos no conceito. */
         const val MINIMO_RESPOSTAS = 5
+        /** Um aluno só: respostas dele no conceito. */
+        const val MINIMO_RESPOSTAS_ALUNO = 3
     }
 }
 

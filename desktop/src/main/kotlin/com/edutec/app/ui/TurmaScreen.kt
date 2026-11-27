@@ -564,7 +564,7 @@ private fun ListaAlunos(
             val temSimulados = alunos.any { PseudonimoSimulacao.matches(it.nome) }
             Text(
                 (if (temSimulados) "Pior estado de cada aluno (simulação: pseudônimos)." else "Pior estado de cada aluno.") +
-                    " Clique num aluno para ver o mapa dele.",
+                    " Clique num nome para ver o mapa individual.",
                 color = TintaSuave, fontSize = 12.sp, modifier = Modifier.padding(start = Espaco1),
             )
             Spacer(Modifier.height(Espaco1))
@@ -671,7 +671,8 @@ private fun CartaoGrafo(
                     Text("Sem dados", color = TintaSuave, fontSize = 13.sp)
                 }
                 Text(
-                    "Tamanho = nº de respostas · apagado = poucos dados (menos de ${ConceitoGrafo.MINIMO_RESPOSTAS})",
+                    "Tamanho = nº de respostas · apagado = poucos dados (menos de " +
+                        "${grafo.conceitos.firstOrNull()?.minimoRespostas ?: ConceitoGrafo.MINIMO_RESPOSTAS})",
                     color = TintaSuave, fontSize = 13.sp, modifier = Modifier.align(Alignment.CenterVertically),
                 )
             }

@@ -223,7 +223,9 @@ private fun Resumo(r: ResumoTurma, confianca: ConfiancaTurma) {
         Numero("${r.atividadesEncerradas}",
             (if (r.atividadesEncerradas == 1) "atividade encerrada" else "atividades encerradas") +
                 " (de ${r.atividades} ${if (r.atividades == 1) "publicada" else "publicadas"})")
-        Numero("${r.respostas}", "respostas registradas")
+        ComDica("Cada questão conta uma vez para cada conceito que ela avalia.") {
+            Numero("${r.respostas}", "respostas registradas", info = true)
+        }
         Numero(pct(r.media), "domínio estimado médio · mediana ${pct(r.mediana)}")
         Surface(shape = FormaMd, color = Fundo) {
             Column(Modifier.widthIn(min = 150.dp).padding(Espaco3), verticalArrangement = Arrangement.spacedBy(Espaco1)) {

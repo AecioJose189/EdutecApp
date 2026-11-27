@@ -261,7 +261,8 @@ fun DialogoDominioEstimado(onFechar: () -> Unit) {
                 )
                 Text(
                     "Não é nota. Com poucas respostas a estimativa ainda muda bastante: por isso cada conceito " +
-                        "mostra em quantas respostas ela se baseia, e com menos de 5 aparece o selo \"poucos dados\".",
+                        "mostra em quantas respostas ela se baseia, e com poucas (menos de 5 na turma, menos de 3 no mapa " +
+                        "de um aluno) aparece o selo \"poucos dados\".",
                     color = TintaSuave, fontSize = 15.sp,
                 )
                 HorizontalDivider(color = Borda)
@@ -296,7 +297,7 @@ fun LegendaEstados(modifier: Modifier = Modifier) {
     }
 }
 
-/** Selo "poucos dados": o domínio estimado se baseia em menos de 5 respostas. */
+/** Selo "poucos dados": o domínio estimado se baseia em poucas respostas (5 na turma, 3 num aluno). */
 @Composable
 fun SeloPoucosDados(modifier: Modifier = Modifier) {
     Surface(shape = FormaMd, color = Fundo, border = BorderStroke(1.dp, Borda), modifier = modifier) {

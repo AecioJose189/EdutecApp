@@ -76,7 +76,7 @@ fun FaixaMapaDoAluno(aluno: Aluno, onVoltar: () -> Unit, modifier: Modifier = Mo
             Spacer(Modifier.width(Espaco3))
             Column(Modifier.weight(1f)) {
                 Text("Mapa de ${aluno.nome}", color = Tinta, fontFamily = Sora, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text("Domínio estimado dele em cada conceito. Clique num conceito para ver o histórico.", color = Tinta, fontSize = 12.sp)
+                Text("Domínio estimado em cada conceito. Clique num conceito para ver o histórico.", color = Tinta, fontSize = 12.sp)
             }
             OutlinedButton(onClick = onVoltar, border = BorderStroke(1.dp, Primaria), shape = FormaMd,
                 contentPadding = PaddingValues(horizontal = Espaco4, vertical = Espaco2), modifier = Modifier.maoAoPassar()) {
@@ -128,7 +128,7 @@ private fun ConteudoHistorico(h: HistoricoConceito, onExplicarDominio: () -> Uni
     }
     val ultimo = h.respostas.last().dominio
     ChipEstado(estadoDominioLocal(ultimo), texto = "${estadoDominioLocal(ultimo).rotulo} · domínio estimado ${pct(ultimo)}")
-    Text("Chance estimada de o aluno saber o conceito, atualizada a cada resposta; não é nota.", color = TintaSuave, fontSize = 12.sp)
+    Text("Chance estimada de saber o conceito, atualizada a cada resposta; não é nota.", color = TintaSuave, fontSize = 12.sp)
     TextButton(onClick = onExplicarDominio, contentPadding = PaddingValues(horizontal = 0.dp), modifier = Modifier.maoAoPassar()) {
         Text("O que é domínio estimado?", color = Primaria, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }

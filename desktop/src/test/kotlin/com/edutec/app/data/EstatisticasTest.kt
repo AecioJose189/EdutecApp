@@ -68,6 +68,16 @@ class EstatisticasTest {
     }
 
     @Test
+    fun `poucos dados - menos de 3 no mapa do aluno, menos de 5 na turma`() {
+        val turma = GrafoTurma(listOf(ConceitoGrafo("A", respostas = 4, media = 0.9, estado = EstadoConceito.Consolidado)), emptyList())
+        assertTrue(turma.conceitos[0].poucosDados) // turma: 4 < 5
+        val dele = { n: Int -> turma.doAluno(MapaAluno(listOf(DominioAlunoConceito("A", 0.9, "consolidado", n)))).conceitos[0] }
+        assertTrue(dele(2).poucosDados)
+        assertEquals(false, dele(3).poucosDados)
+        assertEquals(false, dele(4).poucosDados)
+    }
+
+    @Test
     fun `json da turma-api`() {
         val json = Json { ignoreUnknownKeys = true }
         val e = json.decodeFromString<EstatisticasTurma>("""

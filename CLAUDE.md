@@ -452,7 +452,9 @@ Ideias do grupo inspiradas no LearnHarness; só back-end e contrato (`docs/contr
   abre o conceito no mapa), gráfico de evolução no Canvas (duas séries: forma, traço e legenda além da cor;
   valores nos pontos) e destaques por atividade (`destaques`). "Incluir simulação" só aparece se houver.
   **Mapa do aluno** (`ui/MapaAluno.kt`): clicar num aluno da lista pinta o mapa com o domínio dele
-  (`GrafoTurma.doAluno`, mesmo layout), faixa "Mapa de X" + "Voltar à turma toda", e o painel vira o histórico
+  (`GrafoTurma.doAluno`, mesmo layout; "poucos dados" abaixo de 3 respostas dele no conceito, a turma segue com 5:
+  `ConceitoGrafo.minimoRespostas`), faixa "Mapa de X" + "Voltar à turma toda" (textos neutros, sem "dele/dela"),
+  e o painel vira o histórico
   do conceito (gráfico do domínio resposta a resposta, ✓/✗, confiança). Estado em `TurmaViewModel`
   (`estatisticas`, `incluirSimulacao`, `alunoSelecionado`, `mapaDoAluno`, `historico`, `conceitoEmFoco`).
 - Testes: pgTAP `estatisticas.test.sql` (30; 12 arquivos, 202); desktop `EstatisticasTest` e mais casos no
