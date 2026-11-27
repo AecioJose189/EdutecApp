@@ -33,12 +33,19 @@
 //                                         alunos: [Confianca + aluno_id, nome] }   (fase 2b; só múltipla escolha)
 //                                       Confianca = { n_respostas, n_com_confianca, erros_com_certeza, acertos_no_chute }
 //   estatisticas  { turma_id, incluir_simulacao? } → { tem_simulacao, incluir_simulacao, resumo, conceitos,
-//                                         evolucao, confianca }   (UC13, fase 3; só reais por padrão)
+//                                         evolucao, confianca, treino }   (UC13, fase 3; só reais por padrão;
+//                                         treino = o mesmo de treino_turma, fase 4)
 //   mapa_aluno    { turma_id, aluno }  → { conceitos: [{ conceito, p_dominio, estado, n_respostas }] }   (UC11)
 //   historico_conceito { turma_id, aluno, conceito } → { conceito, p_inicial, respostas: [{ criado_em,
 //                                         atividade, acertou, confianca, p_dominio }], erros_com_certeza,
 //                                         acertos_no_chute }   (UC12)
 //                                       aluno = AlunoGrafo.chave (o uuid do aluno real; "sim-..." na simulação)
+//                                       fase 4: + treino: { n_treinos, acertos } (flashcards do aluno nesse conceito)
+//   treino_turma  { turma_id }        → { resumo: { n_alunos, n_alunos_treinando, treinos_7_dias, n_treinos, taxa_acerto },
+//                                         alunos: [{ aluno_id, nome, treinos_7_dias, n_treinos, acertos, taxa_acerto,
+//                                                    cartoes_por_caixa: {"1","2","3"}, ultimo_treino_em }],
+//                                         conceitos: [{ conceito, n_alunos_treinando, treinos_7_dias }] }
+//                                       (fase 4: revisão espaçada fora de sala; não altera o domínio estimado)
 //   simular       { turma_id }        → { n_alunos, n_respostas }   DEMONSTRAÇÃO: 25 pseudônimos
 //                                       respondendo às questões publicadas (substitui a anterior)
 //
@@ -95,6 +102,7 @@ const ACOES: Record<string, (ctx: Contexto, corpo: Corpo) => Promise<unknown>> =
   estatisticas,
   mapa_aluno: mapaAluno,
   historico_conceito: historicoConceito,
+  treino_turma: treinoTurma,
   fundir_conceitos: fundirConceitos,
   marcar_distintos: marcarDistintos,
 };
@@ -574,13 +582,14 @@ async function estatisticas(ctx: Contexto, corpo: Corpo) {
   const turma = uuid(corpo.turma_id, "turma_id");
   const incluir = corpo.incluir_simulacao === true;
   await exigirTurma(ctx, turma);
-  const [est, evo, conf] = await Promise.all([
+  const [est, evo, conf, treino] = await Promise.all([
     ctx.servico.rpc("estatisticas_turma", { turma, incluir_simulacao: incluir }),
     ctx.servico.rpc("evolucao_turma", { turma, incluir_simulacao: incluir }),
     ctx.servico.rpc("confianca_turma", { turma }),
+    ctx.servico.rpc("treino_turma", { turma }),
   ]);
-  for (const r of [est, evo, conf]) if (r.error) throw falhaBanco("carregar as estatísticas", r.error);
-  return { ...(est.data as Record<string, unknown>), evolucao: evo.data, confianca: conf.data };
+  for (const r of [est, evo, conf, treino]) if (r.error) throw falhaBanco("carregar as estatísticas", r.error);
+  return { ...(est.data as Record<string, unknown>), evolucao: evo.data, confianca: conf.data, treino: treino.data };
 }
 
 /** Chave do aluno: o uuid (real) ou o pseudônimo da simulação ("sim-<turma>-NN"). */
@@ -607,8 +616,20 @@ async function historicoConceito(ctx: Contexto, corpo: Corpo) {
   const conceito = String(corpo.conceito ?? "").trim();
   if (!conceito) throw new ErroPedido("Informe o conceito.", 400);
   await exigirTurma(ctx, turma);
-  const { data, error } = await ctx.servico.rpc("historico_aluno_conceito", { turma, aluno, conceito });
-  if (error) throw falhaBanco("carregar o histórico", error);
+  const [hist, treino] = await Promise.all([
+    ctx.servico.rpc("historico_aluno_conceito", { turma, aluno, conceito }),
+    ctx.servico.rpc("treino_aluno_conceito", { turma, aluno, conceito }),
+  ]);
+  for (const r of [hist, treino]) if (r.error) throw falhaBanco("carregar o histórico", r.error);
+  return { ...(hist.data as Record<string, unknown>), treino: treino.data };
+}
+
+/** Fase 4: treino com flashcards fora de sala (por aluno e por conceito). Não altera o domínio estimado. */
+async function treinoTurma(ctx: Contexto, corpo: Corpo) {
+  const turma = uuid(corpo.turma_id, "turma_id");
+  await exigirTurma(ctx, turma);
+  const { data, error } = await ctx.servico.rpc("treino_turma", { turma });
+  if (error) throw falhaBanco("carregar o treino da turma", error);
   return data;
 }
 
