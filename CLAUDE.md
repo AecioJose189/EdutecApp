@@ -246,7 +246,7 @@ só depois de conferir o papel na turma):
 - Ao vivo no desktop: Realtime `postgres_changes` em `public.tentativas` com filtro `sessao_id=eq.<id>`
   e o JWT do professor (INSERT = entrou; UPDATE com `enviada_em` = enviou).
 
-Testes: pgTAP (8 arquivos, 119 testes, inclusive `rls.test.sql`, `tentativas.test.sql` e `conceitos.test.sql`) e o fluxo
+Testes: pgTAP (9 arquivos, 145 testes, inclusive `rls.test.sql`, `tentativas.test.sql` e `conceitos.test.sql`) e o fluxo
 inteiro com dois usuários de teste contra o projeto real:
 `SUPABASE_CHAVE_SECRETA=<service_role> npx deno run -A scripts/testar-fluxo-mvp.ts` (o comando
 que obtém a chave está no cabeçalho do script). Cada execução cria uma turma na conta
@@ -400,6 +400,19 @@ Resposta aos testes de usabilidade de novembro (`docs/feedback-testes-nov.md`).
   O desktop funciona com a turma-api antiga (campos novos têm padrão; sem `numero`, sem "Atividade N").
 - Testes: `ProximosPassosTest`, `PaginaRetornoTest`, `TurmaViewModelTest` (EDT do Swing, espera com prazo),
   `PoucosDadosTest`; capturas novas `turma-passos`, `turma-atividades`, `turma-juntar`, `passos-turma-*`.
+
+## Fase 2 — back-end da revisão do aluno (27/11/2026, branch `fase2-backend`, sai da `fase1-fluxo`)
+
+Contrato: `docs/contrato-api-fase2.md` (só acréscimos; o modo simulado do site ainda não tem estas ações).
+- Migration `20261127130000_revisao_aluno`: `numero_da_atividade(atividade)` (ordem `publicada_em, id` na turma;
+  a turma-api `listar_atividades` desempata igual), `minhas_atividades(aluno, turma?)` e
+  `revisao_tentativa(tentativa, aluno)` (LU403 se não for do aluno ou não estiver enviada). Só service_role.
+  **Regra anti-cola no Postgres:** com a sessão aberta, `correta`/`feedback`/`rubrica` somem do JSON; com a
+  sessão encerrada, vêm completos.
+- `aluno-api`: `enviar_respostas` + `questoes: [{questao_id, acertou}]` (lido de `tentativas.respostas`; null nas
+  abertas); ações `minhas_atividades` e `revisao_tentativa` (LU403 → `nao_matriculado`).
+- Testes: pgTAP `revisao.test.sql` (26; total 9 arquivos, 145), `scripts/testar-fluxo-mvp.ts` com o aluno 2
+  (`aluno2.teste@lumini-teste.example.com`, entra pelo QR sem convite) e a revisão antes/depois de encerrar.
 
 Ainda não existe: correção das abertas, edição na Revisão, prazo/liberação na publicação, gerar a partir do
 grafo, abas Materiais/Estatísticas, histórico semanal, "Ver alunos com dificuldade".

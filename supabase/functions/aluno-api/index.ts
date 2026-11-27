@@ -9,6 +9,12 @@
 //                     com entrar_na_turma: true é matriculado e entra — docs/contrato-api-fase2.md)
 //   enviar_respostas { tentativa_id, respostas } → { acertos, total_multipla_escolha, abertas_aguardando_correcao }
 //   meu_grafo        { turma_id }                → { conceitos: [{ nome, prerequisitos, dominio, estado, n_respostas }] }
+//   (fase 2, docs/contrato-api-fase2.md)
+//   enviar_respostas também devolve questoes: [{ questao_id, acertou: true | false | null }] (null = aberta)
+//   minhas_atividades { turma_id? }              → { atividades: [{ tentativa_id, atividade, turma, enviada_em,
+//                                                     acertos, total_multipla_escolha, gabarito_liberado }] }
+//   revisao_tentativa { tentativa_id }           → { atividade, gabarito_liberado, acertos, total_multipla_escolha,
+//                                                     questoes }  (gabarito só com a sessão encerrada)
 // Turma: { id, nome, codigo, professor_nome }
 // Erro: { erro: <código>, mensagem: <texto para o aluno> } com status 4xx/5xx.
 //
@@ -47,6 +53,8 @@ const ACOES: Record<string, (u: Usuario, corpo: Corpo) => Promise<unknown>> = {
   entrar_sessao: entrarSessao,
   enviar_respostas: enviarRespostas,
   meu_grafo: meuGrafo,
+  minhas_atividades: minhasAtividades,
+  revisao_tentativa: revisaoTentativa,
 };
 
 Deno.serve(async (req) => {
@@ -287,11 +295,47 @@ async function enviarRespostas(u: Usuario, corpo: Corpo) {
     throw falhaBanco("enviar as respostas", error);
   }
   const r = (data as Record<string, number>[])[0];
+
+  // Fase 2: quais questões acertou (sem a alternativa correta: o gabarito só sai com a sessão encerrada).
+  const { data: enviada, error: erroLeitura } = await clienteServico()
+    .from("tentativas").select("respostas").eq("id", tentativa).single();
+  if (erroLeitura) throw falhaBanco("ler o resultado", erroLeitura);
+  const registro = (enviada?.respostas ?? []) as { questao_id: string; tipo: string; correta: boolean | null }[];
+
   return {
     acertos: r.acertos,
     total_multipla_escolha: r.total_multipla_escolha,
     abertas_aguardando_correcao: r.abertas_aguardando_correcao,
+    questoes: registro.map((q) => ({
+      questao_id: q.questao_id,
+      acertou: q.tipo === "aberta" ? null : q.correta === true,
+    })),
   };
+}
+
+// ---------- revisão (fase 2) ----------
+// A regra de revelação fica no Postgres (minhas_atividades / revisao_tentativa, migration 20261127130000).
+
+async function minhasAtividades(u: Usuario, corpo: Corpo) {
+  const turma = corpo.turma_id == null || corpo.turma_id === "" ? null : String(corpo.turma_id);
+  if (turma !== null && !UUID.test(turma)) {
+    throw new ErroAluno("nao_matriculado", "Você não está nesta turma.", 403);
+  }
+  const { data, error } = await clienteServico().rpc("minhas_atividades", { aluno: u.id, turma });
+  if (error) throw falhaBanco("carregar suas atividades", error);
+  return data;
+}
+
+async function revisaoTentativa(u: Usuario, corpo: Corpo) {
+  const tentativa = String(corpo.tentativa_id ?? "");
+  const naoEncontrada = new ErroAluno("nao_matriculado", "Atividade não encontrada entre as suas.", 403);
+  if (!UUID.test(tentativa)) throw naoEncontrada;
+  const { data, error } = await clienteServico().rpc("revisao_tentativa", { tentativa, aluno: u.id });
+  if (error) {
+    if (error.code === "LU403") throw naoEncontrada;
+    throw falhaBanco("carregar a revisão", error);
+  }
+  return data;
 }
 
 // ---------- grafo do aluno ----------

@@ -3,6 +3,7 @@
 //   aluno:     aceita convite → lê o QR → responde → vê o próprio grafo
 //   aluno 2:   NÃO aceita o convite → lê o QR → nao_matriculado com a turma → entrar_na_turma → responde
 //   professor: acompanha a sessão ao vivo (Realtime) → vê o grafo da turma → encerra
+//   aluno:     revê a atividade (fase 2): sem gabarito com a sessão aberta, gabarito completo depois de encerrar
 // Também confere os erros do contrato (docs/contrato-api-mvp.md) e que o aluno não recebe gabarito.
 //
 // Uso (na raiz do repositório):
@@ -244,6 +245,14 @@ const enviado = await chamar("aluno-api", aluno.token, {
 verificar(enviado.status === 200 && enviado.corpo?.total_multipla_escolha === mc.length &&
   enviado.corpo?.abertas_aguardando_correcao === abertas.length,
   `enviar_respostas: acertou ${enviado.corpo?.acertos} de ${enviado.corpo?.total_multipla_escolha}`, enviado);
+// deno-lint-ignore no-explicit-any
+const porQuestao: any[] = enviado.corpo?.questoes ?? [];
+verificar(porQuestao.length === questoes.length &&
+  porQuestao.every((r, i) => r.questao_id === questoes[i].id &&
+    (questoes[i].tipo === "aberta" ? r.acertou === null : typeof r.acertou === "boolean")) &&
+  porQuestao.filter((r) => r.acertou === true).length === enviado.corpo?.acertos,
+  "enviar_respostas.questoes: acertou por questão (null nas abertas)", porQuestao);
+verificar(!/correta|feedback|rubrica/.test(JSON.stringify(enviado.corpo)), "resultado do envio sem gabarito");
 const repetido = await chamar("aluno-api", aluno.token, {
   acao: "enviar_respostas", tentativa_id: entrou.corpo?.tentativa_id, respostas: [],
 });
@@ -271,6 +280,35 @@ const enviado2 = await chamar("aluno-api", aluno2.token, {
 });
 verificar(enviado2.status === 200 && enviado2.corpo?.total_multipla_escolha === mc.length,
   `aluno 2 respondeu: acertou ${enviado2.corpo?.acertos} de ${enviado2.corpo?.total_multipla_escolha}`, enviado2);
+
+etapa("5c. Aluno: revisão com a sessão ainda aberta (anti-cola)");
+const tentativaId: string = entrou.corpo?.tentativa_id;
+const minhasAtiv = await chamar("aluno-api", aluno.token, { acao: "minhas_atividades", turma_id: turmaId });
+const item = minhasAtiv.corpo?.atividades?.[0];
+verificar(minhasAtiv.status === 200 && minhasAtiv.corpo?.atividades?.length === 1 && item?.tentativa_id === tentativaId &&
+  item?.atividade?.id === atividadeId && item?.atividade?.numero === 1 && item?.atividade?.titulo === ativ?.titulo &&
+  item?.turma?.id === turmaId && item?.acertos === enviado.corpo?.acertos &&
+  item?.total_multipla_escolha === mc.length && item?.gabarito_liberado === false && item?.enviada_em,
+  "minhas_atividades: a tentativa enviada, nº 1, gabarito_liberado false", minhasAtiv);
+const todas = await chamar("aluno-api", aluno.token, { acao: "minhas_atividades" });
+verificar(todas.corpo?.atividades?.some((a: { tentativa_id: string }) => a.tentativa_id === tentativaId),
+  "minhas_atividades sem turma_id traz todas as turmas");
+const revAberta = await chamar("aluno-api", aluno.token, { acao: "revisao_tentativa", tentativa_id: tentativaId });
+// deno-lint-ignore no-explicit-any
+const qRev: any[] = revAberta.corpo?.questoes ?? [];
+verificar(revAberta.status === 200 && revAberta.corpo?.gabarito_liberado === false && qRev.length === questoes.length,
+  "revisao_tentativa com a sessão aberta", revAberta);
+verificar(!/"(correta|feedback|rubrica)"/.test(JSON.stringify(revAberta.corpo)),
+  "sessão aberta: nenhum correta, feedback ou rubrica (os campos somem)", revAberta.corpo);
+verificar(qRev.every((q, i) => q.acertou === porQuestao[i].acertou && q.minha_resposta &&
+    (q.tipo === "aberta" ? q.minha_resposta.texto : q.minha_resposta.alternativa_id === "a")),
+  "acertou e minha_resposta batem com o envio");
+const alheia = await chamar("aluno-api", aluno2.token, { acao: "revisao_tentativa", tentativa_id: tentativaId });
+verificar(alheia.status === 403 && alheia.corpo?.erro === "nao_matriculado", "um aluno não lê a tentativa de outro", alheia);
+const profLe = await chamar("aluno-api", prof.token, { acao: "revisao_tentativa", tentativa_id: tentativaId });
+verificar(profLe.corpo?.erro === "nao_matriculado", "nem o professor lê pela aluno-api", profLe);
+const lixo = await chamar("aluno-api", aluno.token, { acao: "revisao_tentativa", tentativa_id: "nao-e-uuid" });
+verificar(lixo.corpo?.erro === "nao_matriculado", "tentativa_id inválido → nao_matriculado", lixo);
 
 etapa("6. Professor: ao vivo e grafo");
 for (let i = 0; i < 20 && eventos.length < 2; i++) await esperar(250);
@@ -310,6 +348,23 @@ const qrFechado = await chamar("turma-api", prof.token, { acao: "token_qr", sess
 verificar(qrFechado.status === 409, "sem QR depois de encerrar", qrFechado);
 const tarde = await chamar("aluno-api", aluno.token, { acao: "entrar_sessao", token });
 verificar(tarde.corpo?.erro === "sessao_encerrada", "entrar depois de encerrar → sessao_encerrada", tarde);
+
+const revFechada = await chamar("aluno-api", aluno.token, { acao: "revisao_tentativa", tentativa_id: tentativaId });
+// deno-lint-ignore no-explicit-any
+const qFim: any[] = revFechada.corpo?.questoes ?? [];
+verificar(revFechada.corpo?.gabarito_liberado === true, "depois de encerrar: gabarito_liberado true", revFechada);
+verificar(qFim.filter((q) => q.tipo === "multipla_escolha").every((q) =>
+    q.alternativas?.length > 0 && q.alternativas.every((a: { correta: unknown; feedback: unknown }) =>
+      typeof a.correta === "boolean" && typeof a.feedback === "string") &&
+    q.alternativas.filter((a: { correta: boolean }) => a.correta).length === 1),
+  "depois de encerrar: cada alternativa com correta e feedback (uma correta por questão)", qFim);
+verificar(qFim.filter((q) => q.tipo === "aberta").every((q) => typeof q.rubrica === "string" && q.rubrica.length > 0),
+  "depois de encerrar: rubrica das abertas");
+verificar(qFim.every((q) => q.tipo !== "multipla_escolha" ||
+    q.acertou === q.alternativas.some((a: { id: string; correta: boolean }) => a.correta && a.id === q.minha_resposta?.alternativa_id)),
+  "acertou confere com o gabarito revelado");
+const minhasDepois = await chamar("aluno-api", aluno.token, { acao: "minhas_atividades", turma_id: turmaId });
+verificar(minhasDepois.corpo?.atividades?.[0]?.gabarito_liberado === true, "minhas_atividades: gabarito_liberado true");
 
 const sessao2 = await chamar("turma-api", prof.token, { acao: "abrir_sessao", atividade_id: atividadeId });
 verificar(sessao2.corpo?.sessao?.id && sessao2.corpo.sessao.id !== sessaoId, "nova sessão para a mesma atividade");
