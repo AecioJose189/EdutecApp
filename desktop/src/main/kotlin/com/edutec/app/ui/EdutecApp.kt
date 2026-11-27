@@ -16,6 +16,8 @@ import com.edutec.app.data.Usuario
 @Composable
 fun EdutecApp() {
     val sessao = viewModel { SessaoViewModel() }
+    val trazerParaFrente = LocalTrazerParaFrente.current
+    LaunchedEffect(sessao.voltasDoNavegador) { if (sessao.voltasDoNavegador > 0) trazerParaFrente() }
     when (val estado = sessao.estado) {
         EstadoSessao.Iniciando -> CarregandoSessao()
         is EstadoSessao.Deslogado -> LoginScreen(

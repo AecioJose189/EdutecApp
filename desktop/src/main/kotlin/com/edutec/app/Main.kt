@@ -25,6 +25,8 @@ import com.edutec.app.ui.EdutecApp
 import com.edutec.app.ui.LocalAcoesVoltar
 import com.edutec.app.ui.LocalAvisar
 import com.edutec.app.ui.LocalJanela
+import com.edutec.app.ui.LocalTrazerParaFrente
+import com.edutec.app.ui.trazerParaFrente
 import com.edutec.app.ui.simboloLumini
 import com.edutec.app.ui.theme.EdutecTheme
 import kotlinx.coroutines.launch
@@ -52,6 +54,7 @@ fun main() = application {
             LocalAvisar provides { mensagem: String -> escopo.launch { avisos.showSnackbar(mensagem) } },
             LocalAcoesVoltar provides acoesVoltar,
             LocalJanela provides estadoJanela,
+            LocalTrazerParaFrente provides { trazerParaFrente(window) },
         ) {
             EdutecTheme {
                 Box(Modifier.fillMaxSize()) {

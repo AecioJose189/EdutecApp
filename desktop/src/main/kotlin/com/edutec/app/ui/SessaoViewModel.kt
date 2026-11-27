@@ -44,6 +44,10 @@ class SessaoViewModel : ViewModel() {
     var erro by mutableStateOf<String?>(null)
         private set
 
+    /** Sobe a cada login concluído no navegador: a janela vem para a frente (ver EdutecApp). */
+    var voltasDoNavegador by mutableStateOf(0)
+        private set
+
     private var login: Job? = null
     private var saindo = false
 
@@ -85,6 +89,7 @@ class SessaoViewModel : ViewModel() {
         login = viewModelScope.launch {
             try {
                 Login.entrarComGoogle { urlLogin = it }
+                voltasDoNavegador++
             } catch (e: CancellationException) {
                 throw e
             } catch (e: ConfiguracaoAusente) {

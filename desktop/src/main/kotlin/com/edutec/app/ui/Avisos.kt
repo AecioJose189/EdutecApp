@@ -44,3 +44,27 @@ fun TeclaVoltar(onVoltar: () -> Unit) {
 
 /** Estado da janela (a projeção da sessão entra e sai da tela cheia). Nulo nos @Preview. */
 val LocalJanela = staticCompositionLocalOf<androidx.compose.ui.window.WindowState?> { null }
+
+/** Traz a janela do Lumini para a frente (ex.: na volta do login no navegador). Nada nos @Preview. */
+val LocalTrazerParaFrente = staticCompositionLocalOf<() -> Unit> { {} }
+
+/**
+ * Restaura (se minimizada), põe na frente e pede o foco. Alguns sistemas (Windows, vários gerenciadores
+ * do Linux) não deixam um programa em segundo plano roubar o foco: se ela não ganhou o foco em 300 ms,
+ * fica "sempre no topo" por um instante, o que a traz para cima mesmo assim.
+ */
+fun trazerParaFrente(janela: java.awt.Frame) = java.awt.EventQueue.invokeLater {
+    if (janela.extendedState and java.awt.Frame.ICONIFIED != 0) {
+        janela.extendedState = janela.extendedState and java.awt.Frame.ICONIFIED.inv()
+    }
+    janela.toFront()
+    janela.requestFocus()
+    javax.swing.Timer(300) {
+        if (!janela.isFocused) {
+            janela.isAlwaysOnTop = true
+            janela.toFront()
+            janela.requestFocus()
+            javax.swing.Timer(400) { janela.isAlwaysOnTop = false }.apply { isRepeats = false }.start()
+        }
+    }.apply { isRepeats = false }.start()
+}

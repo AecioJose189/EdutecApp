@@ -52,9 +52,11 @@ object Login {
             val parametros = parametrosDaQuery(troca.requestURI.rawQuery)
             val codigo = parametros["code"]
             val ok = codigo != null
-            val pagina = paginaDeRetorno(
-                if (ok) "Pronto! Você já pode voltar ao Lumini." else "Não foi possível entrar: " +
-                    (parametros["error_description"] ?: parametros["error"] ?: "retorno sem código."),
+            val pagina = PaginaRetorno.html(
+                ok,
+                if (ok) PaginaRetorno.MENSAGEM_OK else "O Google não concluiu o login (" +
+                    (parametros["error_description"] ?: parametros["error"] ?: "retorno sem código") +
+                    "). Volte ao Lumini e tente de novo.",
             ).toByteArray()
             troca.responseHeaders.add("Content-Type", "text/html; charset=utf-8")
             troca.sendResponseHeaders(200, pagina.size.toLong())
@@ -128,14 +130,4 @@ object Login {
             val (k, v) = it.split('=', limit = 2)
             URLDecoder.decode(k, Charsets.UTF_8) to URLDecoder.decode(v, Charsets.UTF_8)
         }
-
-    private fun paginaDeRetorno(mensagem: String) = """
-        <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Lumini</title></head>
-        <body style="font-family:sans-serif;background:#F6F4EF;color:#1A1A1A;display:flex;align-items:center;
-        justify-content:center;height:100vh;margin:0"><div style="background:#fff;border-radius:24px;padding:40px 48px;
-        text-align:center"><h1 style="margin:0 0 12px">Lumini</h1><p style="font-size:18px;margin:0">${mensagem.escaparHtml()}</p>
-        </div></body></html>
-    """.trimIndent()
-
-    private fun String.escaparHtml() = replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
 }

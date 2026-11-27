@@ -5,14 +5,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -20,6 +18,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -34,7 +33,6 @@ import com.edutec.app.ui.theme.Borda
 import com.edutec.app.ui.theme.EdutecTheme
 import com.edutec.app.ui.theme.Erro
 import com.edutec.app.ui.theme.Espaco1
-import com.edutec.app.ui.theme.Espaco3
 import com.edutec.app.ui.theme.Espaco4
 import com.edutec.app.ui.theme.Espaco6
 import com.edutec.app.ui.theme.Espaco8
@@ -44,6 +42,7 @@ import com.edutec.app.ui.theme.FormaMd
 import com.edutec.app.ui.theme.Fundo
 import com.edutec.app.ui.theme.Primaria
 import com.edutec.app.ui.theme.Superficie
+import com.edutec.app.ui.theme.Tinta
 import com.edutec.app.ui.theme.TintaSuave
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -69,24 +68,24 @@ fun LoginScreen(
             ) {
                 LogoLumini(altura = 72.dp)
                 Text(
-                    "Grafo de conhecimento da turma e domínio estimado de cada conceito.",
+                    "Mapa do conhecimento da turma e domínio estimado de cada conceito.",
                     color = TintaSuave, fontSize = 15.sp, textAlign = TextAlign.Center,
                 )
                 aviso?.let { Text(it, color = TintaSuave, fontSize = 14.sp, textAlign = TextAlign.Center) }
                 Spacer(Modifier.height(Espaco1))
                 if (entrando) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Primaria)
-                        Spacer(Modifier.width(Espaco3))
-                        Text("Continue no navegador…", color = TintaSuave, fontSize = 15.sp)
-                    }
+                    CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp, color = Primaria)
+                    Text(
+                        "Continue no navegador. Quando terminar, o Lumini volta sozinho.",
+                        color = Tinta, fontSize = 16.sp, textAlign = TextAlign.Center,
+                    )
                     if (urlLogin != null) {
                         TextButton(onClick = {
                             area.setText(AnnotatedString(urlLogin))
                             avisar("Link copiado: cole no navegador")
                         }, modifier = Modifier.maoAoPassar()) { Text("O navegador não abriu? Copiar o link") }
                     }
-                    TextButton(onClick = onCancelar, modifier = Modifier.maoAoPassar()) { Text("Cancelar", color = TintaSuave) }
+                    OutlinedButton(onClick = onCancelar, shape = FormaMd, modifier = Modifier.maoAoPassar()) { Text("Cancelar") }
                 } else {
                     Button(
                         onClick = onEntrar,
