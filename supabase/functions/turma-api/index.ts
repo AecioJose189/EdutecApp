@@ -32,6 +32,13 @@
 //   confianca     { turma_id }        → { turma: Confianca, conceitos: [Confianca + conceito],
 //                                         alunos: [Confianca + aluno_id, nome] }   (fase 2b; só múltipla escolha)
 //                                       Confianca = { n_respostas, n_com_confianca, erros_com_certeza, acertos_no_chute }
+//   estatisticas  { turma_id, incluir_simulacao? } → { tem_simulacao, incluir_simulacao, resumo, conceitos,
+//                                         evolucao, confianca }   (UC13, fase 3; só reais por padrão)
+//   mapa_aluno    { turma_id, aluno }  → { conceitos: [{ conceito, p_dominio, estado, n_respostas }] }   (UC11)
+//   historico_conceito { turma_id, aluno, conceito } → { conceito, p_inicial, respostas: [{ criado_em,
+//                                         atividade, acertou, confianca, p_dominio }], erros_com_certeza,
+//                                         acertos_no_chute }   (UC12)
+//                                       aluno = AlunoGrafo.chave (o uuid do aluno real; "sim-..." na simulação)
 //   simular       { turma_id }        → { n_alunos, n_respostas }   DEMONSTRAÇÃO: 25 pseudônimos
 //                                       respondendo às questões publicadas (substitui a anterior)
 //
@@ -43,7 +50,7 @@
 //                 total_multipla_escolha, abertas_aguardando_correcao }
 // ConceitoGrafo: { nome, prerequisitos, n_alunos, n_respostas, media_dominio, mediana_dominio,
 //                  estado_da_media, estado_moda, n_revisar }  (sem respostas: números 0 e estados null)
-// AlunoGrafo: { aluno_id, rotulo, pior_estado, menor_dominio }  rotulo = nome do aluno (pseudônimo
+// AlunoGrafo: { aluno_id, chave, rotulo, pior_estado, menor_dominio }  (chave: para mapa_aluno/historico_conceito)  rotulo = nome do aluno (pseudônimo
 //             "Aluno NN" para a simulação)
 // Duplicata: { conceito_a, conceito_b, similaridade }  nomes parecidos mas não iguais (pg_trgm), para o
 //             professor decidir; nada é fundido sozinho. Da mais parecida para a menos.
@@ -85,6 +92,9 @@ const ACOES: Record<string, (ctx: Contexto, corpo: Corpo) => Promise<unknown>> =
   grafo,
   simular,
   confianca,
+  estatisticas,
+  mapa_aluno: mapaAluno,
+  historico_conceito: historicoConceito,
   fundir_conceitos: fundirConceitos,
   marcar_distintos: marcarDistintos,
 };
@@ -478,6 +488,7 @@ async function grafo(ctx: Contexto, corpo: Corpo) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([pseudonimo, a], i) => ({
       aluno_id: a.aluno_id,
+      chave: pseudonimo,
       rotulo: a.nome ?? `Aluno ${(pseudonimo.match(/(\d+)$/)?.[1] ?? String(i + 1)).padStart(2, "0")}`,
       pior_estado: estadoDominio(a.menor),
       menor_dominio: Math.round(a.menor * 10000) / 10000,
@@ -555,6 +566,49 @@ async function confianca(ctx: Contexto, corpo: Corpo) {
   await exigirTurma(ctx, turma);
   const { data, error } = await ctx.servico.rpc("confianca_turma", { turma });
   if (error) throw falhaBanco("carregar as estatísticas de confiança", error);
+  return data;
+}
+
+/** UC13: resumo, tabela por conceito, evolução por atividade e confiança, numa chamada. */
+async function estatisticas(ctx: Contexto, corpo: Corpo) {
+  const turma = uuid(corpo.turma_id, "turma_id");
+  const incluir = corpo.incluir_simulacao === true;
+  await exigirTurma(ctx, turma);
+  const [est, evo, conf] = await Promise.all([
+    ctx.servico.rpc("estatisticas_turma", { turma, incluir_simulacao: incluir }),
+    ctx.servico.rpc("evolucao_turma", { turma, incluir_simulacao: incluir }),
+    ctx.servico.rpc("confianca_turma", { turma }),
+  ]);
+  for (const r of [est, evo, conf]) if (r.error) throw falhaBanco("carregar as estatísticas", r.error);
+  return { ...(est.data as Record<string, unknown>), evolucao: evo.data, confianca: conf.data };
+}
+
+/** Chave do aluno: o uuid (real) ou o pseudônimo da simulação ("sim-<turma>-NN"). */
+function chaveAluno(valor: unknown): string {
+  const chave = String(valor ?? "");
+  if (!/^[A-Za-z0-9_-]{3,64}$/.test(chave)) throw new ErroPedido("Aluno inválido.", 400);
+  return chave;
+}
+
+/** UC11: o mapa pintado com o domínio estimado de um aluno. */
+async function mapaAluno(ctx: Contexto, corpo: Corpo) {
+  const turma = uuid(corpo.turma_id, "turma_id");
+  const aluno = chaveAluno(corpo.aluno);
+  await exigirTurma(ctx, turma);
+  const { data, error } = await ctx.servico.rpc("mapa_aluno", { turma, aluno });
+  if (error) throw falhaBanco("carregar o mapa do aluno", error);
+  return data;
+}
+
+/** UC12: histórico de um aluno num conceito, resposta a resposta. */
+async function historicoConceito(ctx: Contexto, corpo: Corpo) {
+  const turma = uuid(corpo.turma_id, "turma_id");
+  const aluno = chaveAluno(corpo.aluno);
+  const conceito = String(corpo.conceito ?? "").trim();
+  if (!conceito) throw new ErroPedido("Informe o conceito.", 400);
+  await exigirTurma(ctx, turma);
+  const { data, error } = await ctx.servico.rpc("historico_aluno_conceito", { turma, aluno, conceito });
+  if (error) throw falhaBanco("carregar o histórico", error);
   return data;
 }
 
