@@ -246,7 +246,7 @@ só depois de conferir o papel na turma):
 - Ao vivo no desktop: Realtime `postgres_changes` em `public.tentativas` com filtro `sessao_id=eq.<id>`
   e o JWT do professor (INSERT = entrou; UPDATE com `enviada_em` = enviou).
 
-Testes: pgTAP (13 arquivos, 251 testes, inclusive `rls.test.sql`, `tentativas.test.sql` e `conceitos.test.sql`) e o fluxo
+Testes: pgTAP (14 arquivos, 277 testes, inclusive `rls.test.sql`, `tentativas.test.sql` e `conceitos.test.sql`) e o fluxo
 inteiro com dois usuários de teste contra o projeto real:
 `SUPABASE_CHAVE_SECRETA=<service_role> npx deno run -A scripts/testar-fluxo-mvp.ts` (o comando
 que obtém a chave está no cabeçalho do script). Cada execução cria uma turma na conta
@@ -497,8 +497,52 @@ professor vê.
 - **Aplicado em produção em 27/11/2026:** migration `20261130120000` e deploy de `aluno-api` e `turma-api`.
   Script de fluxo inteiro contra a produção: "Tudo certo" (Realtime incluído).
 
-Ainda não existe: correção das abertas, edição na Revisão, prazo/liberação na publicação, gerar a partir do
-grafo, aba Materiais, histórico semanal, "Ver alunos com dificuldade".
+## Fase 5 — Alunos com dificuldade e atividade de reforço (27/11/2026, branch `fase5-dificuldade`, sai da `fase4-flashcards`)
+
+Os dois botões do painel do conceito no mapa da turma.
+- **"Ver alunos com dificuldade"** (`ui/AlunosConceito.kt`, `DialogoAlunosConceito`): alunos **reais** no conceito,
+  os piores primeiro, em "Revisar" e "Em desenvolvimento" (consolidados e sem dados recolhidos em "Ver todos";
+  ninguém com dificuldade → "Nenhum aluno em 'revisar' ou 'em desenvolvimento' neste conceito."). Cada linha:
+  selo de estado, domínio estimado, respostas ("poucos dados" abaixo de 3, como no mapa do aluno), erros com
+  certeza, acertos no chute e treinos com flashcards. Clicar abre o mapa do aluno com o conceito selecionado e o
+  histórico (`TurmaViewModel.abrirAlunoNoConceito` → `selecionarAluno` + `conceitoEmFoco`).
+  turma-api `alunos_conceito` → `alunos_do_conceito` (mesmas contagens do histórico e de `treino_aluno_conceito`).
+- **"Gerar atividade de reforço"**: a origem "Conceitos do mapa" da Nova atividade agora funciona (a tela passou a
+  receber os conceitos do mapa; antes era lista vazia; `Conceito.estado` null = sem dados). O 1º conceito escolhido
+  é o **principal**: o PDF usado é o de onde ele veio; se os escolhidos vêm de PDFs diferentes, a tela avisa
+  (`textoOutroMaterial`). Origem de um conceito = primeira atividade da turma cuja geração tem o conceito (nome
+  normalizado, seguindo as fusões em `conceitos_fusoes`) ou cuja questão o cita; PDF diferente = hash diferente.
+  turma-api `origem_conceitos` (carregado ao abrir a Nova atividade, `NovaAtividadeViewModel.carregarOrigens`).
+- **gerar-atividade** com `conceitos_foco` (JSON, máx. 8) + `turma_id`, **sem PDF**: `contexto_reforco` (Postgres)
+  devolve o hash do PDF do principal e os enunciados já publicados desses conceitos (até 40); o PDF vem do Storage
+  (`pdfs/<hash>.pdf`; fora dele → 409). O prompt ganha o bloco "ATIVIDADE DE REFORÇO" (foco com os nomes exatos +
+  "não repita estas questões"); a validação exige que toda questão cite um conceito do foco e aceita 1–8 conceitos.
+  Só nomes de conceitos e enunciados do professor vão para a IA (RN13). Passa pela Revisão e só vai para os alunos
+  ao publicar (RN04). Partes puras em `_shared/reforco.ts` (testes `reforco_test.ts`).
+- **Cache (RN12):** `geracoes.foco` + `foco_chave` = sha256(conceitos normalizados + enunciados já publicados).
+  Geração comum busca `foco_chave is null` (nunca devolve um reforço). Publicado um reforço, o próximo pedido com
+  os mesmos conceitos tem outra chave e gera questões novas. Resposta ganha `foco` e `origem`.
+- Migration `20261201120000_dificuldade_reforco` (`nomes_do_conceito`, `origem_dos_conceitos`, `contexto_reforco`,
+  `alunos_do_conceito`; só service_role). **Ordem do deploy: migration antes da gerar-atividade** (ela filtra por
+  `foco_chave`).
+- Testes: pgTAP `dificuldade_reforco.test.sql` (26; 14 arquivos, 277); `revisao_espacada.test.sql` passou a
+  contar só os treinos da própria turma (falhava com treinos de outras turmas no banco). Deno `reforco_test.ts` (5).
+  Desktop `DificuldadeTest`, `ReforcoTextosTest` e mais 2 no `TurmaViewModelTest` (66 no total). Capturas
+  `alunos-conceito*` e `nova-atividade` (reforço com PDFs diferentes). Script de fluxo: etapa 10. No local, o
+  reforço vem de uma geração posta no cache local com a chave calculada (sem Gemini); a 1ª execução em produção
+  chama o Gemini.
+- **Honestidade da interface** (nada de botão que só avisa "próxima versão"): saíram a aba "Materiais", o botão
+  "Criar questões manualmente" (fora do escopo), o cartão "atividades aguardam sua revisão" de Minhas turmas (o app
+  nunca passava dados para ele) e o seletor de semestre (não filtrava nada: turmas não têm semestre no banco;
+  `semestresRecentes()` e o teste ficam para quando tiverem; o cartão diz "alunos nas suas turmas"). A chave
+  "Permitir refazer" saiu: `atividades.permitir_refazer` é gravado (sempre true pelo desktop) mas nada o lê. O texto
+  fixo `TEXTO_REFAZER` diz o que acontece de verdade: um envio por sessão (`unique (sessao_id, aluno_id)`); para
+  refazer, o professor abre outra sessão da atividade (mesmas questões, alternativas em outra ordem, respostas de
+  novo no domínio estimado); encerrada a sessão, as de múltipla escolha vão para os flashcards. Sem "variantes".
+- **Ainda não aplicado em produção:** migration `20261201120000` e deploy de `turma-api` e `gerar-atividade`.
+
+Ainda não existe: correção das abertas, edição na Revisão, prazo/liberação na publicação, aba Materiais,
+histórico semanal.
 
 ## Entrega anterior (21/10/2026) — atividade da 1ª VA (feita no Android, tag `demo-nivel2`)
 
