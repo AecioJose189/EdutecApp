@@ -10,7 +10,8 @@ data class Conceito(
     val nome: String,
     /** Chance estimada (0–100) de a turma saber o conceito; não é nota. */
     val dominio: Int,
-    val estado: EstadoConceito,
+    /** null = sem dados (ainda sem respostas). */
+    val estado: EstadoConceito?,
 )
 
 data class Aluno(

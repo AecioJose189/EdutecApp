@@ -6,7 +6,9 @@ import java.io.File
 
 /** O que o professor pediu na tela Nova atividade (valores já no formato da Edge Function). */
 data class PedidoGeracao(
-    val arquivo: File,
+    /** PDF enviado; null no reforço (o servidor usa o PDF de origem do conceito principal). */
+    val arquivo: File?,
+    /** Nome do PDF, ou o material de origem no reforço ("Atividade 2 · Probabilidade"). */
     val nomeArquivo: String,
     val quantidade: Int,
     /** multipla_escolha | aberta | mista */
@@ -23,7 +25,11 @@ data class PedidoGeracao(
     val tempoMinutos: Int? = null,
     /** Título da atividade; vazio = o servidor usa os primeiros conceitos. */
     val titulo: String = "",
-)
+    /** Fase 5, reforço: conceitos escolhidos no mapa (o 1º é o principal). Vazio = geração a partir do PDF. */
+    val conceitosFoco: List<String> = emptyList(),
+) {
+    val reforco get() = conceitosFoco.isNotEmpty()
+}
 
 // Espelho do JSON devolvido por supabase/functions/gerar-atividade.
 
@@ -42,6 +48,15 @@ data class AtividadeGerada(
     @SerialName("gerado_em") val geradoEm: String? = null,
     /** Linha da tabela geracoes no servidor; é o que a turma-api publica. null se não foi salva. */
     @SerialName("geracao_id") val geracaoId: Long? = null,
+    /** Reforço: conceitos do foco e o material de onde veio o PDF. */
+    val foco: List<String> = emptyList(),
+    val origem: OrigemReforco? = null,
+)
+
+@Serializable
+data class OrigemReforco(
+    val atividade: AtividadeOrigem? = null,
+    @SerialName("outros_materiais") val outrosMateriais: List<String> = emptyList(),
 )
 
 @Serializable

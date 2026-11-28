@@ -121,6 +121,14 @@ object TurmaRepositorio {
         chamar("historico_conceito", "turma_id" to turmaId, "aluno" to chave, "conceito" to conceito)
 
     /** DEMONSTRAÇÃO: simula 25 alunos (pseudônimos) respondendo; substitui a simulação anterior da turma. */
+    /** Fase 5: alunos reais num conceito, os piores primeiro ("Ver alunos com dificuldade"). */
+    suspend fun alunosConceito(turmaId: String, conceito: String): AlunosDoConceito =
+        chamar("alunos_conceito", "turma_id" to turmaId, "conceito" to conceito)
+
+    /** Fase 5: material (PDF) de origem de cada conceito, para a atividade de reforço. */
+    suspend fun origemConceitos(turmaId: String): List<OrigemConceito> =
+        chamar<RespostaOrigens>("origem_conceitos", "turma_id" to turmaId).conceitos
+
     suspend fun simular(turmaId: String) {
         chamar<RespostaSimular>("simular", "turma_id" to turmaId)
     }
@@ -287,3 +295,6 @@ private data class TurmaApi(
         },
     )
 }
+
+@Serializable
+private data class RespostaOrigens(val conceitos: List<OrigemConceito> = emptyList())

@@ -79,11 +79,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.edutec.app.data.AtividadeOrigem
 import com.edutec.app.data.Conceito
 import com.edutec.app.data.DadosExemplo
 import com.edutec.app.data.DadosTurmaExemplo
 import com.edutec.app.data.EstadoConceito
+import com.edutec.app.data.materialDoReforco
+import com.edutec.app.data.MaterialReforco
+import com.edutec.app.data.MAX_CONCEITOS_REFORCO
+import com.edutec.app.data.OrigemConceito
 import com.edutec.app.data.PedidoGeracao
+import com.edutec.app.data.rotulo
+import com.edutec.app.data.tituloReforco
 import com.edutec.app.data.Turma
 import com.edutec.app.ui.theme.Borda
 import com.edutec.app.ui.theme.BordaControle
@@ -177,12 +184,14 @@ fun NovaAtividadeScreen(
     onVoltar: () -> Unit = {},
     /** Etapa 5: publica o resultado revisado na turma. */
     onPublicar: () -> Unit = {},
+    /** Fase 5: material (PDF) de origem de cada conceito, para o reforço; null = não carregado. */
+    origens: Carga<List<OrigemConceito>>? = null,
 ) {
     val avisar = LocalAvisar.current
 
     // rememberSaveable: as escolhas sobrevivem a girar a tela (e à ida e volta de Gerando/Revisão).
-    // Turma sem grafo ainda começa direto em "Material em PDF".
-    var origem by rememberSaveable { mutableStateOf(if (conceitos.isEmpty()) Origem.Pdf else Origem.Grafo) }
+    // "Gerar atividade de reforço" (conceitos vindos do painel) começa em "Conceitos do mapa"; o resto em PDF.
+    var origem by rememberSaveable { mutableStateOf(if (conceitosIniciais.isEmpty()) Origem.Pdf else Origem.Grafo) }
     val selecionados = rememberSaveable(saver = SaverSelecionados) { conceitosIniciais.toMutableStateList() }
     var pdf by rememberSaveable(stateSaver = SaverPdf) { mutableStateOf<MaterialPdf?>(null) }
     val progressoEnvio = 1f
@@ -210,10 +219,18 @@ fun NovaAtividadeScreen(
         }
     }
 
-    val conceitosOrdenados = conceitos.filter { it.nome in selecionados }.map { it.nome }
-    // Nesta versão só há material no servidor quando a origem é um PDF.
+    // Na ordem em que foram escolhidos: o 1º é o principal (o PDF dele é o usado).
+    val conceitosOrdenados = selecionados.toList()
+    val material = (origens as? Carga.Pronto)?.valor?.let { materialDoReforco(conceitosOrdenados, it) }
     val motivoDesabilitado = when {
-        origem == Origem.Grafo -> "Para a demonstração, gere a partir de um PDF"
+        origem == Origem.Grafo -> when {
+            conceitosOrdenados.isEmpty() -> "Escolha ao menos um conceito do mapa"
+            conceitosOrdenados.size > MAX_CONCEITOS_REFORCO -> "Escolha no máximo $MAX_CONCEITOS_REFORCO conceitos"
+            origens is Carga.Erro -> origens.mensagem
+            material == null -> "Carregando o material de origem dos conceitos…"
+            material.atividade == null -> "Não encontrei o material de origem de \"${material.principal}\". Gere a partir de um PDF."
+            else -> null
+        }
         pdf == null -> "Envie um PDF para gerar a atividade"
         pdf?.enviado != true -> "Aguarde o envio do PDF terminar"
         else -> null
@@ -245,6 +262,7 @@ fun NovaAtividadeScreen(
                 onOrigem = { origem = it },
                 conceitos = conceitos,
                 selecionados = selecionados,
+                material = material,
                 onAlternar = { nome -> if (nome in selecionados) selecionados.remove(nome) else selecionados.add(nome) },
                 onSelecionarRevisar = {
                     conceitos.filter { it.estado == EstadoConceito.Revisar && it.nome !in selecionados }
@@ -279,13 +297,30 @@ fun NovaAtividadeScreen(
                 resumo = resumo,
                 motivoDesabilitado = motivoDesabilitado,
                 onGerar = {
-                    val material = pdf
-                    val arquivo = material?.arquivoLocal
-                    if (origem == Origem.Pdf && material != null && arquivo != null) {
+                    val doPdf = pdf
+                    val arquivo = doPdf?.arquivoLocal
+                    val deOrigem = material?.atividade
+                    if (origem == Origem.Grafo && deOrigem != null) {
+                        // Reforço: o servidor usa o PDF de origem do conceito principal (RN04: passa pela Revisão).
+                        onGerar(
+                            PedidoGeracao(
+                                arquivo = null,
+                                nomeArquivo = deOrigem.rotulo(),
+                                quantidade = quantidade,
+                                formato = formato.valor,
+                                dificuldade = ValorDificuldade.getValue(dificuldade),
+                                permitirRefazer = permitirRefazer,
+                                tempoMinutos = tempo.removeSuffix(" min").toIntOrNull(),
+                                titulo = titulo.trim().ifBlank { tituloReforco(conceitosOrdenados) },
+                                turmaId = turma.id.ifBlank { null },
+                                conceitosFoco = conceitosOrdenados,
+                            )
+                        )
+                    } else if (origem == Origem.Pdf && doPdf != null && arquivo != null) {
                         onGerar(
                             PedidoGeracao(
                                 arquivo = arquivo,
-                                nomeArquivo = material.nome,
+                                nomeArquivo = doPdf.nome,
                                 quantidade = quantidade,
                                 formato = formato.valor,
                                 dificuldade = ValorDificuldade.getValue(dificuldade),
@@ -422,6 +457,7 @@ private fun CartaoOrigem(
     onOrigem: (Origem) -> Unit,
     conceitos: List<Conceito>,
     selecionados: List<String>,
+    material: MaterialReforco?,
     onAlternar: (String) -> Unit,
     onSelecionarRevisar: () -> Unit,
     pdf: MaterialPdf?,
@@ -445,7 +481,7 @@ private fun CartaoOrigem(
             }
 
             when (origem) {
-                Origem.Grafo -> ConteudoGrafo(conceitos, selecionados, onAlternar, onSelecionarRevisar)
+                Origem.Grafo -> ConteudoGrafo(conceitos, selecionados, material, onAlternar, onSelecionarRevisar)
                 Origem.Pdf -> ConteudoPdf(pdf, progressoEnvio, onEscolherPdf, onRemoverPdf)
             }
         }
@@ -520,6 +556,7 @@ private fun IconeDocumento(cor: Color, modifier: Modifier = Modifier.size(18.dp)
 private fun ConteudoGrafo(
     conceitos: List<Conceito>,
     selecionados: List<String>,
+    material: MaterialReforco?,
     onAlternar: (String) -> Unit,
     onSelecionarRevisar: () -> Unit,
 ) {
@@ -560,13 +597,13 @@ private fun ConteudoGrafo(
             }
         }
 
-        EstadoConceito.entries.forEach { estado ->
+        (EstadoConceito.entries + listOf(null)).forEach { estado ->
             val doGrupo = conceitos.filter { it.estado == estado }
             if (doGrupo.isEmpty()) return@forEach
             Row(verticalAlignment = Alignment.CenterVertically) {
                 SeloEstado(estado, tamanho = 18.dp)
                 Spacer(Modifier.width(Espaco2))
-                Text(estado.rotulo, color = TintaSuave, fontSize = 14.sp)
+                Text(estado?.rotulo ?: "Sem dados", color = TintaSuave, fontSize = 14.sp)
             }
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(Espaco3),
@@ -582,12 +619,56 @@ private fun ConteudoGrafo(
             "${selecionados.size} conceito(s) selecionado(s). Os pré-requisitos ajudam a ordenar as questões.",
             color = TintaSuave, fontSize = 14.sp,
         )
+        material?.let { MaterialDoReforco(it) }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Info, null, tint = TintaSuave, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(Espaco2))
             Text("Domínio = chance estimada de o aluno saber o conceito, não é nota.", color = TintaSuave, fontSize = 12.sp)
         }
     }
+}
+
+/** De que PDF a IA vai gerar o reforço (o do conceito principal), com aviso se os escolhidos vêm de PDFs diferentes. */
+@Composable
+private fun MaterialDoReforco(m: MaterialReforco) {
+    Surface(shape = FormaMd, color = Fundo, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Espaco4), verticalArrangement = Arrangement.spacedBy(Espaco2)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconeDocumento(Tinta)
+                Spacer(Modifier.width(Espaco2))
+                Text(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("Material: ") }
+                        append(m.atividade?.let { "o PDF da ${it.rotulo()}" } ?: "não encontrado")
+                    },
+                    color = Tinta, fontSize = 14.sp,
+                )
+            }
+            if (m.atividade == null) {
+                Text("Não encontrei de que PDF veio \"${m.principal}\". Gere a partir de um PDF.", color = TintaSuave, fontSize = 13.sp)
+                return@Column
+            }
+            Text(
+                "A IA cria questões focadas nesses conceitos, diferentes das já publicadas na turma. " +
+                    "Você revisa tudo antes de publicar.",
+                color = TintaSuave, fontSize = 13.sp,
+            )
+            if (m.deOutroMaterial.isNotEmpty()) {
+                Text(
+                    textoOutroMaterial(m),
+                    color = Tinta, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
+/** Aviso quando os conceitos escolhidos vêm de PDFs diferentes. */
+internal fun textoOutroMaterial(m: MaterialReforco): String {
+    val nomes = m.deOutroMaterial.joinToString(", ") { "\"$it\"" }
+    val verbo = if (m.deOutroMaterial.size == 1) "veio" else "vieram"
+    return "$nomes $verbo de outro PDF. A IA vai usar só o material de \"${m.principal}\" " +
+        "(o conceito principal, o primeiro escolhido)."
 }
 
 @Composable
@@ -999,6 +1080,7 @@ private fun PreviewNovaAtividadeTablet() {
         NovaAtividadeScreen(
             DadosExemplo.turmas.first(), onFechar = {},
             conceitosIniciais = setOf("Regra da cadeia", "Derivada"),
+            origens = Carga.Pronto(OrigensExemplo),
             conceitos = DadosTurmaExemplo.conceitos,
         )
     }
@@ -1014,3 +1096,10 @@ private fun PreviewNovaAtividadeCelular() {
 
 /** "Probabilidade - aula 3.pdf" → "Probabilidade - aula 3" (o título da atividade, editável). */
 internal fun tituloDoArquivo(nome: String): String = nome.substringBeforeLast('.').trim().take(200)
+
+internal val OrigensExemplo = listOf(
+    OrigemConceito("Regra da cadeia", "pdf-b", AtividadeOrigem("a2", 2, "Derivadas e regra da cadeia")),
+    OrigemConceito("Derivada implícita", "pdf-b", AtividadeOrigem("a2", 2, "Derivadas e regra da cadeia")),
+    OrigemConceito("Derivada", "pdf-a", AtividadeOrigem("a1", 1, "Limites e derivadas")),
+    OrigemConceito("Continuidade", "pdf-a", AtividadeOrigem("a1", 1, "Limites e derivadas")),
+)

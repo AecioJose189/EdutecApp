@@ -188,6 +188,8 @@ fun TurmaScreen(
     /** Conceito a destacar ao abrir o mapa vindo das Estatísticas; [onFocoConsumido] zera. */
     conceitoEmFoco: String? = null,
     onFocoConsumido: () -> Unit = {},
+    /** Fase 5: "Ver alunos com dificuldade" do conceito. */
+    onVerAlunos: (String) -> Unit = {},
 ) {
     val avisar = LocalAvisar.current
     var explicarDominio by remember { mutableStateOf(false) }
@@ -298,7 +300,7 @@ fun TurmaScreen(
                 onJuntarConceitos, onMarcarDistintos, juntando, onExplicarDominio = { explicarDominio = true },
                 alunoSelecionado = alunoSelecionado, mapaDoAluno = mapaDoAluno, onAluno = onAluno,
                 historico = historico, onHistorico = onHistorico,
-                conceitoEmFoco = conceitoEmFoco, onFocoConsumido = onFocoConsumido,
+                conceitoEmFoco = conceitoEmFoco, onFocoConsumido = onFocoConsumido, onVerAlunos = onVerAlunos,
             )
         }
     }
@@ -325,8 +327,8 @@ private fun ConteudoGrafo(
     onHistorico: (String) -> Unit,
     conceitoEmFoco: String?,
     onFocoConsumido: () -> Unit,
+    onVerAlunos: (String) -> Unit,
 ) {
-    val avisar = LocalAvisar.current
     // Mapa de um aluno: mesmo layout e nós da turma, pintados com o domínio estimado dele.
     val doAluno = alunoSelecionado?.let { (mapaDoAluno as? Carga.Pronto)?.valor?.let(dados::doAluno) }
     val mapa = doAluno ?: dados
@@ -394,7 +396,7 @@ private fun ConteudoGrafo(
                 conceito = conceito,
                 grafo = dados,
                 onReforco = { onNovaAtividade(setOf(conceito.nome)) },
-                onVerAlunos = { avisar("Lista de alunos com dificuldade (próxima versão)") },
+                onVerAlunos = { onVerAlunos(conceito.nome) },
                 onJuntar = { juntarDe = conceito.nome; juntarCom = null },
                 onExplicarDominio = onExplicarDominio,
                 preencherAltura = expandido,

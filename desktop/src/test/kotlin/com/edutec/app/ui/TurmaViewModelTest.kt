@@ -1,6 +1,8 @@
 package com.edutec.app.ui
 
 import com.edutec.app.data.Aluno
+import com.edutec.app.data.AlunoNoConceito
+import com.edutec.app.data.AlunosDoConceito
 import com.edutec.app.data.AtividadePublicada
 import com.edutec.app.data.DominioAlunoConceito
 import com.edutec.app.data.EstadoConceito
@@ -25,7 +27,7 @@ class TurmaViewModelTest {
     private val atividade = AtividadePublicada("a1", "Probabilidade", "2026-10-28T12:00:00Z", numero = 1)
 
     private fun viewModel(membros: List<Membro>, atividades: List<AtividadePublicada> = listOf(atividade)) = TurmaViewModel(
-        buscarGrafo = { GrafoTurma(emptyList(), emptyList()) },
+        buscarGrafo = { GrafoTurma(emptyList(), listOf(Aluno("Ana Souza", EstadoConceito.Revisar, "ana"))) },
         simularRespostas = {},
         buscarAtividades = { atividades },
         buscarMembros = { membros },
@@ -35,6 +37,10 @@ class TurmaViewModelTest {
         buscarEstatisticas = { _, incluir -> pedidosEstatisticas += incluir; EstatisticasTurma(resumo = ResumoTurma(alunos = if (incluir) 28 else 3)) },
         buscarMapaAluno = { _, chave -> MapaAluno(listOf(DominioAlunoConceito("Base", if (chave == "ana") 0.9 else null))) },
         buscarHistorico = { _, _, conceito -> HistoricoConceito(conceito) },
+        buscarAlunosConceito = { _, conceito ->
+            AlunosDoConceito(conceito, listOf(AlunoNoConceito("ana", "Ana Souza", 0.2, "revisar", 4),
+                AlunoNoConceito("bia", "Bia", 0.6, "em_desenvolvimento", 2)))
+        },
     )
 
     private val pedidosEstatisticas = mutableListOf<Boolean>()
@@ -124,5 +130,35 @@ class TurmaViewModelTest {
         assertEquals(TurmaViewModel.ABA_GRAFO, vm.aba)
         assertEquals("Base", vm.conceitoEmFoco)
         assertNull(vm.alunoSelecionado)
+    }
+
+    @Test
+    fun `alunos com dificuldade - abre a lista e, ao clicar, o mapa do aluno no conceito`() {
+        val vm = viewModel(membros = emptyList())
+        vm.abrir("t1")
+        esperar { vm.grafo.value is EstadoGrafo.Pronto }
+        vm.verAlunosComDificuldade("Base")
+        esperar { vm.alunosDoConceito is Carga.Pronto }
+        assertEquals("Base", vm.alunosDe)
+        val lista = (vm.alunosDoConceito as Carga.Pronto).valor
+        assertEquals(listOf("Ana Souza", "Bia"), lista.alunos.map { it.nome })
+
+        vm.abrirAlunoNoConceito(lista.alunos[0])
+        assertNull(vm.alunosDoConceito)                     // a lista fecha
+        assertEquals("ana", vm.alunoSelecionado?.chave)     // o mapa dele
+        assertEquals(EstadoConceito.Revisar, vm.alunoSelecionado?.estado) // o Aluno do grafo (pior estado)
+        assertEquals("Base", vm.conceitoEmFoco)             // com o conceito selecionado
+        assertEquals(TurmaViewModel.ABA_GRAFO, vm.aba)
+        esperar { vm.mapaDoAluno is Carga.Pronto }
+    }
+
+    @Test
+    fun `aluno fora do grafo vira um Aluno com o estado do conceito`() {
+        val vm = viewModel(membros = emptyList())
+        vm.abrir("t1")
+        vm.verAlunosComDificuldade("Base")
+        esperar { vm.alunosDoConceito is Carga.Pronto }
+        vm.abrirAlunoNoConceito((vm.alunosDoConceito as Carga.Pronto).valor.alunos[1])
+        assertEquals(Aluno("Bia", EstadoConceito.Desenvolvimento, "bia"), vm.alunoSelecionado)
     }
 }

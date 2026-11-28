@@ -161,7 +161,7 @@ private fun AvisoRevisao(estado: EstadoGeracao.Concluido, onGerarNovas: () -> Un
                     } else {
                         append("A IA gerou ${atividade.questoes.size} questões e ${atividade.conceitos.size} conceitos")
                     }
-                    append(" a partir de \"${estado.pedido.nomeArquivo}\"")
+                    append(origemDoPedido(estado.pedido))
                     if (!atividade.reaproveitado) atividade.duracaoMs?.let { append(" em ${(it + 500) / 1000} s") }
                     append(".")
                 },
@@ -551,3 +551,8 @@ private fun PreviewRevisaoCelular() {
         )
     }
 }
+
+/** " a partir de "aula.pdf"" ou, no reforço, " de reforço em A, B, a partir do PDF da Atividade 2 · Título". */
+internal fun origemDoPedido(pedido: com.edutec.app.data.PedidoGeracao): String =
+    if (pedido.reforco) " de reforço em ${pedido.conceitosFoco.joinToString(", ")}, a partir do PDF da ${pedido.nomeArquivo}"
+    else " a partir de \"${pedido.nomeArquivo}\""

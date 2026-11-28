@@ -12,6 +12,7 @@ import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -43,16 +44,19 @@ object GeracaoRepositorio {
     private val supabase get() = Supabase.cliente
 
     suspend fun gerar(pedido: PedidoGeracao): AtividadeGerada = withContext(Dispatchers.IO) {
-        val bytes = pedido.arquivo.readBytes()
+        // Reforço: sem PDF; o servidor usa o de origem do conceito principal.
+        val bytes = if (pedido.reforco) null else pedido.arquivo?.readBytes()
+            ?: throw ErroGeracao.Servidor("Escolha um PDF para gerar a atividade.")
         val corpo = MultiPartFormDataContent(
             formData {
-                append(
+                if (bytes != null) append(
                     "pdf", bytes,
                     Headers.build {
                         append(HttpHeaders.ContentType, "application/pdf")
                         append(HttpHeaders.ContentDisposition, "filename=\"${pedido.nomeArquivo.replace("\"", "")}\"")
                     },
                 )
+                if (pedido.reforco) append("conceitos_foco", json.encodeToString(pedido.conceitosFoco))
                 append("quantidade", pedido.quantidade.toString())
                 append("formato", pedido.formato)
                 append("dificuldade", pedido.dificuldade)
