@@ -29,8 +29,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -72,14 +70,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.edutec.app.data.AtividadePendente
 import com.edutec.app.data.DadosExemplo
 import com.edutec.app.data.EstadoConceito
 import com.edutec.app.data.Turma
 import com.edutec.app.data.Usuario
 import com.edutec.app.data.rotuloAlunos
 import com.edutec.app.data.semDados
-import com.edutec.app.data.semestresRecentes
 import com.edutec.app.ui.theme.Borda
 import com.edutec.app.ui.theme.BordaControle
 import com.edutec.app.ui.theme.EdutecTheme
@@ -105,7 +101,6 @@ import com.edutec.app.ui.theme.Menta
 import com.edutec.app.ui.theme.MentaSuave
 import com.edutec.app.ui.theme.Primaria
 import com.edutec.app.ui.theme.RaioLg
-import com.edutec.app.ui.theme.SobrePrimaria
 import com.edutec.app.ui.theme.Sora
 import com.edutec.app.ui.theme.Superficie
 import com.edutec.app.ui.theme.Tinta
@@ -129,14 +124,10 @@ fun MinhasTurmasScreen(
     /** Falha ao carregar a lista; mostra a mensagem e o botão "Tentar de novo". */
     erro: String? = null,
     onTentarDeNovo: () -> Unit = {},
-    /** Atividades geradas aguardando revisão; ainda não há banco, então o app passa vazia. */
-    pendentes: List<AtividadePendente> = emptyList(),
     /** Professor logado (nome e foto no topo, com "Sair"). */
     usuario: Usuario? = null,
     onSair: () -> Unit = {},
 ) {
-    val semestres = remember { semestresRecentes() }
-    var semestre by rememberSaveable { mutableStateOf(semestres.first()) }
     var mostrarNovaTurma by rememberSaveable { mutableStateOf(false) }
 
     val avisar = LocalAvisar.current
@@ -168,9 +159,6 @@ fun MinhasTurmasScreen(
             verticalArrangement = Arrangement.spacedBy(EspacoGrade),
         ) {
             BarraSuperior(
-                semestres = semestres,
-                semestre = semestre,
-                onSemestreSelecionado = { semestre = it; avisar("Semestre $it selecionado") },
                 usuario = usuario,
                 onSair = onSair,
             )
@@ -185,16 +173,12 @@ fun MinhasTurmasScreen(
                 EstadoVazioTurmas(onNovaTurma = { mostrarNovaTurma = true })
             } else {
                 // Os números do resumo só aparecem quando há algo real para contar (nada inventado).
-                if (pendentes.isNotEmpty() || totalAlunos > 0) {
+                if (totalAlunos > 0) {
                     Resumo(
                         expandido = expandido,
-                        pendentes = pendentes.size,
-                        descricaoPendente = pendentes.firstOrNull()
-                            ?.let { "${it.disciplina} · ${it.turma}" }.orEmpty(),
                         conceitosARevisar = conceitosARevisar,
                         turmasComRevisao = turmasComRevisao,
                         totalAlunos = totalAlunos,
-                        onRevisar = { avisar("Abrindo revisão da atividade") },
                     )
                 }
                 GradeTurmas(
@@ -229,13 +213,9 @@ fun MinhasTurmasScreen(
 
 @Composable
 private fun BarraSuperior(
-    semestres: List<String>,
-    semestre: String,
-    onSemestreSelecionado: (String) -> Unit,
     usuario: Usuario?,
     onSair: () -> Unit,
 ) {
-    var menuAberto by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -244,46 +224,8 @@ private fun BarraSuperior(
         LogoLumini()
         Spacer(Modifier.weight(1f))
 
-        Box {
-            Surface(
-                onClick = { menuAberto = true },
-                shape = FormaPilula,
-                color = MentaSuave,
-            ) {
-                Row(
-                    modifier = Modifier.padding(start = Espaco4, end = Espaco3, top = Espaco3, bottom = Espaco3),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "Semestre $semestre",
-                        color = Tinta,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Spacer(Modifier.width(Espaco2))
-                    Icon(
-                        imageVector = Icons.Filled.KeyboardArrowDown,
-                        contentDescription = "Trocar semestre",
-                        tint = Tinta,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            }
-            DropdownMenu(expanded = menuAberto, onDismissRequest = { menuAberto = false }) {
-                semestres.forEach { opcao ->
-                    DropdownMenuItem(
-                        text = { Text("Semestre $opcao") },
-                        onClick = {
-                            menuAberto = false
-                            onSemestreSelecionado(opcao)
-                        },
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.width(Espaco4))
-
+        // Sem seletor de semestre: as turmas ainda não têm semestre no banco (semestresRecentes() fica
+        // pronto para quando tiverem).
         if (usuario != null) MenuUsuario(usuario, onSair)
     }
 }
@@ -369,12 +311,9 @@ private fun ItemLegenda(estado: EstadoConceito) {
 @Composable
 private fun Resumo(
     expandido: Boolean,
-    pendentes: Int,
-    descricaoPendente: String,
     conceitosARevisar: Int,
     turmasComRevisao: Int,
     totalAlunos: Int,
-    onRevisar: () -> Unit,
 ) {
     val textoConceitos = "${if (conceitosARevisar == 1) "conceito" else "conceitos"} a revisar em " +
         "$turmasComRevisao ${if (turmasComRevisao == 1) "turma" else "turmas"}"
@@ -390,7 +329,7 @@ private fun Resumo(
     val cartaoAlunos: @Composable (Modifier) -> Unit = { mod ->
         CartaoNumero(
             numero = totalAlunos.toString(),
-            legenda = "alunos neste semestre",
+            legenda = "alunos nas suas turmas",
             modifier = mod,
         )
     }
@@ -402,20 +341,11 @@ private fun Resumo(
                 .height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(EspacoGrade),
         ) {
-            if (pendentes > 0) {
-                CartaoAtividadePendente(
-                    pendentes, descricaoPendente, onRevisar,
-                    Modifier.weight(2f).fillMaxHeight(),
-                )
-            }
             cartaoConceitos(Modifier.weight(1f).fillMaxHeight())
             cartaoAlunos(Modifier.weight(1f).fillMaxHeight())
         }
     } else {
         Column(verticalArrangement = Arrangement.spacedBy(EspacoGrade)) {
-            if (pendentes > 0) {
-                CartaoAtividadePendente(pendentes, descricaoPendente, onRevisar, Modifier.fillMaxWidth())
-            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -424,47 +354,6 @@ private fun Resumo(
             ) {
                 cartaoConceitos(Modifier.weight(1f).fillMaxHeight())
                 cartaoAlunos(Modifier.weight(1f).fillMaxHeight())
-            }
-        }
-    }
-}
-
-@Composable
-private fun CartaoAtividadePendente(
-    quantidade: Int,
-    descricao: String,
-    onRevisar: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val titulo = if (quantidade == 1) "1 atividade aguarda sua revisão"
-    else "$quantidade atividades aguardam sua revisão"
-
-    Surface(shape = CantoCartao, color = MentaSuave, modifier = modifier) {
-        Row(
-            modifier = Modifier.padding(horizontal = Espaco6, vertical = Espaco4),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(FormaMd)
-                    .background(Primaria),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Edit,
-                    contentDescription = null,
-                    tint = SobrePrimaria,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-            Spacer(Modifier.width(Espaco4))
-            Column(Modifier.weight(1f)) {
-                Text(titulo, color = Tinta, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Text(descricao, color = Tinta, fontSize = 14.sp)
-            }
-            TextButton(onClick = onRevisar) {
-                Text("Revisar →", color = Primaria, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -844,13 +733,13 @@ private fun turmasExemplo() = remember { DadosExemplo.turmas.toMutableStateList(
 @Preview
 @Composable
 private fun PreviewTablet() {
-    EdutecTheme { MinhasTurmasScreen(turmas = turmasExemplo(), pendentes = DadosExemplo.atividadesPendentes) }
+    EdutecTheme { MinhasTurmasScreen(turmas = turmasExemplo()) }
 }
 
 @Preview
 @Composable
 private fun PreviewCelular() {
-    EdutecTheme { MinhasTurmasScreen(turmas = turmasExemplo(), pendentes = DadosExemplo.atividadesPendentes) }
+    EdutecTheme { MinhasTurmasScreen(turmas = turmasExemplo()) }
 }
 
 @Preview

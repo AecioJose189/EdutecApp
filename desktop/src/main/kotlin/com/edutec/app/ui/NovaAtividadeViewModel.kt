@@ -7,6 +7,10 @@ import com.edutec.app.data.ErroGeracao
 import com.edutec.app.data.ErroTurmaApi
 import com.edutec.app.data.TurmaRepositorio
 import com.edutec.app.data.GeracaoRepositorio
+import com.edutec.app.data.OrigemConceito
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.edutec.app.data.PedidoGeracao
 import com.edutec.app.data.SessaoExpirada
 import kotlinx.coroutines.CancellationException
@@ -43,7 +47,30 @@ const val QUESTOES_SE_SOBRECARREGADA = 3
 class NovaAtividadeViewModel(
     private val gerarAtividade: suspend (PedidoGeracao) -> AtividadeGerada = GeracaoRepositorio::gerar,
     private val publicarAtividade: suspend (String, Long, Boolean, Int?, String?) -> String = TurmaRepositorio::publicar,
+    private val buscarOrigens: suspend (String) -> List<OrigemConceito> = TurmaRepositorio::origemConceitos,
 ) : ViewModel() {
+
+    /** Fase 5: de que PDF veio cada conceito da turma (para o reforço); null = ainda não pedido. */
+    var origens by mutableStateOf<Carga<List<OrigemConceito>>?>(null)
+        private set
+    private var origensDe: String? = null
+
+    /** Carrega a origem dos conceitos da turma ao abrir a Nova atividade (de novo a cada abertura). */
+    fun carregarOrigens(turmaId: String) {
+        if (turmaId.isBlank()) return
+        origensDe = turmaId
+        origens = Carga.Carregando
+        viewModelScope.launch {
+            val r = try {
+                Carga.Pronto(buscarOrigens(turmaId))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Carga.Erro((e as? ErroTurmaApi ?: e as? SessaoExpirada)?.message ?: "Não foi possível carregar o material de origem dos conceitos.")
+            }
+            if (origensDe == turmaId) origens = r
+        }
+    }
 
     private val _estado = MutableStateFlow<EstadoGeracao>(EstadoGeracao.Ocioso)
     val estado: StateFlow<EstadoGeracao> = _estado.asStateFlow()

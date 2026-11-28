@@ -8,6 +8,9 @@ import androidx.lifecycle.viewModelScope
 import com.edutec.app.data.Aluno
 import com.edutec.app.data.AtividadePublicada
 import com.edutec.app.data.EstatisticasTurma
+import com.edutec.app.data.EstadoConceito
+import com.edutec.app.data.AlunosDoConceito
+import com.edutec.app.data.AlunoNoConceito
 import com.edutec.app.data.HistoricoConceito
 import com.edutec.app.data.MapaAluno
 import com.edutec.app.data.Convite
@@ -49,7 +52,14 @@ class TurmaViewModel(
     private val buscarEstatisticas: suspend (String, Boolean) -> EstatisticasTurma = TurmaRepositorio::estatisticas,
     private val buscarMapaAluno: suspend (String, String) -> MapaAluno = TurmaRepositorio::mapaAluno,
     private val buscarHistorico: suspend (String, String, String) -> HistoricoConceito = TurmaRepositorio::historico,
+    private val buscarAlunosConceito: suspend (String, String) -> AlunosDoConceito = TurmaRepositorio::alunosConceito,
 ) : ViewModel() {
+    /** Fase 5: "Ver alunos com dificuldade" de um conceito; null = lista fechada. */
+    var alunosDoConceito by mutableStateOf<Carga<AlunosDoConceito>?>(null)
+        private set
+    var alunosDe by mutableStateOf<String?>(null)
+        private set
+
     /** Aba Estatísticas (UC13). */
     var estatisticas by mutableStateOf<Carga<EstatisticasTurma>>(Carga.Carregando)
         private set
@@ -133,6 +143,8 @@ class TurmaViewModel(
             historico = null
             historicoDe = null
             conceitoEmFoco = null
+            alunosDoConceito = null
+            alunosDe = null
         }
         this.turmaId = turmaId
         // O painel "Próximos passos" precisa dos alunos e das atividades em qualquer aba.
@@ -319,6 +331,32 @@ class TurmaViewModel(
             val r = carregar("carregar o histórico") { buscarHistorico(turma, chave, conceito) }
             if (alunoSelecionado?.chave == chave && historicoDe == conceito) historico = r
         }
+    }
+
+    /** Fase 5: lista dos alunos reais no conceito, os piores primeiro. */
+    fun verAlunosComDificuldade(conceito: String) {
+        val turma = turmaId ?: return
+        alunosDe = conceito
+        alunosDoConceito = Carga.Carregando
+        viewModelScope.launch {
+            val r = carregar("carregar os alunos deste conceito") { buscarAlunosConceito(turma, conceito) }
+            if (this@TurmaViewModel.turmaId == turma && alunosDe == conceito) alunosDoConceito = r
+        }
+    }
+
+    fun fecharAlunosComDificuldade() {
+        alunosDoConceito = null
+        alunosDe = null
+    }
+
+    /** Da lista de alunos do conceito para o mapa do aluno, já com o conceito selecionado e o histórico. */
+    fun abrirAlunoNoConceito(aluno: AlunoNoConceito) {
+        val conceito = alunosDe ?: return
+        fecharAlunosComDificuldade()
+        val doGrafo = (grafo.value as? EstadoGrafo.Pronto)?.grafo?.alunos?.find { it.chave == aluno.alunoId }
+        selecionarAluno(doGrafo ?: Aluno(aluno.nome, aluno.estado ?: EstadoConceito.Desenvolvimento, aluno.alunoId))
+        conceitoEmFoco = conceito
+        aba = ABA_GRAFO
     }
 
     /** Abre o diálogo "Convidar alunos" ([novo] = trocar o código). */

@@ -9,6 +9,9 @@
 //   fase 3:    estatísticas, mapa de cada aluno e histórico do conceito (professor)
 //   fase 4:    revisão espaçada com flashcards: sem baralho com a sessão aberta → encerrar → baralho aparece
 //              (sem gabarito) → responder → caixa muda → domínio intacto → professor vê o treino
+//   fase 5:    alunos com dificuldade num conceito; origem dos conceitos; atividade de reforço gerada do PDF
+//              de origem, focada no conceito, sem repetir enunciados, com cache por foco (RN12) e publicada
+//              pelo professor (RN04). A geração chama o Gemini na 1ª vez (sem cota gasta nas seguintes).
 // Também confere os erros do contrato (docs/contrato-api-mvp.md) e que o aluno não recebe gabarito.
 //
 // Uso (na raiz do repositório):
@@ -521,6 +524,77 @@ if (cartoes.length > 0) {
   const treinoAluno = await chamar("turma-api", aluno.token, { acao: "treino_turma", turma_id: turmaId });
   verificar(treinoAluno.status === 404, "treino_turma: aluno → 404", treinoAluno);
 }
+
+etapa("10. Professor: alunos com dificuldade e atividade de reforço (fase 5)");
+const dificuldade = await chamar("turma-api", prof.token, { acao: "alunos_conceito", turma_id: turmaId, conceito: conceitoMc });
+// deno-lint-ignore no-explicit-any
+const naLista: any[] = dificuldade.corpo?.alunos ?? [];
+const valores = naLista.map((a) => a.p_dominio ?? 2);
+verificar(dificuldade.status === 200 && naLista.length === 2 &&
+    new Set(naLista.map((a) => a.aluno_id)).size === 2 && naLista.every((a) => a.aluno_id === aluno.id || a.aluno_id === aluno2.id) &&
+    valores.every((v, i) => i === 0 || valores[i - 1] <= v),
+  `alunos_conceito ("${conceitoMc}"): ${naLista.map((a) => `${a.nome} ${a.estado ?? "sem dados"}`).join(", ")} (piores primeiro)`, dificuldade.corpo);
+verificar(naLista.every((a) => typeof a.n_respostas === "number" && typeof a.erros_com_certeza === "number" &&
+    typeof a.acertos_no_chute === "number" && typeof a.treino?.n_treinos === "number"),
+  "cada aluno com respostas, erros com certeza, acertos no chute e treino");
+const da2 = naLista.find((a) => a.aluno_id === aluno2.id);
+verificar(da2 && da2.acertos_no_chute + da2.erros_com_certeza === (hist2.corpo?.acertos_no_chute ?? 0) + (hist2.corpo?.erros_com_certeza ?? 0),
+  "contagens iguais às do histórico do conceito (mesma regra)", { da2, hist: hist2.corpo });
+const dificuldadeAluno = await chamar("turma-api", aluno.token, { acao: "alunos_conceito", turma_id: turmaId, conceito: conceitoMc });
+verificar(dificuldadeAluno.status === 404, "alunos_conceito: aluno → 404", dificuldadeAluno);
+const conceitoFalso = await chamar("turma-api", prof.token, { acao: "alunos_conceito", turma_id: turmaId, conceito: "Não existe" });
+verificar(conceitoFalso.status === 404, "alunos_conceito: conceito fora da turma → 404", conceitoFalso);
+
+const origens = await chamar("turma-api", prof.token, { acao: "origem_conceitos", turma_id: turmaId });
+verificar(origens.status === 200 && origens.corpo?.conceitos?.length === conceitosTurma() &&
+    origens.corpo.conceitos.every((c: { atividade: { id: string } | null }) => c.atividade?.id === atividadeId),
+  `origem_conceitos: ${origens.corpo?.conceitos?.length} conceito(s), todos da atividade publicada`, origens.corpo);
+
+async function gerarReforco(token: string, campos: Record<string, string>): Promise<Resposta> {
+  const form = new FormData();
+  for (const [k, v] of Object.entries(campos)) form.append(k, v);
+  const r = await fetch(`${URL_SUPABASE}/functions/v1/gerar-atividade`, {
+    method: "POST", headers: { apikey: CHAVE_PUBLICA, Authorization: `Bearer ${token}` }, body: form,
+  });
+  return { status: r.status, corpo: await r.json().catch(() => null) };
+}
+const pedidoReforco = { turma_id: turmaId, conceitos_foco: JSON.stringify([conceitoMc]), quantidade: "3",
+  formato: "multipla_escolha", dificuldade: "media" };
+const semTurma = await gerarReforco(prof.token, { ...pedidoReforco, turma_id: "" });
+verificar(semTurma.status === 400, "reforço sem turma_id → 400", semTurma);
+const foraDaTurma = await gerarReforco(prof.token, { ...pedidoReforco, conceitos_foco: JSON.stringify(["Não existe"]) });
+verificar(foraDaTurma.status === 404, "reforço com conceito fora da turma → 404", foraDaTurma);
+const alheio = await gerarReforco(aluno.token, pedidoReforco);
+verificar(alheio.status === 404, "reforço numa turma alheia → 404", alheio);
+
+const normalizar = (t: string) => t.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/\s+/g, " ").trim();
+const reforco = await gerarReforco(prof.token, pedidoReforco);
+// deno-lint-ignore no-explicit-any
+const qReforco: any[] = reforco.corpo?.questoes ?? [];
+verificar(reforco.status === 200 && Number.isInteger(reforco.corpo?.geracao_id),
+  `reforço (${reforco.corpo?.reaproveitado ? "reaproveitado" : `gerado por ${reforco.corpo?.modelo}${reforco.corpo?.reserva ? " (reserva)" : ""}`}, ` +
+  `${qReforco.length} questões)`, reforco.status === 200 ? undefined : reforco);
+verificar(JSON.stringify(reforco.corpo?.foco) === JSON.stringify([conceitoMc]) && reforco.corpo?.origem?.atividade?.id === atividadeId &&
+    Array.isArray(reforco.corpo?.origem?.outros_materiais), "reforço: foco e material de origem (a atividade publicada)", reforco.corpo?.origem);
+verificar(qReforco.length === 3 && qReforco.every((q) => q.tipo === "multipla_escolha" &&
+    q.conceitos.some((c: string) => normalizar(c) === normalizar(conceitoMc))),
+  `reforço: 3 questões de múltipla escolha, todas sobre "${conceitoMc}"`, qReforco.map((q) => q.conceitos));
+const publicados = new Set(questoes.map((q: { enunciado: string }) => normalizar(q.enunciado)));
+verificar(qReforco.every((q) => !publicados.has(normalizar(q.enunciado))), "reforço: nenhum enunciado igual aos já publicados");
+const reforcoDeNovo = await gerarReforco(prof.token, pedidoReforco);
+verificar(reforcoDeNovo.corpo?.reaproveitado === true && reforcoDeNovo.corpo?.geracao_id === reforco.corpo?.geracao_id,
+  "reforço de novo: reaproveitado do cache (RN12, chave com o foco)", reforcoDeNovo.corpo?.reaproveitado);
+const comum = await gerarAtividade(prof.token);
+verificar(comum.corpo?.geracao_id === geracao.corpo?.geracao_id, "geração comum do mesmo PDF não devolve o reforço");
+
+const pubReforco = await chamar("turma-api", prof.token, {
+  acao: "publicar", turma_id: turmaId, geracao_id: reforco.corpo?.geracao_id, permitir_refazer: true, tempo_minutos: 15,
+  titulo: `Reforço: ${conceitoMc}`,
+});
+verificar(pubReforco.status === 200, "professor publica o reforço depois de revisar (RN04)", pubReforco);
+const lista2 = await chamar("turma-api", prof.token, { acao: "listar_atividades", turma_id: turmaId });
+verificar(lista2.corpo?.atividades?.some((a: { titulo: string; numero: number }) => a.titulo === `Reforço: ${conceitoMc}` && a.numero === 2),
+  "reforço aparece como Atividade 2", lista2.corpo?.atividades);
 
 console.log(falhas === 0 ? "\nTudo certo." : `\n${falhas} verificação(ões) falharam.`);
 Deno.exit(falhas === 0 ? 0 : 1);

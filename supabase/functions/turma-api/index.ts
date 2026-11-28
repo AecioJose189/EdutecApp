@@ -46,6 +46,14 @@
 //                                                    cartoes_por_caixa: {"1","2","3"}, ultimo_treino_em }],
 //                                         conceitos: [{ conceito, n_alunos_treinando, treinos_7_dias }] }
 //                                       (fase 4: revisão espaçada fora de sala; não altera o domínio estimado)
+//   alunos_conceito { turma_id, conceito } → { conceito, alunos: [{ aluno_id, nome, p_dominio, estado,
+//                                         n_respostas, erros_com_certeza, acertos_no_chute,
+//                                         treino: { n_treinos, acertos } }] }
+//                                       (fase 5: "Ver alunos com dificuldade"; só alunos reais, os piores
+//                                       primeiro, sem dados no fim; 404 se o conceito não é da turma)
+//   origem_conceitos { turma_id }     → { conceitos: [{ conceito, material, atividade: { id, numero, titulo } | null }] }
+//                                       (fase 5: de que PDF veio cada conceito, para o reforço; material =
+//                                       hash do PDF: mesmo material ⇔ mesmo PDF)
 //   simular       { turma_id }        → { n_alunos, n_respostas }   DEMONSTRAÇÃO: 25 pseudônimos
 //                                       respondendo às questões publicadas (substitui a anterior)
 //
@@ -103,6 +111,8 @@ const ACOES: Record<string, (ctx: Contexto, corpo: Corpo) => Promise<unknown>> =
   mapa_aluno: mapaAluno,
   historico_conceito: historicoConceito,
   treino_turma: treinoTurma,
+  alunos_conceito: alunosConceito,
+  origem_conceitos: origemConceitos,
   fundir_conceitos: fundirConceitos,
   marcar_distintos: marcarDistintos,
 };
@@ -631,6 +641,36 @@ async function treinoTurma(ctx: Contexto, corpo: Corpo) {
   const { data, error } = await ctx.servico.rpc("treino_turma", { turma });
   if (error) throw falhaBanco("carregar o treino da turma", error);
   return data;
+}
+
+/** Fase 5: alunos reais da turma num conceito, os piores primeiro ("Ver alunos com dificuldade"). */
+async function alunosConceito(ctx: Contexto, corpo: Corpo) {
+  const turma = uuid(corpo.turma_id, "turma_id");
+  const conceito = texto(corpo.conceito, "conceito", 200);
+  await exigirTurma(ctx, turma);
+  const { data: existe, error: erroConceito } = await ctx.servico
+    .from("conceitos_turma").select("nome").eq("turma_id", turma).eq("nome", conceito).maybeSingle();
+  if (erroConceito) throw falhaBanco("conferir o conceito", erroConceito);
+  if (!existe) throw new ErroPedido("Conceito não encontrado nesta turma.", 404);
+  const { data, error } = await ctx.servico.rpc("alunos_do_conceito", { turma, conceito });
+  if (error) throw falhaBanco("carregar os alunos do conceito", error);
+  return data;
+}
+
+/** Fase 5: material (PDF) de origem de cada conceito, para a atividade de reforço. */
+async function origemConceitos(ctx: Contexto, corpo: Corpo) {
+  const turma = uuid(corpo.turma_id, "turma_id");
+  await exigirTurma(ctx, turma);
+  const { data, error } = await ctx.servico.rpc("origem_dos_conceitos", { turma });
+  if (error) throw falhaBanco("carregar a origem dos conceitos", error);
+  const linhas = data as { conceito: string; hash_pdf: string | null; atividade_id: string | null; numero: number | null; titulo: string | null }[];
+  return {
+    conceitos: linhas.map((l) => ({
+      conceito: l.conceito,
+      material: l.hash_pdf,
+      atividade: l.atividade_id ? { id: l.atividade_id, numero: l.numero, titulo: l.titulo } : null,
+    })),
+  };
 }
 
 async function simular(ctx: Contexto, corpo: Corpo) {

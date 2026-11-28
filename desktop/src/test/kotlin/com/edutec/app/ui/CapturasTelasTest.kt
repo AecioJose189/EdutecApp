@@ -26,6 +26,7 @@ class CapturasTelasTest {
     private val arquivos = listOf(
         "LoginScreen", "MinhasTurmasScreen", "TurmaScreen", "NovaAtividadeScreen", "GerandoAtividade",
         "RevisaoAtividade", "ProjecaoScreen", "JuntarConceitos", "PassosTurma", "EstatisticasScreen", "MapaAluno",
+        "AlunosConceito",
     )
 
     @Test

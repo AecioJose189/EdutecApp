@@ -4,8 +4,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.edutec.app.data.Usuario
+import com.edutec.app.data.conceitosParaReforco
 
 /**
  * Entrada (login Google) e navegação simples por estado: Minhas turmas → Turma (Grafo, Atividades,
@@ -152,6 +154,7 @@ private fun AppDoProfessor(usuario: Usuario, onSair: () -> Unit) {
                 onHistorico = dadosTurma::carregarHistorico,
                 conceitoEmFoco = dadosTurma.conceitoEmFoco,
                 onFocoConsumido = { dadosTurma.conceitoEmFoco = null },
+                onVerAlunos = dadosTurma::verAlunosComDificuldade,
                 membros = dadosTurma.membros,
                 onRecarregarAba = { dadosTurma.carregarAba() },
                 onConvidar = { dadosTurma.abrirConvite() },
@@ -171,6 +174,17 @@ private fun AppDoProfessor(usuario: Usuario, onSair: () -> Unit) {
                 },
                 juntando = dadosTurma.juntando,
             )
+            val alunosDoConceito = dadosTurma.alunosDoConceito
+            val alunosDe = dadosTurma.alunosDe
+            if (alunosDoConceito != null && alunosDe != null) {
+                DialogoAlunosConceito(
+                    conceito = alunosDe,
+                    alunos = alunosDoConceito,
+                    onAluno = dadosTurma::abrirAlunoNoConceito,
+                    onTentarDeNovo = { dadosTurma.verAlunosComDificuldade(alunosDe) },
+                    onFechar = dadosTurma::fecharAlunosComDificuldade,
+                )
+            }
             dadosTurma.sessaoSemAlunos?.let { atividade ->
                 DialogoSemAlunos(
                     onConvidar = { dadosTurma.abrirConvite() },
@@ -197,11 +211,18 @@ private fun AppDoProfessor(usuario: Usuario, onSair: () -> Unit) {
                 navegacao.fecharNovaAtividade()
             }
             TeclaVoltar { if (estado == EstadoGeracao.Ocioso) fechar() else geracao.voltar() }
+            // Conceitos do mapa (para o reforço) e de que PDF veio cada um.
+            val grafoDaTurma by dadosTurma.grafo.collectAsState()
+            val conceitosDoMapa = remember(grafoDaTurma, dadosTurma.turmaId) {
+                (grafoDaTurma as? EstadoGrafo.Pronto)?.grafo?.takeIf { dadosTurma.turmaId == turma.id }
+                    ?.conceitosParaReforco().orEmpty()
+            }
+            LaunchedEffect(turma.id) { geracao.carregarOrigens(turma.id) }
             NovaAtividadeScreen(
                 turma = turma,
                 conceitosIniciais = conceitosIniciais,
-                // Ainda não há banco com o grafo da turma: só dá para gerar a partir de PDF.
-                conceitos = emptyList(),
+                conceitos = conceitosDoMapa,
+                origens = geracao.origens,
                 onFechar = fechar,
                 estado = estado,
                 onGerar = geracao::gerar,

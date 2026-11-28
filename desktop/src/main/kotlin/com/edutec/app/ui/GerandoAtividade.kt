@@ -130,7 +130,8 @@ fun ErroGeracaoConteudo(
             Icon(Icons.Filled.CheckCircle, null, tint = Primaria, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(Espaco2))
             Text(
-                "Nada foi perdido: suas escolhas e o PDF \"${estado.pedido.nomeArquivo}\" continuam aqui.",
+                if (estado.pedido.reforco) "Nada foi perdido: os conceitos escolhidos continuam aqui."
+                else "Nada foi perdido: suas escolhas e o PDF \"${estado.pedido.nomeArquivo}\" continuam aqui.",
                 color = Primaria, fontSize = 14.sp,
             )
         }
@@ -195,7 +196,8 @@ internal fun descreverPedido(pedido: PedidoGeracao): String {
         "dificil" -> "difícil"
         else -> "média"
     }
-    return "${pedido.quantidade} questões $formato · $dificuldade · ${pedido.nomeArquivo}"
+    val origem = if (pedido.reforco) "reforço em ${pedido.conceitosFoco.joinToString(", ")}" else pedido.nomeArquivo
+    return "${pedido.quantidade} questões $formato · $dificuldade · $origem"
 }
 
 // ---------------------------------------------------------------------------

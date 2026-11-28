@@ -161,7 +161,7 @@ private fun AvisoRevisao(estado: EstadoGeracao.Concluido, onGerarNovas: () -> Un
                     } else {
                         append("A IA gerou ${atividade.questoes.size} questões e ${atividade.conceitos.size} conceitos")
                     }
-                    append(" a partir de \"${estado.pedido.nomeArquivo}\"")
+                    append(origemDoPedido(estado.pedido))
                     if (!atividade.reaproveitado) atividade.duracaoMs?.let { append(" em ${(it + 500) / 1000} s") }
                     append(".")
                 },
@@ -219,15 +219,13 @@ private fun formatarData(iso: String?): String {
 // ---------------------------------------------------------------------------
 
 /**
- * Configurações mínimas de publicação, vindas do formulário (refazer e tempo).
+ * Configurações mínimas de publicação, vindas do formulário (tempo por tentativa).
  * TODO: prazo de entrega e data de liberação para os alunos.
  */
 @Composable
 private fun BarraPublicar(estado: EstadoGeracao.Concluido, onPublicar: () -> Unit) {
     val pedido = estado.pedido
     val configuracao = buildString {
-        append(if (pedido.permitirRefazer) "Permitir refazer" else "Tentativa única")
-        append(" · ")
         append(pedido.tempoMinutos?.let { "$it min por tentativa" } ?: "sem limite de tempo")
     }
     val textos: @Composable (Modifier) -> Unit = { mod ->
@@ -551,3 +549,8 @@ private fun PreviewRevisaoCelular() {
         )
     }
 }
+
+/** " a partir de "aula.pdf"" ou, no reforço, " de reforço em A, B, a partir do PDF da Atividade 2 · Título". */
+internal fun origemDoPedido(pedido: com.edutec.app.data.PedidoGeracao): String =
+    if (pedido.reforco) " de reforço em ${pedido.conceitosFoco.joinToString(", ")}, a partir do PDF da ${pedido.nomeArquivo}"
+    else " a partir de \"${pedido.nomeArquivo}\""

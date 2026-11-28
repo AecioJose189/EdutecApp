@@ -134,8 +134,8 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 private val CantoCartao = FormaLg
 private val Espaco = Espaco4
-private val Abas = listOf(TurmaViewModel.ABA_GRAFO, "Atividades", "Materiais", "Estatísticas", "Turma")
-private val AbasProntas = setOf(TurmaViewModel.ABA_GRAFO, "Atividades", TurmaViewModel.ABA_ESTATISTICAS, "Turma")
+// Só abas que funcionam ("Materiais" saiu: não havia nada por trás dela).
+private val Abas = listOf(TurmaViewModel.ABA_GRAFO, "Atividades", TurmaViewModel.ABA_ESTATISTICAS, "Turma")
 
 /**
  * Tela de uma turma: grafo de conhecimento com o domínio estimado de cada conceito (dados reais da
@@ -188,8 +188,9 @@ fun TurmaScreen(
     /** Conceito a destacar ao abrir o mapa vindo das Estatísticas; [onFocoConsumido] zera. */
     conceitoEmFoco: String? = null,
     onFocoConsumido: () -> Unit = {},
+    /** Fase 5: "Ver alunos com dificuldade" do conceito. */
+    onVerAlunos: (String) -> Unit = {},
 ) {
-    val avisar = LocalAvisar.current
     var explicarDominio by remember { mutableStateOf(false) }
     if (explicarDominio) DialogoDominioEstimado(onFechar = { explicarDominio = false })
 
@@ -225,9 +226,7 @@ fun TurmaScreen(
                 turma = turma,
                 expandido = expandido,
                 aba = aba,
-                onAba = {
-                    if (it in AbasProntas) onAba(it) else avisar("Aba \"$it\" ainda não implementada")
-                },
+                onAba = onAba,
                 onVoltar = onVoltar,
                 onNovaAtividade = { onNovaAtividade(emptySet()) },
                 onConvidar = onConvidar,
@@ -298,7 +297,7 @@ fun TurmaScreen(
                 onJuntarConceitos, onMarcarDistintos, juntando, onExplicarDominio = { explicarDominio = true },
                 alunoSelecionado = alunoSelecionado, mapaDoAluno = mapaDoAluno, onAluno = onAluno,
                 historico = historico, onHistorico = onHistorico,
-                conceitoEmFoco = conceitoEmFoco, onFocoConsumido = onFocoConsumido,
+                conceitoEmFoco = conceitoEmFoco, onFocoConsumido = onFocoConsumido, onVerAlunos = onVerAlunos,
             )
         }
     }
@@ -325,8 +324,8 @@ private fun ConteudoGrafo(
     onHistorico: (String) -> Unit,
     conceitoEmFoco: String?,
     onFocoConsumido: () -> Unit,
+    onVerAlunos: (String) -> Unit,
 ) {
-    val avisar = LocalAvisar.current
     // Mapa de um aluno: mesmo layout e nós da turma, pintados com o domínio estimado dele.
     val doAluno = alunoSelecionado?.let { (mapaDoAluno as? Carga.Pronto)?.valor?.let(dados::doAluno) }
     val mapa = doAluno ?: dados
@@ -394,7 +393,7 @@ private fun ConteudoGrafo(
                 conceito = conceito,
                 grafo = dados,
                 onReforco = { onNovaAtividade(setOf(conceito.nome)) },
-                onVerAlunos = { avisar("Lista de alunos com dificuldade (próxima versão)") },
+                onVerAlunos = { onVerAlunos(conceito.nome) },
                 onJuntar = { juntarDe = conceito.nome; juntarCom = null },
                 onExplicarDominio = onExplicarDominio,
                 preencherAltura = expandido,

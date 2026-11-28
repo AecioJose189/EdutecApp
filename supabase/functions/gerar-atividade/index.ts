@@ -10,11 +10,17 @@
 //                conceitos que a turma já tem e reutiliza o nome exato quando for o mesmo conceito.
 //                O reaproveitamento por hash (RN12) não depende dele: publicar_atividade normaliza os
 //                nomes (minúsculas, sem acento) e liga ao conceito que a turma já tem.
+//   conceitos_foco  (fase 5, atividade de reforço) lista JSON de conceitos da turma, o 1º é o principal.
+//                Exige turma_id e dispensa o "pdf": o PDF é o de onde o conceito principal veio
+//                (contexto_reforco no Postgres; lido do Storage pelo hash). A IA recebe o foco e os
+//                enunciados já publicados desses conceitos, para não repetir. Erros: 404 conceito fora da
+//                turma, 409 sem material de origem (ou PDF fora do Storage).
 //
 // Saída 200: { conceitos, questoes, arquivo, modelo, nivel_raciocinio, tokens, duracao_ms,
 //              reaproveitado, gerado_em, geracao_id, reserva, tentativas }
 // modelo = quem gerou; reserva = true se foi o modelo reserva; tentativas = [{ modelo, ms, resultado }]
-// (vazia quando reaproveitado).
+// (vazia quando reaproveitado). No reforço, também: foco (conceitos) e origem { atividade {id, numero,
+// titulo}, outros_materiais } (conceitos que vieram de outro PDF: vale o do principal).
 //
 // Robustez (_shared/gemini.ts, gerarComReserva): em 503/429/rede/tempo, repete o modelo principal uma
 // vez e depois tenta o modelo reserva (GEMINI_MODELO_RESERVA). Tudo termina até ~140 s depois do
@@ -23,7 +29,10 @@
 //
 // RN12 (cada PDF é processado uma vez): o PDF é identificado pelo SHA-256 e salvo como
 // pdfs/<hash>.pdf. Se já houver na tabela `geracoes` um resultado para o mesmo hash e os mesmos
-// parâmetros, ele volta na hora, sem chamar o Gemini, com reaproveitado = true.
+// parâmetros, ele volta na hora, sem chamar o Gemini, com reaproveitado = true. No reforço a chave
+// inclui o foco: foco_chave = sha256(conceitos normalizados + enunciados já publicados).
+// O envio do PDF ao Storage não derruba o pedido (_shared/pdf_storage.ts): já existe → ignora; senão
+// repete uma vez; se ainda falhar, a geração volta mesmo assim e só o reforço dela fica sem o PDF.
 // Erro:      { erro: "..." } com status 4xx/5xx.
 //
 // Autenticação: verify_jwt = true e só usuários logados (o professor no desktop). As tabelas e o
@@ -32,6 +41,8 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { type Usuario, usuarioDoPedido } from "../_shared/auth.ts";
 import { ErroGemini, gerarComReserva } from "../_shared/gemini.ts";
+import { blocoReforco, chaveFoco, lerConceitosFoco, validarFoco } from "../_shared/reforco.ts";
+import { garantirPdf, salvarPdf } from "../_shared/pdf_storage.ts";
 
 const TAMANHO_MAXIMO = 20 * 1024 * 1024;
 /** Limites da lista de conceitos da turma enviada à IA (o prompt não cresce sem controle). */
@@ -96,17 +107,29 @@ Deno.serve(async (req) => {
       return erro("Entre com sua conta Google para gerar atividades.", 401);
     }
 
-    const { pdf, quantidade, formato, dificuldade, forcarNova, turmaId } = await lerFormulario(req);
+    const { pdf: pdfEnviado, quantidade, formato, dificuldade, forcarNova, turmaId, foco } = await lerFormulario(req);
     // Antes do cache: turma de outro professor é 404 mesmo quando o resultado viria salvo.
     const conceitosTurma = turmaId ? await conceitosDaTurma(usuario, turmaId) : [];
-    const hash = await sha256(pdf);
-    const caminho = `pdfs/${hash}.pdf`;
     const supabase = clienteServico();
-    const parametros = { hash_pdf: hash, quantidade, formato, dificuldade };
+
+    // Reforço: o PDF de origem do conceito principal e os enunciados que a IA não deve repetir.
+    const reforco = foco ? await contextoReforco(supabase, turmaId!, foco) : null;
+    const hash = reforco ? reforco.hash_pdf : await sha256(pdfEnviado!);
+    const caminho = `pdfs/${hash}.pdf`;
+    const parametros: Parametros = {
+      hash_pdf: hash, quantidade, formato, dificuldade,
+      foco: foco ?? null,
+      foco_chave: reforco ? await chaveFoco(foco!, reforco.enunciados) : null,
+    };
+    const origem = reforco ? { atividade: reforco.atividade, outros_materiais: reforco.outros_materiais } : undefined;
+    const extras = reforco ? { foco, origem } : {};
 
     if (!forcarNova) {
       const salvo = await buscarGeracao(supabase, parametros);
       if (salvo) {
+        // Se o PDF ficou fora do Storage numa geração anterior (falha do envio), guarda agora, sem
+        // atrasar a resposta: é o que permite o reforço a partir desta geração.
+        if (pdfEnviado) emSegundoPlano(garantirPdf(supabase, BUCKET, caminho, pdfEnviado));
         return json({
           conceitos: salvo.resultado.conceitos,
           questoes: salvo.resultado.questoes,
@@ -120,21 +143,27 @@ Deno.serve(async (req) => {
           geracao_id: salvo.id,
           reserva: false,
           tentativas: [],
+          ...extras,
         });
       }
     }
+    const pdf = pdfEnviado ?? await baixarPdf(supabase, caminho);
+    const minimoConceitos = reforco ? 1 : 3;
 
     // TODO: a especificação prevê uma questão por chamada ao Gemini (limites do plano gratuito:
     // ~10 pedidos/min e 150 s por Edge Function). Para a demo da 1ª VA, conceitos e todas as
     // questões saem numa única chamada. Depois: 1 chamada para os conceitos e 1 por questão,
     // orquestradas pelo app ou por uma fila.
+    // salvarPdf nunca lança: uma falha do Storage não joga fora a chamada à IA (ver pdf_storage.ts).
     const [, resposta] = await Promise.all([
-      salvarPdf(supabase, caminho, pdf),
+      // No reforço o PDF já está no Storage (foi de lá que veio).
+      reforco ? Promise.resolve() : salvarPdf(supabase, BUCKET, caminho, pdf),
       gerarComReserva<Atividade>({
         pdf,
         instrucaoSistema: INSTRUCAO_SISTEMA,
-        prompt: montarPrompt(quantidade, formato, dificuldade, conceitosTurma),
-        schema: SCHEMA_ATIVIDADE,
+        prompt: montarPrompt(quantidade, formato, dificuldade, conceitosTurma) +
+          (reforco ? blocoReforco(foco!, reforco.enunciados) : ""),
+        schema: schemaAtividade(minimoConceitos),
       }, inicio + PRAZO_TOTAL_MS),
     ]);
     console.log(
@@ -142,7 +171,8 @@ Deno.serve(async (req) => {
         `tentativas: ${resposta.tentativas.map((t) => `${t.modelo} ${t.resultado} ${t.ms} ms`).join(", ")}`,
     );
 
-    const problemas = validarAtividade(resposta.dados, quantidade, formato);
+    const problemas = validarAtividade(resposta.dados, quantidade, formato, minimoConceitos);
+    if (foco && problemas.length === 0) problemas.push(...validarFoco(resposta.dados.questoes, foco));
     if (problemas.length > 0) {
       console.error("Resposta do Gemini reprovada na validação:", problemas);
       return erro(`A IA devolveu uma atividade inválida: ${problemas.join("; ")}`, 502);
@@ -169,6 +199,7 @@ Deno.serve(async (req) => {
       geracao_id: id,
       reserva: resposta.reserva,
       tentativas: resposta.tentativas,
+      ...extras,
     });
   } catch (e) {
     if (e instanceof ErroPedido || e instanceof ErroGemini) {
@@ -198,7 +229,21 @@ async function lerFormulario(req: Request) {
     throw new ErroPedido("Não foi possível ler o formulário enviado.", 400);
   }
 
+  let foco: string[] | null;
+  try {
+    foco = lerConceitosFoco(form.get("conceitos_foco")?.toString() ?? null);
+  } catch (e) {
+    throw new ErroPedido((e as Error).message, 400);
+  }
+  const turmaTexto = (form.get("turma_id") ?? "").toString().trim();
+  if (turmaTexto && !UUID.test(turmaTexto)) throw new ErroPedido('"turma_id" deve ser um uuid.', 400);
+  const turmaId = turmaTexto || null;
+  if (foco && !turmaId) throw new ErroPedido('O reforço ("conceitos_foco") precisa de "turma_id".', 400);
+
+  const parametros = lerParametros(form);
   const arquivo = form.get("pdf");
+  // Reforço: o PDF é o de origem do conceito (vem do Storage); um PDF enviado junto é ignorado.
+  if (foco) return { pdf: null, ...parametros, turmaId, foco };
   if (!(arquivo instanceof File)) throw new ErroPedido('Campo "pdf" ausente.', 400);
   if (arquivo.size === 0) throw new ErroPedido("O PDF está vazio.", 400);
   if (arquivo.size > TAMANHO_MAXIMO) throw new ErroPedido("O PDF passa de 20 MB.", 413);
@@ -207,7 +252,10 @@ async function lerFormulario(req: Request) {
   if (new TextDecoder().decode(pdf.subarray(0, 5)) !== "%PDF-") {
     throw new ErroPedido("O arquivo enviado não é um PDF.", 415);
   }
+  return { pdf, ...parametros, turmaId, foco: null };
+}
 
+function lerParametros(form: FormData) {
   const quantidadeTexto = (form.get("quantidade") ?? "5").toString().trim() || "5";
   const quantidade = Number(quantidadeTexto);
   if (!Number.isInteger(quantidade) || quantidade < 1 || quantidade > 10) {
@@ -223,12 +271,39 @@ async function lerFormulario(req: Request) {
   }
 
   const forcarNova = (form.get("forcar_nova") ?? "").toString().trim().toLowerCase() === "true";
+  return { quantidade, formato, dificuldade, forcarNova };
+}
 
-  const turmaTexto = (form.get("turma_id") ?? "").toString().trim();
-  if (turmaTexto && !UUID.test(turmaTexto)) throw new ErroPedido('"turma_id" deve ser um uuid.', 400);
-  const turmaId = turmaTexto || null;
+interface ContextoReforco {
+  principal: string;
+  hash_pdf: string;
+  atividade: { id: string; numero: number; titulo: string };
+  outros_materiais: string[];
+  enunciados: string[];
+}
 
-  return { pdf, quantidade, formato, dificuldade, forcarNova, turmaId };
+/** Chamado depois de conceitosDaTurma (que já conferiu que a turma é do professor). */
+async function contextoReforco(supabase: Cliente, turmaId: string, foco: string[]): Promise<ContextoReforco> {
+  const { data, error } = await supabase.rpc("contexto_reforco", { turma: turmaId, conceitos: foco });
+  if (error) {
+    if (error.code === "LU404") throw new ErroPedido(error.message, 404);
+    if (error.code === "LU409") throw new ErroPedido(error.message, 409);
+    throw new ErroPedido(`Não foi possível preparar o reforço: ${error.message}`, 500);
+  }
+  return data as ContextoReforco;
+}
+
+async function baixarPdf(supabase: Cliente, caminho: string): Promise<Uint8Array> {
+  const { data, error } = await supabase.storage.from(BUCKET).download(caminho);
+  if (error || !data) {
+    throw new ErroPedido(
+      "O PDF de onde este conceito veio não está guardado no servidor (o envio falhou quando a " +
+        "atividade foi gerada). Para o reforço, gere de novo uma atividade com o mesmo PDF " +
+        "(com as mesmas opções ela volta na hora) e depois peça o reforço.",
+      409,
+    );
+  }
+  return new Uint8Array(await data.arrayBuffer());
 }
 
 /**
@@ -265,6 +340,9 @@ interface Parametros {
   quantidade: number;
   formato: Formato;
   dificuldade: Dificuldade;
+  /** Reforço (fase 5): conceitos do foco e a chave do cache; nulos numa geração comum. */
+  foco: string[] | null;
+  foco_chave: string | null;
 }
 
 function clienteServico(): Cliente {
@@ -275,26 +353,25 @@ function clienteServico(): Cliente {
   );
 }
 
-/** Salva o PDF uma vez só: se pdfs/<hash>.pdf já existe, não envia de novo. */
-async function salvarPdf(supabase: Cliente, caminho: string, pdf: Uint8Array) {
-  const { error } = await supabase.storage.from(BUCKET).upload(caminho, pdf, {
-    contentType: "application/pdf",
-    upsert: false,
-  });
-  if (!error) return;
-  const status = String((error as { statusCode?: string | number }).statusCode ?? "");
-  if (status === "409" || /already exists|duplicate/i.test(error.message)) return;
-  throw new ErroPedido(`Não foi possível salvar o PDF no Storage: ${error.message}`, 500);
+/** Termina depois da resposta (EdgeRuntime.waitUntil); fora do Edge Runtime, só não espera. */
+function emSegundoPlano(tarefa: Promise<unknown>) {
+  const segura = tarefa.catch((e) => console.error("Tarefa em segundo plano falhou:", e));
+  // deno-lint-ignore no-explicit-any
+  const runtime = (globalThis as any).EdgeRuntime;
+  if (runtime?.waitUntil) runtime.waitUntil(segura);
 }
 
 async function buscarGeracao(supabase: Cliente, p: Parametros) {
-  const { data, error } = await supabase
+  const consulta = supabase
     .from("geracoes")
     .select("id, resultado, modelo, criado_em")
     .eq("hash_pdf", p.hash_pdf)
     .eq("quantidade", p.quantidade)
     .eq("formato", p.formato)
-    .eq("dificuldade", p.dificuldade)
+    .eq("dificuldade", p.dificuldade);
+  // Geração comum nunca devolve um reforço (e vice-versa).
+  const filtrada = p.foco_chave ? consulta.eq("foco_chave", p.foco_chave) : consulta.is("foco_chave", null);
+  const { data, error } = await filtrada
     .order("criado_em", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -386,12 +463,13 @@ ${lista}
 `;
 }
 
-const SCHEMA_ATIVIDADE = {
+/** minConceitos: 3 numa geração comum; 1 no reforço (o foco pode ser um conceito só). */
+const schemaAtividade = (minConceitos: number) => ({
   type: "OBJECT",
   properties: {
     conceitos: {
       type: "ARRAY",
-      minItems: 3,
+      minItems: minConceitos,
       maxItems: 8,
       items: {
         type: "OBJECT",
@@ -437,11 +515,11 @@ const SCHEMA_ATIVIDADE = {
   },
   required: ["conceitos", "questoes"],
   propertyOrdering: ["conceitos", "questoes"],
-};
+});
 
 // ---------- validação ----------
 
-function validarAtividade(a: Atividade, quantidade: number, formato: Formato): string[] {
+function validarAtividade(a: Atividade, quantidade: number, formato: Formato, minConceitos = 3): string[] {
   const problemas: string[] = [];
   if (!Array.isArray(a?.conceitos) || !Array.isArray(a?.questoes)) {
     return ["faltam as listas de conceitos ou de questões"];
@@ -455,8 +533,8 @@ function validarAtividade(a: Atividade, quantidade: number, formato: Formato): s
     else if (nomes.has(nome)) problemas.push(`conceito repetido "${nome}"`);
     else nomes.add(nome);
   }
-  if (a.conceitos.length < 3 || a.conceitos.length > 8) {
-    problemas.push(`${a.conceitos.length} conceitos (esperado: 3 a 8)`);
+  if (a.conceitos.length < minConceitos || a.conceitos.length > 8) {
+    problemas.push(`${a.conceitos.length} conceitos (esperado: ${minConceitos} a 8)`);
   }
   for (const c of a.conceitos) {
     for (const p of c.prerequisitos ?? []) {

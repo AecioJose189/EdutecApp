@@ -67,6 +67,9 @@ select enviar_tentativa('00000000-0000-4000-8000-00000000f701', '00000000-0000-4
   {"questao_id": "1", "alternativa_id": "b"}, {"questao_id": "2", "alternativa_id": "b"},
   {"questao_id": "3", "alternativa_id": "a"}, {"questao_id": "4", "texto": "t"}, {"questao_id": "5", "alternativa_id": "a"}]');
 
+-- Só os treinos desta turma: o banco (local ou de produção) pode ter outros.
+create temp view treinos_da_turma as select * from treinos where turma_id = '00000000-0000-4000-8000-00000000cf01';
+
 create temp table ids as select
   (select id from atividades where geracao_id = -90) as a1,
   (select id from atividades where geracao_id = -91) as a2;
@@ -221,28 +224,28 @@ select is((select (j -> 'cartoes_por_caixa') || jsonb_build_object('total', j ->
 select is((select j -> 'conceitos_com_mais_cartoes' from res),
   '[{"conceito": "Base", "n_cartoes": 1}, {"conceito": "Meio", "n_cartoes": 1}, {"conceito": "Topo", "n_cartoes": 1}]'::jsonb,
   'resumo: conceitos com mais cartões');
-select is(revisao_resumo('00000000-0000-4000-8000-000000000f01') -> 'turmas' -> 0 -> 'treinos_7_dias', (select to_jsonb(count(*)) from treinos),
+select is(revisao_resumo('00000000-0000-4000-8000-000000000f01') -> 'turmas' -> 0 -> 'treinos_7_dias', (select to_jsonb(count(*)) from treinos_da_turma),
   'resumo (hoje de verdade): treinos nos últimos 7 dias');
 select is((select j -> 'treinos_7_dias' from res), '0'::jsonb, 'resumo: treinos de mais de 7 dias antes de "hoje" não contam');
 
 create temp table tt as select treino_turma('00000000-0000-4000-8000-00000000cf01') as j;
 select is((select j -> 'resumo' from tt),
-  jsonb_build_object('n_alunos', 2, 'n_alunos_treinando', 1, 'treinos_7_dias', (select count(*) from treinos),
-    'n_treinos', (select count(*) from treinos),
-    'taxa_acerto', (select round(avg(acertou::int), 4) from treinos)), 'professor: resumo do treino');
+  jsonb_build_object('n_alunos', 2, 'n_alunos_treinando', 1, 'treinos_7_dias', (select count(*) from treinos_da_turma),
+    'n_treinos', (select count(*) from treinos_da_turma),
+    'taxa_acerto', (select round(avg(acertou::int), 4) from treinos_da_turma)), 'professor: resumo do treino');
 select is((select jsonb_agg(jsonb_build_array(x ->> 'nome', x -> 'n_treinos', x -> 'cartoes_por_caixa') order by x ->> 'nome')
              from tt, jsonb_array_elements(j -> 'alunos') x),
-  jsonb_build_array(jsonb_build_array('Ana', (select count(*) from treinos), '{"1": 2, "2": 1, "3": 0}'::jsonb),
+  jsonb_build_array(jsonb_build_array('Ana', (select count(*) from treinos_da_turma), '{"1": 2, "2": 1, "3": 0}'::jsonb),
                     jsonb_build_array('Bia', 0, '{"1": 0, "2": 0, "3": 0}'::jsonb)), 'professor: por aluno (Bia com zeros)');
 select is((select j -> 'conceitos' from tt),
   jsonb_build_array(
-    jsonb_build_object('conceito', 'Base', 'n_alunos_treinando', 1, 'treinos_7_dias', (select count(*) from treinos where 'Base' = any (conceitos))),
+    jsonb_build_object('conceito', 'Base', 'n_alunos_treinando', 1, 'treinos_7_dias', (select count(*) from treinos_da_turma where 'Base' = any (conceitos))),
     jsonb_build_object('conceito', 'Meio', 'n_alunos_treinando', 1, 'treinos_7_dias', 1),
     jsonb_build_object('conceito', 'Topo', 'n_alunos_treinando', 1, 'treinos_7_dias', 1)),
   'professor: alunos treinando por conceito');
 select is(treino_aluno_conceito('00000000-0000-4000-8000-00000000cf01', '00000000-0000-4000-8000-000000000f01', 'Base'),
-  jsonb_build_object('n_treinos', (select count(*) from treinos where 'Base' = any (conceitos)),
-                     'acertos', (select count(*) from treinos where 'Base' = any (conceitos) and acertou)),
+  jsonb_build_object('n_treinos', (select count(*) from treinos_da_turma where 'Base' = any (conceitos)),
+                     'acertos', (select count(*) from treinos_da_turma where 'Base' = any (conceitos) and acertou)),
   'histórico do conceito: treinou N vezes (X acertos)');
 
 select * from finish();
