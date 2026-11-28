@@ -31,6 +31,8 @@
 // pdfs/<hash>.pdf. Se já houver na tabela `geracoes` um resultado para o mesmo hash e os mesmos
 // parâmetros, ele volta na hora, sem chamar o Gemini, com reaproveitado = true. No reforço a chave
 // inclui o foco: foco_chave = sha256(conceitos normalizados + enunciados já publicados).
+// O envio do PDF ao Storage não derruba o pedido (_shared/pdf_storage.ts): já existe → ignora; senão
+// repete uma vez; se ainda falhar, a geração volta mesmo assim e só o reforço dela fica sem o PDF.
 // Erro:      { erro: "..." } com status 4xx/5xx.
 //
 // Autenticação: verify_jwt = true e só usuários logados (o professor no desktop). As tabelas e o
@@ -40,6 +42,7 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { type Usuario, usuarioDoPedido } from "../_shared/auth.ts";
 import { ErroGemini, gerarComReserva } from "../_shared/gemini.ts";
 import { blocoReforco, chaveFoco, lerConceitosFoco, validarFoco } from "../_shared/reforco.ts";
+import { garantirPdf, salvarPdf } from "../_shared/pdf_storage.ts";
 
 const TAMANHO_MAXIMO = 20 * 1024 * 1024;
 /** Limites da lista de conceitos da turma enviada à IA (o prompt não cresce sem controle). */
@@ -124,6 +127,9 @@ Deno.serve(async (req) => {
     if (!forcarNova) {
       const salvo = await buscarGeracao(supabase, parametros);
       if (salvo) {
+        // Se o PDF ficou fora do Storage numa geração anterior (falha do envio), guarda agora, sem
+        // atrasar a resposta: é o que permite o reforço a partir desta geração.
+        if (pdfEnviado) emSegundoPlano(garantirPdf(supabase, BUCKET, caminho, pdfEnviado));
         return json({
           conceitos: salvo.resultado.conceitos,
           questoes: salvo.resultado.questoes,
@@ -148,9 +154,10 @@ Deno.serve(async (req) => {
     // ~10 pedidos/min e 150 s por Edge Function). Para a demo da 1ª VA, conceitos e todas as
     // questões saem numa única chamada. Depois: 1 chamada para os conceitos e 1 por questão,
     // orquestradas pelo app ou por uma fila.
+    // salvarPdf nunca lança: uma falha do Storage não joga fora a chamada à IA (ver pdf_storage.ts).
     const [, resposta] = await Promise.all([
       // No reforço o PDF já está no Storage (foi de lá que veio).
-      reforco ? Promise.resolve() : salvarPdf(supabase, caminho, pdf),
+      reforco ? Promise.resolve() : salvarPdf(supabase, BUCKET, caminho, pdf),
       gerarComReserva<Atividade>({
         pdf,
         instrucaoSistema: INSTRUCAO_SISTEMA,
@@ -289,7 +296,12 @@ async function contextoReforco(supabase: Cliente, turmaId: string, foco: string[
 async function baixarPdf(supabase: Cliente, caminho: string): Promise<Uint8Array> {
   const { data, error } = await supabase.storage.from(BUCKET).download(caminho);
   if (error || !data) {
-    throw new ErroPedido("O PDF de origem deste conceito não está mais no servidor. Gere a partir do PDF.", 409);
+    throw new ErroPedido(
+      "O PDF de onde este conceito veio não está guardado no servidor (o envio falhou quando a " +
+        "atividade foi gerada). Para o reforço, gere de novo uma atividade com o mesmo PDF " +
+        "(com as mesmas opções ela volta na hora) e depois peça o reforço.",
+      409,
+    );
   }
   return new Uint8Array(await data.arrayBuffer());
 }
@@ -341,16 +353,12 @@ function clienteServico(): Cliente {
   );
 }
 
-/** Salva o PDF uma vez só: se pdfs/<hash>.pdf já existe, não envia de novo. */
-async function salvarPdf(supabase: Cliente, caminho: string, pdf: Uint8Array) {
-  const { error } = await supabase.storage.from(BUCKET).upload(caminho, pdf, {
-    contentType: "application/pdf",
-    upsert: false,
-  });
-  if (!error) return;
-  const status = String((error as { statusCode?: string | number }).statusCode ?? "");
-  if (status === "409" || /already exists|duplicate/i.test(error.message)) return;
-  throw new ErroPedido(`Não foi possível salvar o PDF no Storage: ${error.message}`, 500);
+/** Termina depois da resposta (EdgeRuntime.waitUntil); fora do Edge Runtime, só não espera. */
+function emSegundoPlano(tarefa: Promise<unknown>) {
+  const segura = tarefa.catch((e) => console.error("Tarefa em segundo plano falhou:", e));
+  // deno-lint-ignore no-explicit-any
+  const runtime = (globalThis as any).EdgeRuntime;
+  if (runtime?.waitUntil) runtime.waitUntil(segura);
 }
 
 async function buscarGeracao(supabase: Cliente, p: Parametros) {
