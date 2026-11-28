@@ -543,11 +543,16 @@ Os dois botões do painel do conceito no mapa da turma.
   comum do `teste.pdf` com 5 · mista · média continua vindo do cache (`reaproveitado: true`, sem tentativas na IA).
   Script de fluxo inteiro em produção: "Tudo certo" (Realtime incluído); o 1º reforço foi gerado pelo
   gemini-3.8-flash (3 questões, do básico ao elaborado, com os nomes de conceito da turma) e o 2º veio do cache.
-- Observado: o `teste.pdf` **não** tem cache para 5 · múltipla escolha · média (só 3 questões), apesar do guia do
-  avaliador pedir isso. Ao conferir, o pedido foi uma geração nova e falhou com 520 no envio do PDF ao Storage
-  (instabilidade da plataforma: o arquivo já existia; o envio normalmente dá 409, que é tratado). Como `salvarPdf`
-  e a chamada à IA correm em paralelo, uma falha do Storage descarta a chamada à IA (provavelmente gasta).
-  Melhoria possível (não feita): no caminho comum, ignorar falha do Storage quando o PDF já existe.
+- **Storage não derruba a geração** (27/11/2026, `_shared/pdf_storage.ts`, testes `pdf_storage_test.ts` com fetch
+  simulado): o envio do PDF corre junto com a IA e nunca lança. "Já existe" (409) ou falha com o arquivo já no
+  Storage (HEAD) → ignora; senão espera 2 s e reenvia uma vez; se falhar de novo, a geração volta ao professor e o
+  log diz "PDF ... NÃO foi salvo". Sem o PDF, o reforço dessa geração dá 409 explicando que é só gerar de novo com
+  o mesmo PDF: no acerto do cache, `garantirPdf` guarda o PDF que faltar (em segundo plano, `EdgeRuntime.waitUntil`).
+  Deploy da `gerar-atividade` feito; script de fluxo em produção: "Tudo certo". (Antes, um 520 no envio derrubava
+  o pedido e jogava fora a chamada à IA.)
+- **Cache da apresentação:** o `teste.pdf` com o padrão do desktop (5 · múltipla escolha · média) foi gerado em
+  27/11/2026 (reserva gemini-3.5-flash-lite, depois de dois 503 do principal; 67 s; 4 conceitos) e volta do cache em
+  ~3 s. Cópia da resposta em `amostras/resultado-mc-5-media.json`.
 
 Ainda não existe: correção das abertas, edição na Revisão, prazo/liberação na publicação, aba Materiais,
 histórico semanal.
