@@ -539,7 +539,15 @@ Os dois botões do painel do conceito no mapa da turma.
   fixo `TEXTO_REFAZER` diz o que acontece de verdade: um envio por sessão (`unique (sessao_id, aluno_id)`); para
   refazer, o professor abre outra sessão da atividade (mesmas questões, alternativas em outra ordem, respostas de
   novo no domínio estimado); encerrada a sessão, as de múltipla escolha vão para os flashcards. Sem "variantes".
-- **Ainda não aplicado em produção:** migration `20261201120000` e deploy de `turma-api` e `gerar-atividade`.
+- **Aplicado em produção em 27/11/2026** (migration antes do deploy de `turma-api` e `gerar-atividade`). Geração
+  comum do `teste.pdf` com 5 · mista · média continua vindo do cache (`reaproveitado: true`, sem tentativas na IA).
+  Script de fluxo inteiro em produção: "Tudo certo" (Realtime incluído); o 1º reforço foi gerado pelo
+  gemini-3.8-flash (3 questões, do básico ao elaborado, com os nomes de conceito da turma) e o 2º veio do cache.
+- Observado: o `teste.pdf` **não** tem cache para 5 · múltipla escolha · média (só 3 questões), apesar do guia do
+  avaliador pedir isso. Ao conferir, o pedido foi uma geração nova e falhou com 520 no envio do PDF ao Storage
+  (instabilidade da plataforma: o arquivo já existia; o envio normalmente dá 409, que é tratado). Como `salvarPdf`
+  e a chamada à IA correm em paralelo, uma falha do Storage descarta a chamada à IA (provavelmente gasta).
+  Melhoria possível (não feita): no caminho comum, ignorar falha do Storage quando o PDF já existe.
 
 Ainda não existe: correção das abertas, edição na Revisão, prazo/liberação na publicação, aba Materiais,
 histórico semanal.
