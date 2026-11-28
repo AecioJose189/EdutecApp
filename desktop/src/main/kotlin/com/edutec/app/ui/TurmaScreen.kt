@@ -134,8 +134,8 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 private val CantoCartao = FormaLg
 private val Espaco = Espaco4
-private val Abas = listOf(TurmaViewModel.ABA_GRAFO, "Atividades", "Materiais", "Estatísticas", "Turma")
-private val AbasProntas = setOf(TurmaViewModel.ABA_GRAFO, "Atividades", TurmaViewModel.ABA_ESTATISTICAS, "Turma")
+// Só abas que funcionam ("Materiais" saiu: não havia nada por trás dela).
+private val Abas = listOf(TurmaViewModel.ABA_GRAFO, "Atividades", TurmaViewModel.ABA_ESTATISTICAS, "Turma")
 
 /**
  * Tela de uma turma: grafo de conhecimento com o domínio estimado de cada conceito (dados reais da
@@ -191,7 +191,6 @@ fun TurmaScreen(
     /** Fase 5: "Ver alunos com dificuldade" do conceito. */
     onVerAlunos: (String) -> Unit = {},
 ) {
-    val avisar = LocalAvisar.current
     var explicarDominio by remember { mutableStateOf(false) }
     if (explicarDominio) DialogoDominioEstimado(onFechar = { explicarDominio = false })
 
@@ -227,9 +226,7 @@ fun TurmaScreen(
                 turma = turma,
                 expandido = expandido,
                 aba = aba,
-                onAba = {
-                    if (it in AbasProntas) onAba(it) else avisar("Aba \"$it\" ainda não implementada")
-                },
+                onAba = onAba,
                 onVoltar = onVoltar,
                 onNovaAtividade = { onNovaAtividade(emptySet()) },
                 onConvidar = onConvidar,

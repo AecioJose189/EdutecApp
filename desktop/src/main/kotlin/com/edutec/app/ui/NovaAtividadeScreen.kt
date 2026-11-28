@@ -45,8 +45,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -135,6 +133,17 @@ private const val QuantidadeMaxima = 10
 
 private enum class Origem { Grafo, Pdf }
 
+/**
+ * O que acontece de verdade quando o aluno refaz (conferido no banco): cada sessão aceita um envio por aluno
+ * (tentativas: unique sessao_id + aluno_id); para refazer, o professor abre outra sessão da mesma atividade
+ * (mesmas questões, alternativas em outra ordem, respostas de novo no domínio estimado). Encerrada a sessão,
+ * as de múltipla escolha entram nos flashcards. Não há "variantes" nem limite de tentativas configurável.
+ */
+internal const val TEXTO_REFAZER = "Em cada sessão em sala, o aluno envia as respostas uma vez. Para a turma " +
+    "refazer, abra outra sessão desta atividade: as mesmas questões, com as alternativas em outra ordem. " +
+    "Depois que a sessão é encerrada, as questões de múltipla escolha também ficam disponíveis para treino " +
+    "com flashcards."
+
 /** [valor] é o que a Edge Function gerar-atividade espera. */
 private enum class Formato(val titulo: String, val descricao: String, val adjetivo: String, val valor: String) {
     MultiplaEscolha("Múltipla escolha", "Correção e feedback imediatos", "de múltipla escolha", "multipla_escolha"),
@@ -200,7 +209,6 @@ fun NovaAtividadeScreen(
     var titulo by rememberSaveable { mutableStateOf("") }
     var quantidade by rememberSaveable { mutableIntStateOf(QuantidadePadrao) }
     var dificuldade by rememberSaveable { mutableStateOf("Média") }
-    var permitirRefazer by rememberSaveable { mutableStateOf(true) }
     var tempo by rememberSaveable { mutableStateOf("30 min") }
 
     fun abrirSeletorPdf() {
@@ -243,7 +251,6 @@ fun NovaAtividadeScreen(
                 Origem.Pdf -> pdf?.let { "o material \"${it.nome}\"" } ?: "o PDF que você enviar"
             }
         )
-        append(" · ${if (permitirRefazer) "refazer livre" else "tentativa única"}")
         append(" · ${if (tempo == "Sem limite") "sem limite de tempo" else tempo}")
         append(" · ${dificuldade.lowercase()}")
     }
@@ -290,8 +297,6 @@ fun NovaAtividadeScreen(
         }
         val painelLateral: @Composable (Modifier) -> Unit = { mod ->
             PainelTentativas(
-                permitirRefazer = permitirRefazer,
-                onPermitirRefazer = { permitirRefazer = it },
                 tempo = tempo,
                 onTempo = { tempo = it },
                 resumo = resumo,
@@ -309,7 +314,6 @@ fun NovaAtividadeScreen(
                                 quantidade = quantidade,
                                 formato = formato.valor,
                                 dificuldade = ValorDificuldade.getValue(dificuldade),
-                                permitirRefazer = permitirRefazer,
                                 tempoMinutos = tempo.removeSuffix(" min").toIntOrNull(),
                                 titulo = titulo.trim().ifBlank { tituloReforco(conceitosOrdenados) },
                                 turmaId = turma.id.ifBlank { null },
@@ -324,7 +328,6 @@ fun NovaAtividadeScreen(
                                 quantidade = quantidade,
                                 formato = formato.valor,
                                 dificuldade = ValorDificuldade.getValue(dificuldade),
-                                permitirRefazer = permitirRefazer,
                                 tempoMinutos = tempo.removeSuffix(" min").toIntOrNull(),
                                 titulo = titulo.trim(),
                                 turmaId = turma.id.ifBlank { null },
@@ -332,7 +335,6 @@ fun NovaAtividadeScreen(
                         )
                     }
                 },
-                onManual = { avisar("Criar questões manualmente (próxima etapa)") },
                 preencherAltura = expandido,
                 modifier = mod,
             )
@@ -935,15 +937,12 @@ private fun BotaoContador(simbolo: String, descricao: String, enabled: Boolean, 
 
 @Composable
 private fun PainelTentativas(
-    permitirRefazer: Boolean,
-    onPermitirRefazer: (Boolean) -> Unit,
     tempo: String,
     onTempo: (String) -> Unit,
     resumo: String,
     /** null = pode gerar; caso contrário, o botão fica desabilitado e o motivo aparece embaixo. */
     motivoDesabilitado: String?,
     onGerar: () -> Unit,
-    onManual: () -> Unit,
     preencherAltura: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -958,24 +957,8 @@ private fun PainelTentativas(
 
                 Surface(shape = FormaLg, color = MentaSuave, modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(Espaco4), verticalArrangement = Arrangement.spacedBy(Espaco2)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "Permitir refazer",
-                                color = Tinta, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Switch(
-                                checked = permitirRefazer,
-                                onCheckedChange = onPermitirRefazer,
-                                colors = SwitchDefaults.colors(checkedTrackColor = Primaria),
-                            )
-                        }
-                        Text(
-                            if (permitirRefazer) "Ligado: o aluno vê o feedback e pode refazer quantas vezes quiser, " +
-                                "sempre com variantes das questões."
-                            else "Desligado: o aluno responde uma única vez e vê o feedback ao final.",
-                            color = TintaSuave, fontSize = 14.sp,
-                        )
+                        Text("Refazer", color = Tinta, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        Text(TEXTO_REFAZER, color = TintaSuave, fontSize = 14.sp)
                     }
                 }
 
@@ -1036,12 +1019,6 @@ private fun PainelTentativas(
                     Text(motivo, color = TintaSuave, fontSize = 13.sp)
                 }
             }
-            Button(
-                onClick = onManual,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = FormaMd,
-                colors = ButtonDefaults.buttonColors(containerColor = MentaSuave, contentColor = Tinta),
-            ) { Text("Criar questões manualmente", fontWeight = FontWeight.SemiBold) }
         }
     }
 }

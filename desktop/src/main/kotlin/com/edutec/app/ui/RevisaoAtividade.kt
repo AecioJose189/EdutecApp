@@ -219,15 +219,13 @@ private fun formatarData(iso: String?): String {
 // ---------------------------------------------------------------------------
 
 /**
- * Configurações mínimas de publicação, vindas do formulário (refazer e tempo).
+ * Configurações mínimas de publicação, vindas do formulário (tempo por tentativa).
  * TODO: prazo de entrega e data de liberação para os alunos.
  */
 @Composable
 private fun BarraPublicar(estado: EstadoGeracao.Concluido, onPublicar: () -> Unit) {
     val pedido = estado.pedido
     val configuracao = buildString {
-        append(if (pedido.permitirRefazer) "Permitir refazer" else "Tentativa única")
-        append(" · ")
         append(pedido.tempoMinutos?.let { "$it min por tentativa" } ?: "sem limite de tempo")
     }
     val textos: @Composable (Modifier) -> Unit = { mod ->
